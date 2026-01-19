@@ -1,0 +1,116 @@
+@startuml UML_P3_Ranked_AFK_Disconnect_Activity
+
+title Activity Diagram - AFK/Disconnect Handling
+
+|#LightBlue|User|
+start
+
+|#LightGreen|System|
+:Game đang diễn ra;
+:Khởi động InactivityTimer (2 phút);
+:Khởi động ConnectionMonitor;
+
+fork
+    |#LightGreen|System|
+    :Theo dõi hoạt động người chơi;
+    
+    repeat
+        if (User thực hiện nước đi?) then (yes)
+            :Reset InactivityTimer về 2 phút;
+            :Ghi nhận thời gian hoạt động;
+        else (no)
+            :InactivityTimer giảm dần;
+        endif
+        
+        :Chờ;
+        
+    repeat while (InactivityTimer > 0?) is (yes)
+    -> no;
+    
+    |#LightGreen|System|
+    :InactivityTimer = 0;
+    :Đánh dấu AFK;
+    
+    if (Đã có nước đi nào?) then (yes)
+        :Kết thúc game;
+        :Xử thua do AFK;
+        
+        |#Pink|EloService|
+        :Tính toán Elo penalty;
+        :Người AFK: -Elo;
+        :Đối thủ: +Elo (full);
+        :Cập nhật vào DB;
+        
+        |#LightGreen|System|
+        :Tạo ForfeitRecord;
+        note right
+          Lý do: AFK_TIMEOUT
+          Thời gian: >2 phút không hoạt động
+        end note
+        
+    else (no - chưa đi nước nào)
+        :Hủy game;
+        :Không tính Elo;
+        note right
+          Nếu chưa đi nước nào
+          và trong 1 phút đầu
+          → không mất điểm
+        end note
+    endif
+    
+fork again
+    |#LightGreen|System|
+    :Theo dõi kết nối;
+    
+    repeat
+        :Kiểm tra connection status;
+        :Chờ heartbeat từ client;
+        
+        if (Nhận heartbeat?) then (yes)
+            :Kết nối OK;
+        else (no - timeout)
+            :Đánh dấu ngắt kết nối;
+            
+            |#LightGreen|System|
+            :Chờ reconnect (grace period 30s);
+            
+            if (Reconnect thành công?) then (yes)
+                :Phục hồi game;
+                :Tiếp tục chơi;
+            else (no)
+                :Kết thúc game;
+                :Xử thua do Disconnect;
+                
+                |#Pink|EloService|
+                :Tính toán Elo penalty;
+                :Người disconnect: -Elo;
+                :Đối thủ: +Elo;
+                :Cập nhật vào DB;
+                
+                |#LightGreen|System|
+                :Tạo ForfeitRecord;
+                note right
+                  Lý do: DISCONNECT
+                  Không thể kết nối lại
+                  trong 30 giây
+                end note
+                
+                detach
+            endif
+        endif
+        
+    repeat while (Game đang chơi?) is (yes)
+    
+end fork
+
+|#LightGreen|System|
+:Lưu Game History;
+:Cập nhật User Stats;
+
+|#LightBlue|User|
+:Nhận thông báo kết quả;
+:Xem lý do thua (nếu có);
+
+stop
+
+@enduml

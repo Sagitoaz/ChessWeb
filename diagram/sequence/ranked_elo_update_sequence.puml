@@ -1,0 +1,173 @@
+@startuml UML_P3_Ranked_Elo_Update_Sequence
+
+title Sequence Diagram - Game End & Elo Update
+
+actor "User A" as UserA
+participant "GameBoard" as Board
+participant "GameService" as GS
+participant "EloService" as Elo
+participant "API" as API
+database "DB" as DB
+participant "NotificationService" as NS
+actor "User B" as UserB
+
+== Game End ==
+
+UserA -> Board: Đi nước chiếu hết
+activate Board
+
+Board -> GS: makeMove(matchId, move)
+activate GS
+
+GS -> GS: validateMove(move)
+GS -> GS: updateBoardState()
+GS -> GS: checkGameEnd()
+
+alt Checkmate / Người chơi đầu hàng
+    
+    GS -> GS: determineWinner()
+    note right
+      result = {
+        winner: UserA,
+        loser: UserB,
+        reason: CHECKMATE
+      }
+    end note
+    
+else Hòa (Stalemate / Draw offer)
+    
+    GS -> GS: determineResult()
+    note right
+      result = {
+        winner: null,
+        reason: DRAW
+      }
+    end note
+    
+else AFK / Disconnect
+    
+    GS -> GS: forfeit(userId, reason)
+    note right
+      result = {
+        winner: opponent,
+        loser: userId,
+        reason: FORFEIT_AFK
+      }
+    end note
+    
+end
+
+== Update Elo ==
+
+GS -> Elo: calculateEloChange(matchId, result)
+activate Elo
+
+Elo -> API: GET /api/users/rating
+activate API
+
+API -> DB: SELECT rating\nFROM user_ratings\nWHERE userId IN (userA, userB)
+activate DB
+
+DB --> API: {userA: 1500, userB: 1450}
+deactivate DB
+
+API --> Elo: Current ratings
+deactivate API
+
+Elo -> Elo: Calculate expected scores
+note right
+  Expected score formula:
+  EA = 1 / (1 + 10^((RB-RA)/400))
+  EB = 1 / (1 + 10^((RA-RB)/400))
+  
+  Example:
+  RA = 1500, RB = 1450
+  EA = 0.57, EB = 0.43
+end note
+
+Elo -> Elo: Calculate actual scores
+note right
+  Win = 1.0
+  Draw = 0.5
+  Loss = 0.0
+  
+  SA = 1.0 (UserA thắng)
+  SB = 0.0 (UserB thua)
+end note
+
+Elo -> Elo: Calculate Elo changes
+note right
+  K-factor = 32 (for rated < 2400)
+  
+  ΔRA = K × (SA - EA)
+      = 32 × (1.0 - 0.57)
+      = 32 × 0.43 = +14
+  
+  ΔRB = K × (SB - EB)
+      = 32 × (0.0 - 0.43)
+      = 32 × (-0.43) = -14
+  
+  New ratings:
+  RA_new = 1500 + 14 = 1514
+  RB_new = 1450 - 14 = 1436
+end note
+
+Elo --> GS: {userA: +14, userB: -14}
+deactivate Elo
+
+== Save to Database ==
+
+GS -> API: POST /api/ranked/match/{matchId}/complete
+activate API
+
+API -> DB: BEGIN TRANSACTION
+activate DB
+
+API -> DB: UPDATE matches\nSET status='completed',\n    winner_id=userA,\n    end_time=NOW()\nWHERE matchId
+DB --> API: OK
+
+API -> DB: INSERT INTO elo_history\n(userId, matchId, oldRating,\n newRating, change, timestamp)
+note right
+  Ghi 2 bản ghi:
+  - UserA: 1500 → 1514 (+14)
+  - UserB: 1450 → 1436 (-14)
+end note
+DB --> API: OK
+
+API -> DB: UPDATE user_ratings\nSET rating=CASE\n  WHEN userId=userA THEN 1514\n  WHEN userId=userB THEN 1436\nEND\nWHERE userId IN (userA, userB)
+DB --> API: OK
+
+API -> DB: UPDATE user_stats\nSET wins=wins+1\nWHERE userId=userA
+DB --> API: OK
+
+API -> DB: UPDATE user_stats\nSET losses=losses+1\nWHERE userId=userB
+DB --> API: OK
+
+API -> DB: COMMIT
+deactivate DB
+
+API --> GS: Update successful
+deactivate API
+
+== Notify Players ==
+
+GS -> NS: notifyGameEnd(matchId, result)
+activate NS
+
+NS --> UserA: Game ended!\nYou won! (+14 Elo)\nNew rating: 1514
+NS --> UserB: Game ended!\nYou lost (-14 Elo)\nNew rating: 1436
+deactivate NS
+
+GS --> Board: Game completed
+deactivate GS
+
+Board --> UserA: Hiển thị kết quả\nvà thay đổi Elo
+deactivate Board
+
+note over DB
+  Tất cả thay đổi được thực hiện
+  trong một transaction để đảm bảo
+  tính nhất quán của dữ liệu
+end note
+
+@enduml
