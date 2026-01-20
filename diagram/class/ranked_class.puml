@@ -2,232 +2,104 @@
 
 title Class Diagram - Ranked Match Module
 
-package "Ranked Match System" {
-    
-    class RankedMatch {
-        - matchId: string
-        - player1Id: string
-        - player2Id: string
-        - mode: string = "ranked"
-        - status: MatchStatus
-        - startTime: DateTime
-        - endTime: DateTime
-        - winnerId: string
-        - result: GameResult
-        - forfeitReason: ForfeitReason
-        --
-        + start(): void
-        + end(result: GameResult): void
-        + forfeit(playerId: string, reason: ForfeitReason): void
-        + getOpponent(playerId: string): string
-        + getDuration(): number
-    }
-    
-    enum MatchStatus {
-        QUEUING
-        MATCHED
-        IN_GAME
-        PAUSED
-        FORFEITED
-        COMPLETED
-        CANCELLED
-    }
-    
-    enum GameResult {
-        PLAYER1_WIN
-        PLAYER2_WIN
-        DRAW
-        FORFEIT
-    }
-    
-    class Rating {
-        - ratingId: string
-        - userId: string
-        - mode: string = "ranked"
-        - currentRating: number
-        - peakRating: number
-        - gamesPlayed: number
-        - lastUpdated: DateTime
-        --
-        + updateRating(change: number): void
-        + getRating(): number
-        + getKFactor(): number
-        + calculateExpectedScore(opponentRating: number): number
-    }
-    
-    class EloRecord {
-        - recordId: string
-        - userId: string
-        - matchId: string
-        - oldRating: number
-        - newRating: number
-        - change: number
-        - opponentId: string
-        - opponentRating: number
-        - result: GameResult
-        - timestamp: DateTime
-        --
-        + getChange(): number
-        + getDetails(): object
-    }
-    
-    class Penalty {
-        - penaltyId: string
-        - userId: string
-        - matchId: string
-        - reason: ForfeitReason
-        - eloLoss: number
-        - timestamp: DateTime
-        - details: string
-        --
-        + apply(): void
-        + getDescription(): string
-    }
-    
-    enum ForfeitReason {
-        AFK_TIMEOUT
-        DISCONNECT
-        ABANDONMENT
-        CHEAT_DETECTED
-        NONE
-    }
-    
-    class Clock {
-        - clockId: string
-        - matchId: string
-        - player1Time: number = 600000
-        - player2Time: number = 600000
-        - currentTurn: string
-        - isRunning: boolean
-        - startTime: DateTime
-        --
-        + start(): void
-        + stop(): void
-        + switchTurn(): void
-        + getRemainingTime(playerId: string): number
-        + hasTimeLeft(playerId: string): boolean
-        + onTimeout(playerId: string): void
-    }
-    
-    class InactivityTimer {
-        - timerId: string
-        - matchId: string
-        - playerId: string
-        - maxInactivityMs: number = 120000
-        - lastActivityTime: DateTime
-        - isActive: boolean
-        --
-        + start(): void
-        + reset(): void
-        + stop(): void
-        + checkInactivity(): number
-        + onTimeout(): void
-    }
-    
-    class MatchQueue {
-        - queueId: string
-        - userId: string
-        - rating: number
-        - joinTime: DateTime
-        - status: QueueStatus
-        - preferences: object
-        --
-        + join(): void
-        + leave(): void
-        + updatePosition(): number
-        + isExpired(): boolean
-    }
-    
-    enum QueueStatus {
-        WAITING
-        MATCHED
-        EXPIRED
-        CANCELLED
-    }
+' ===== MAIN CLASSES =====
+
+class Match {
+    + id: int
+    + player1Id: int
+    + player2Id: int
+    + winnerId: int
+    + status: String
+    + startTime: DateTime
+    + endTime: DateTime
+    --
+    + start()
+    + end()
 }
 
-package "Core System" {
-    class User {
-        - userId: string
-        - username: string
-        - email: string
-        --
-        + getProfile(): Profile
-    }
-    
-    class Game {
-        - gameId: string
-        - matchId: string
-        - moves: Move[]
-        - currentFEN: string
-        --
-        + addMove(move: Move): void
-        + getPosition(): string
-    }
-    
-    class Move {
-        - moveId: string
-        - from: string
-        - to: string
-        - piece: string
-        - timestamp: DateTime
-    }
+class User {
+    + id: int
+    + username: String
+    + rating: int
+    + wins: int
+    + losses: int
+    + draws: int
 }
 
-' Relationships
-RankedMatch "1" -- "1" Clock : has >
-RankedMatch "1" -- "2" InactivityTimer : monitors >
-RankedMatch "1" -- "0..1" Penalty : may have >
-RankedMatch "1" -- "1" Game : creates >
-RankedMatch --> MatchStatus
-RankedMatch --> GameResult
-RankedMatch --> ForfeitReason
+class EloHistory {
+    + id: int
+    + matchId: int
+    + userId: int
+    + oldRating: int
+    + newRating: int
+    + change: int
+    + createdAt: DateTime
+}
 
-Rating "1" -- "*" EloRecord : history >
-Rating --> User
+class Clock {
+    + matchId: int
+    + player1Time: int
+    + player2Time: int
+    + currentTurn: int
+    --
+    + start()
+    + switchTurn()
+    + getRemaining(playerId): int
+}
 
-EloRecord --> RankedMatch
-EloRecord --> GameResult
+class InactivityTimer {
+    + matchId: int
+    + playerId: int
+    + lastActivity: DateTime
+    + maxSeconds: int = 120
+    --
+    + reset()
+    + isExpired(): bool
+}
 
-Penalty --> ForfeitReason
-Penalty --> User
-Penalty --> RankedMatch
+' ===== ENUMS =====
 
-InactivityTimer --> RankedMatch
+enum MatchStatus {
+    WAITING
+    PLAYING
+    FINISHED
+    CANCELLED
+}
 
-MatchQueue --> User
-MatchQueue --> QueueStatus
-MatchQueue "2" -- "1" RankedMatch : creates >
+enum ForfeitReason {
+    AFK
+    DISCONNECT
+    NONE
+}
 
-Game "1" *-- "*" Move : contains
+' ===== RELATIONSHIPS =====
 
-note right of RankedMatch
-  Đại diện cho một trận đấu xếp hạng
-  giữa 2 người chơi.
-  Quản lý trạng thái, thời gian, và kết quả.
+Match "1" -- "2" User : players
+Match "1" -- "1" Clock
+Match "1" -- "2" InactivityTimer
+Match "1" -- "*" EloHistory
+Match --> MatchStatus
+
+' ===== NOTES =====
+
+note right of Match
+  mode = "ranked"
+  Thời gian: 10 phút/người
 end note
 
 note right of Clock
-  Quản lý thời gian cho mỗi người chơi.
-  Mỗi bên có 10 phút (600000ms).
-  Tự động xử thua khi hết thời gian.
+  player1Time, player2Time
+  = 600000 ms (10 phút)
 end note
 
 note right of InactivityTimer
-  Theo dõi hoạt động của người chơi.
-  Timeout sau 2 phút (120000ms) không hoạt động.
-  Trigger forfeit nếu AFK quá lâu.
+  maxSeconds = 120 (2 phút)
+  Reset mỗi khi player đi nước
 end note
 
-note right of Rating
-  Lưu trữ Elo rating của người chơi.
-  K-factor thường là 32 cho người chơi thường.
-  Tính expected score theo công thức Elo.
-end note
-
-note right of EloRecord
-  Lịch sử thay đổi Elo sau mỗi trận.
-  Ghi lại rating cũ, mới, và số điểm thay đổi.
+note bottom of EloHistory
+  Lưu lịch sử thay đổi Elo
+  sau mỗi ván đấu ranked
 end note
 
 @enduml

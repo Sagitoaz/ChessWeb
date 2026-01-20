@@ -1,83 +1,37 @@
 @startuml UML_P3_Ranked_Queue_Activity
 
-title Activity Diagram - Ranked Queue Flow
+title Activity Diagram 1 - Ranked Game Flow
 
-|User|
 start
-:Nhấn "Tham gia Ranked";
-:Hiển thị màn hình chờ;
 
-|System|
-:Thêm User vào Queue;
-:Lưu thời gian vào queue;
+:User click "Tìm trận";
 
-|MatchmakingEngine|
-:Tìm kiếm đối thủ phù hợp;
-note right
-  Tìm kiếm dựa trên:
-  - Rating tương đương (±100 Elo)
-  - Thời gian chờ
-  - Độ ưu tiên
-end note
+:Thêm vào hàng đợi;
 
-if (Tìm thấy đối thủ?) then (yes)
-    :Tạo Ranked Match;
-    :Gán 2 người chơi vào match;
+:Tìm đối thủ (±100 Elo);
+
+if (Tìm thấy?) then (Có)
     
-    |System|
-    :Khởi tạo Game;
-    :Thiết lập Clock (10 phút/người);
-    :Thiết lập InactivityTimer (2 phút);
-    
-    |User|
-    :Nhận thông báo "Match Found";
-    :Chuyển đến Game Board;
-    
-    |System|
-    :Bắt đầu game;
+    :Tạo Match;
+    :Notify 2 players (WebSocket);
+    :Load Game Board;
+    :Start Clock (10 phút);
+    :Start Inactivity Timer (2 phút);
     
     repeat
-        |User|
-        :Đi nước cờ;
-        
-        |System|
-        :Reset InactivityTimer;
-        :Cập nhật Board Position;
+        :Player đi nước;
+        :Reset Inactivity Timer;
         :Gửi move cho đối thủ;
-        :Kiểm tra game kết thúc;
-        
-    repeat while (Game chưa kết thúc?) is (yes)
-    -> no;
+    repeat while (Game kết thúc?) is (Chưa)
     
-    |System|
-    :Xác định kết quả\n(Win/Lose/Draw);
-    
-    |EloService|
-    :Tính toán thay đổi Elo;
-    note right
-      Công thức Elo:
-      - Expected score
-      - Actual score
-      - K-factor
-      - New rating
-    end note
-    
-    :Cập nhật Rating vào DB;
-    
-    |System|
-    :Lưu Game History;
-    :Cập nhật User Stats;
-    
-    |User|
+    :Xác định Winner/Loser/Draw;
+    :Tính Elo: ΔR = K×(S-E);
+    :Lưu vào DB;
     :Hiển thị kết quả;
-    :Hiển thị thay đổi Elo;
     
-else (no - timeout)
-    |System|
-    :Gửi thông báo "Không tìm thấy";
+else (Không - Timeout)
     
-    |User|
-    :Có thể thử lại;
+    :Thông báo "Không tìm thấy";
     
 endif
 

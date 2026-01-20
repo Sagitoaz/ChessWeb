@@ -1,66 +1,55 @@
 @startuml UML_P3_Ranked_UseCase
 
-title Use Case Diagram - Ranked Match System
+title Use Case Diagram - Ranked Match (Thành viên 3)
 
 left to right direction
 
-actor "User\n(đã đăng nhập)" as User
-actor "Matchmaking\nEngine" as Engine <<system>>
+' ===== ACTORS =====
+actor "User" as User
 
-rectangle "Ranked Match System" {
-    usecase "Join Ranked Queue" as UC1
-    usecase "Match Found" as UC2
-    usecase "Play Ranked Game" as UC3
-    usecase "Make Move" as UC3_1
-    usecase "Auto Lose\n(AFK > 2 phút)" as UC4
-    usecase "Auto Lose\n(Disconnect)" as UC5
-    usecase "Game Over +\nUpdate Rating (Elo)" as UC6
-    usecase "View Ranked Rating" as UC7
-    usecase "Monitor Inactivity" as UC8 <<system>>
-    usecase "Calculate Elo Change" as UC9 <<system>>
+' ===== SYSTEM =====
+rectangle "Ranked Match" {
+    (Join Queue) as UC1
+    (Play Game) as UC2
+    (View Rating) as UC3
+    (Update Elo) as UC4
+    (Handle AFK) as UC5
+    (Handle Disconnect) as UC6
 }
 
-' User relationships
-User --> UC1 : Tham gia hàng đợi
-User --> UC3 : Chơi ván ranked
-User --> UC3_1 : Đi nước cờ
-User --> UC7 : Xem rating
+' ===== RELATIONSHIPS =====
+User --> UC1
+User --> UC2
+User --> UC3
 
-' System relationships
-Engine --> UC2 : Ghép cặp người chơi
-UC8 --> UC4 : Phát hiện AFK
-UC8 --> UC5 : Phát hiện disconnect
-UC9 --> UC6 : Tính toán Elo
+UC2 ..> UC4 : <<include>>
+UC5 ..> UC2 : <<extend>>
+UC6 ..> UC2 : <<extend>>
 
-' Includes and extends
-UC1 ..> UC2 : <<include>>
-UC2 ..> UC3 : <<include>>
-UC3 ..> UC3_1 : <<include>>
-UC3 ..> UC6 : <<include>>
+' ===== NOTES =====
+note right of UC1 : Vào hàng đợi, tìm đối thủ ±100 Elo
 
-UC3 <.. UC4 : <<extend>>
-UC3 <.. UC5 : <<extend>>
-
-UC6 ..> UC9 : <<include>>
-
-note right of UC4
-  Nếu người chơi không thao tác
-  trong 2 phút liên tiếp
-  → Xử thua tự động
+note right of UC2
+  Clock: 10 phút/người
+  Inactivity: 2 phút
 end note
 
-note right of UC5
-  Nếu mất kết nối
-  → Xử thua tự động
-  (trừ khi chưa đi nước nào 
-  và trong 1 phút đầu)
+note right of UC4 : Công thức: ΔR = K×(S-E), K=32
+
+note right of UC5 : Không thao tác >2 phút → Thua
+
+note right of UC6 : Mất kết nối >30s → Thua
+
+@enduml
+  - Không reconnect → Thua
+  - Trừ Elo
 end note
 
-note bottom of UC6
-  Cập nhật Elo theo chuẩn quốc tế
-  - Người thắng: +Elo
-  - Người thua: -Elo
-  - Hòa: điều chỉnh nhẹ
+' ===== BOUNDARY NOTE =====
+note top of "Hệ thống Ranked Match"
+  Chỉ User đã đăng nhập mới truy cập được
+  Database: matches, ratings, elo_history
+  Real-time: WebSocket
 end note
 
 @enduml

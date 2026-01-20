@@ -1,83 +1,55 @@
 @startuml UML_P3_Ranked_AFK_Disconnect_Activity
 
-title Activity Diagram - AFK/Disconnect Handling
+title Activity Diagram 2 - AFK/Disconnect Handling
 
-|#LightBlue|User|
 start
 
-|#LightGreen|System|
 :Game đang diễn ra;
-:Khởi động InactivityTimer (2 phút);
-:Khởi động ConnectionMonitor;
 
 fork
-    |#LightGreen|System|
-    :Theo dõi hoạt động người chơi;
+    :Monitor Inactivity;
     
-    repeat
-        if (User thực hiện nước đi?) then (yes)
-            :Reset InactivityTimer về 2 phút;
-            :Ghi nhận thời gian hoạt động;
-        else (no)
-            :InactivityTimer giảm dần;
-        endif
-        
-        :Chờ;
-        
-    repeat while (InactivityTimer > 0?) is (yes)
-    -> no;
+    while (Player có move?) is (Có)
+        :Reset timer = 120s;
+    endwhile (Không >120s)
     
-    |#LightGreen|System|
-    :InactivityTimer = 0;
-    :Đánh dấu AFK;
-    
-    if (Đã có nước đi nào?) then (yes)
-        :Kết thúc game;
-        :Xử thua do AFK;
-        
-        |#Pink|EloService|
-        :Tính toán Elo penalty;
-        :Người AFK: -Elo;
-        :Đối thủ: +Elo (full);
-        :Cập nhật vào DB;
-        
-        |#LightGreen|System|
-        :Tạo ForfeitRecord;
-        note right
-          Lý do: AFK_TIMEOUT
-          Thời gian: >2 phút không hoạt động
-        end note
-        
-    else (no - chưa đi nước nào)
-        :Hủy game;
-        :Không tính Elo;
-        note right
-          Nếu chưa đi nước nào
-          và trong 1 phút đầu
-          → không mất điểm
-        end note
-    endif
+    :AFK detected;
     
 fork again
-    |#LightGreen|System|
-    :Theo dõi kết nối;
+    :Monitor Connection;
     
-    repeat
-        :Kiểm tra connection status;
-        :Chờ heartbeat từ client;
-        
-        if (Nhận heartbeat?) then (yes)
-            :Kết nối OK;
-        else (no - timeout)
-            :Đánh dấu ngắt kết nối;
-            
-            |#LightGreen|System|
-            :Chờ reconnect (grace period 30s);
-            
-            if (Reconnect thành công?) then (yes)
-                :Phục hồi game;
-                :Tiếp tục chơi;
-            else (no)
+    while (Heartbeat OK?) is (Có)
+        :Connection OK;
+    endwhile (Mất >30s)
+    
+    :Disconnect detected;
+    
+end fork
+
+if (Có ít nhất 1 move?) then (Có)
+    
+    :Xử thua player vi phạm;
+    :Opponent thắng;
+    :Trừ Elo player thua;
+    :Cộng Elo opponent;
+    
+else (Không - chưa đi nước nào)
+    
+    if (Game < 1 phút?) then (Có)
+        :Hủy match;
+        :Không mất Elo;
+    else (Không)
+        :Xử thua bình thường;
+    endif
+    
+endif
+
+:Lưu kết quả vào DB;
+:Thông báo cho 2 players;
+
+stop
+
+@enduml
                 :Kết thúc game;
                 :Xử thua do Disconnect;
                 
