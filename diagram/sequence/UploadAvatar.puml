@@ -1,0 +1,110 @@
+@startuml UploadAvatarSequence
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam maxmessagesize 100
+skinparam sequenceParticipant underline
+
+title Sequence Diagram - Upload Avatar Flow
+
+actor "User" as User
+participant "Profile Page" as ProfilePage
+participant "Upload Service" as UploadService
+participant "Image Processor" as ImageProcessor
+participant "3rd-party API\n(Cloud Storage)" as CloudAPI
+participant "Profile Service" as ProfileService
+participant "Database" as DB
+
+User -> ProfilePage: Click "Chọn ảnh avatar"
+activate ProfilePage
+ProfilePage --> User: Mở file picker
+deactivate ProfilePage
+
+User -> ProfilePage: Chọn file ảnh từ thiết bị
+activate ProfilePage
+ProfilePage -> ProfilePage: Validate file\n(type, size, format)
+
+alt File không hợp lệ
+    ProfilePage --> User: Hiển thị lỗi:\n"File không đúng định dạng hoặc quá lớn"
+    deactivate ProfilePage
+    
+else File hợp lệ
+    ProfilePage --> User: Hiển thị preview ảnh
+    User -> ProfilePage: Click "Upload"
+    
+    ProfilePage -> UploadService: POST /api/upload/avatar\n{file, userId}
+    activate UploadService
+    
+    UploadService -> UploadService: Kiểm tra authentication
+    
+    UploadService -> ImageProcessor: processImage(file)
+    activate ImageProcessor
+    
+    ImageProcessor -> ImageProcessor: Resize to 512x512
+    ImageProcessor -> ImageProcessor: Compress (optimize quality)
+    ImageProcessor -> ImageProcessor: Generate thumbnail 128x128
+    ImageProcessor --> UploadService: {mainImage, thumbnail}
+    deactivate ImageProcessor
+    
+    UploadService -> CloudAPI: uploadFile(mainImage)
+    activate CloudAPI
+    CloudAPI -> CloudAPI: Store file in bucket
+    CloudAPI --> UploadService: {mainUrl, uploadId}
+    deactivate CloudAPI
+    
+    UploadService -> CloudAPI: uploadFile(thumbnail)
+    activate CloudAPI
+    CloudAPI -> CloudAPI: Store thumbnail
+    CloudAPI --> UploadService: {thumbnailUrl}
+    deactivate CloudAPI
+    
+    UploadService -> ProfileService: updateAvatar(userId, mainUrl, thumbnailUrl)
+    activate ProfileService
+    
+    ProfileService -> DB: SELECT avatarUrl FROM users WHERE id = userId
+    activate DB
+    DB --> ProfileService: oldAvatarUrl
+    deactivate DB
+    
+    ProfileService -> DB: UPDATE users SET avatarUrl = mainUrl,\navatarThumbnail = thumbnailUrl\nWHERE id = userId
+    activate DB
+    DB --> ProfileService: Updated successfully
+    deactivate DB
+    
+    alt Có avatar cũ
+        ProfileService -> CloudAPI: deleteFile(oldAvatarUrl)
+        activate CloudAPI
+        CloudAPI --> ProfileService: File deleted
+        deactivate CloudAPI
+    end
+    
+    ProfileService --> UploadService: {success: true, avatarUrl: mainUrl}
+    deactivate ProfileService
+    
+    UploadService --> ProfilePage: 200 OK\n{avatarUrl, thumbnailUrl}
+    deactivate UploadService
+    
+    ProfilePage -> ProfilePage: Cập nhật hiển thị avatar mới
+    ProfilePage --> User: Hiển thị thông báo:\n"Cập nhật avatar thành công"
+    deactivate ProfilePage
+end
+
+note right of CloudAPI
+  **3rd-party Cloud Storage:**
+  - AWS S3
+  - Cloudinary
+  - Firebase Storage
+  - Azure Blob Storage
+  
+  Trả về public URL để truy cập
+end note
+
+note left of ImageProcessor
+  **Image Processing:**
+  - Resize: 512x512 (main)
+  - Thumbnail: 128x128
+  - Format: WebP/PNG/JPG
+  - Max size: 5MB
+  - Compression: 80% quality
+end note
+
+@enduml

@@ -1,0 +1,122 @@
+@startuml AuthAndProfile
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<Main>> LightBlue
+  BorderColor<<Main>> Blue
+}
+
+actor "Người dùng" as User
+actor "API thứ 3\n(Cloud Storage)" as API
+
+rectangle "Hệ thống ChessWeb - Auth & Profile" {
+  
+  ' ========== AUTHENTICATION ==========
+  package "Authentication" {
+    usecase "Đăng ký\ntài khoản" as Register <<Main>>
+    usecase "Đăng nhập" as Login <<Main>>
+    usecase "Đăng xuất" as Logout <<Main>>
+    usecase "Quên mật khẩu" as ForgotPassword <<Main>>
+  }
+  
+  package "Register Details" #F8F8F8 {
+    usecase "Nhập thông tin\nđăng ký" as RegisterInput
+    usecase "Xác thực\nthông tin" as RegisterValidate
+    usecase "Kiểm tra\nusername/email" as CheckExist
+    usecase "Tạo tài khoản" as CreateAccount
+    usecase "Gửi email\nxác nhận" as SendEmail
+  }
+  
+  package "Login Details" #F8F8F8 {
+    usecase "Nhập thông tin\nđăng nhập" as LoginInput
+    usecase "Xác thực\nđăng nhập" as LoginValidate
+    usecase "Tạo session/\ntoken" as CreateSession
+  }
+  
+  ' ========== PROFILE ==========
+  package "Profile Management" {
+    usecase "Xem hồ sơ" as ViewProfile <<Main>>
+    usecase "Chỉnh sửa\nhồ sơ" as EditProfile <<Main>>
+    usecase "Tải lên\navatar" as UploadAvatar <<Main>>
+  }
+  
+  package "Profile Details" #F8F8F8 {
+    usecase "Hiển thị\nthông tin" as ShowInfo
+    usecase "Cập nhật\nthông tin" as UpdateInfo
+    usecase "Thay đổi\nmật khẩu" as ChangePassword
+    usecase "Upload ảnh\nlên API" as UploadToAPI
+  }
+  
+  ' ========== STATISTICS ==========
+  package "Statistics & Rating" {
+    usecase "Xem thống kê\ncá nhân" as ViewStats <<Main>>
+    usecase "Xem điểm\nxếp hạng" as ViewRating <<Main>>
+    usecase "Xem bảng\nxếp hạng" as ViewLeaderboard <<Main>>
+  }
+  
+  package "Stats Details" #F8F8F8 {
+    usecase "Hiển thị tỷ lệ\nthắng/thua/hòa" as ShowWinRate
+    usecase "Hiển thị rating\ntheo mode" as ShowRatingByMode
+    usecase "Hiển thị lịch sử\nrating" as ShowRatingHistory
+  }
+}
+
+' ========== USER CONNECTIONS ==========
+User -up-> Register
+User -up-> Login
+User -up-> ForgotPassword
+User -up-> Logout
+
+User --> ViewProfile
+User --> EditProfile
+User --> UploadAvatar
+
+User -down-> ViewStats
+User -down-> ViewRating
+User -down-> ViewLeaderboard
+
+' ========== REGISTER INCLUDES ==========
+Register ..> RegisterInput : <<include>>
+Register ..> RegisterValidate : <<include>>
+Register ..> CheckExist : <<include>>
+Register ..> CreateAccount : <<include>>
+Register <.. SendEmail : <<extend>>
+
+' ========== LOGIN INCLUDES ==========
+Login ..> LoginInput : <<include>>
+Login ..> LoginValidate : <<include>>
+Login ..> CreateSession : <<include>>
+
+' ========== PROFILE INCLUDES ==========
+ViewProfile ..> ShowInfo : <<include>>
+EditProfile ..> UpdateInfo : <<include>>
+EditProfile <.. ChangePassword : <<extend>>
+UploadAvatar ..> UploadToAPI : <<include>>
+UploadAvatar --> API
+
+' ========== STATS INCLUDES ==========
+ViewStats ..> ShowWinRate : <<include>>
+ViewRating ..> ShowRatingByMode : <<include>>
+ViewRating <.. ShowRatingHistory : <<extend>>
+
+note right of Register
+  Tạo tài khoản để:
+  - Lưu lịch sử ván đấu
+  - Theo dõi điểm xếp hạng
+  - Tham gia ranked, giải đấu
+  - Cá nhân hóa trải nghiệm
+end note
+
+note right of ViewRating
+  Rating (Elo) tính theo
+  chuẩn quốc tế, phân theo:
+  - Đấu với bot
+  - Đấu xếp hạng
+  - Giải đấu
+end note
+
+note bottom of API
+  Lưu ảnh vào
+  Cloud Storage
+end note
+
+@enduml

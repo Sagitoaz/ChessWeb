@@ -1,0 +1,87 @@
+@startuml LoginSequence
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam maxmessagesize 100
+skinparam sequenceParticipant underline
+
+title Sequence Diagram - Login Flow
+
+actor "Người dùng" as User
+participant "Login Page" as LoginPage
+participant "Auth Controller" as AuthController
+participant "Auth Service" as AuthService
+participant "Database" as DB
+participant "Session Manager" as Session
+
+User -> LoginPage: Truy cập trang đăng nhập
+activate LoginPage
+LoginPage --> User: Hiển thị form đăng nhập
+deactivate LoginPage
+
+User -> LoginPage: Nhập username/email và password
+activate LoginPage
+User -> LoginPage: Click "Đăng nhập"
+
+LoginPage -> AuthController: POST /api/auth/login\n{username, password}
+activate AuthController
+
+AuthController -> AuthService: validateCredentials(username, password)
+activate AuthService
+
+AuthService -> DB: findUserByUsername(username)
+activate DB
+DB --> AuthService: User data (có hash password)
+deactivate DB
+
+AuthService -> AuthService: comparePassword(password, hashedPassword)
+
+alt Sai mật khẩu
+    AuthService --> AuthController: Error: Invalid credentials
+    deactivate AuthService
+    AuthController --> LoginPage: 401 Unauthorized\n{"error": "Username hoặc password sai"}
+    deactivate AuthController
+    LoginPage --> User: Hiển thị lỗi: "Thông tin đăng nhập không đúng"
+    deactivate LoginPage
+    
+else Đăng nhập thành công
+    AuthService --> AuthController: Success: User validated
+    deactivate AuthService
+    
+    AuthController -> Session: createSession(userId)
+    activate Session
+    Session -> Session: Tạo JWT token hoặc session ID
+    Session -> DB: Lưu session vào database
+    activate DB
+    DB --> Session: Session saved
+    deactivate DB
+    Session --> AuthController: {sessionId, token, expiresAt}
+    deactivate Session
+    
+    AuthController -> DB: updateLastLogin(userId)
+    activate DB
+    DB --> AuthController: Updated
+    deactivate DB
+    
+    AuthController --> LoginPage: 200 OK\n{token, user: {id, username, avatar, rating}}
+    deactivate AuthController
+    
+    LoginPage -> LoginPage: Lưu token vào localStorage/cookie
+    LoginPage --> User: Chuyển hướng đến trang chủ/dashboard
+    deactivate LoginPage
+    
+    User -> LoginPage: Truy cập trang chủ
+    activate LoginPage
+    LoginPage --> User: Hiển thị trang với thông tin user
+    deactivate LoginPage
+end
+
+note right of Session
+  Session có thể sử dụng:
+  - JWT (stateless)
+  - Redis session store
+  - Database session
+  
+  Thời gian hết hạn: 7-30 ngày
+end note
+
+@enduml

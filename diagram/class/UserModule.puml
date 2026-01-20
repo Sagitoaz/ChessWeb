@@ -1,0 +1,177 @@
+@startuml UserModuleClass
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor LightYellow
+    BorderColor Black
+    ArrowColor Blue
+}
+
+title Class Diagram - User Module
+
+class User {
+    - id: int
+    - username: String {unique}
+    - email: String {unique}
+    - passwordHash: String
+    - displayName: String
+    - bio: String
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    - lastLoginAt: DateTime
+    - isActive: Boolean
+    - isVerified: Boolean
+    --
+    + register(username, email, password): User
+    + login(username, password): Session
+    + logout(): void
+    + verifyEmail(token): Boolean
+    + resetPassword(newPassword): void
+    + updateProfile(data): Boolean
+}
+
+class Session {
+    - id: int
+    - userId: int
+    - token: String
+    - refreshToken: String
+    - ipAddress: String
+    - userAgent: String
+    - createdAt: DateTime
+    - expiresAt: DateTime
+    - lastActivityAt: DateTime
+    - isActive: Boolean
+    --
+    + createSession(user): Session
+    + validateToken(token): Boolean
+    + refreshSession(): Session
+    + revokeSession(): void
+    + isExpired(): Boolean
+    + extendExpiration(): void
+}
+
+class Profile {
+    - id: int
+    - userId: int
+    - avatarUrl: String
+    - avatarThumbnail: String
+    - country: String
+    - language: String
+    - timezone: String
+    - preferences: JSON
+    - socialLinks: JSON
+    --
+    + updateAvatar(url, thumbnail): Boolean
+    + getAvatarUrl(): String
+    + updatePreferences(prefs): void
+    + getProfile(): Profile
+}
+
+class UserStats {
+    - id: int
+    - userId: int
+    - totalGames: Integer
+    - totalWins: Integer
+    - totalLosses: Integer
+    - totalDraws: Integer
+    - winRate: Float
+    - longestWinStreak: Integer
+    - currentStreak: Integer
+    - totalPlayTime: Integer
+    - lastUpdated: DateTime
+    --
+    + updateStats(gameResult): void
+    + getWinRate(): Float
+    + getTotalGames(): Integer
+    + getStats(): UserStats
+    + calculateWinRate(): Float
+}
+
+class Rating {
+    - id: int
+    - userId: int
+    - eloRanked: Integer
+    - eloBot: Integer
+    - eloTournament: Integer
+    - rankRanked: String
+    - rankBot: String
+    - rankTournament: String
+    - peakEloRanked: Integer
+    - peakEloBot: Integer
+    - peakEloTournament: Integer
+    - lastUpdated: DateTime
+    --
+    + updateEloRanked(opponent, result): Integer
+    + updateEloBot(botLevel, result): Integer
+    + updateEloTournament(opponent, result): Integer
+    + calculateNewElo(current, opponent, result): Integer
+    + getRank(elo): String
+    + getAllRatings(): Rating
+}
+
+class Game {
+    - id: int
+    - whitePlayerId: int
+    - blackPlayerId: int
+    - result: String
+    - gameMode: String
+    - pgn: String
+    - duration: Integer
+    - createdAt: DateTime
+    --
+    + createGame(): Game
+    + endGame(result): void
+    + saveGame(): Boolean
+}
+
+' Relationships
+User "1" -- "1" Profile : has
+User "1" -- "1" UserStats : has
+User "1" -- "1" Rating : has
+User "1" -- "0..*" Session : has
+User "1" -- "0..*" Game : plays
+
+Profile "1" *-- "1" User : belongs to
+UserStats "1" *-- "1" User : belongs to
+Rating "1" *-- "1" User : belongs to
+Session "0..*" o-- "1" User : belongs to
+Game "0..*" -- "2" User : involves
+
+note right of User
+  **Người dùng chính**
+  - Lưu thông tin đăng nhập
+  - Quản lý tài khoản
+  - Xác thực email
+end note
+
+note right of Session
+  **Quản lý phiên đăng nhập**
+  - JWT token hoặc session ID
+  - Hết hạn sau 7-30 ngày
+  - Có thể refresh token
+end note
+
+note right of Profile
+  **Hồ sơ cá nhân**
+  - Avatar lưu URL từ API thứ 3
+  - Thumbnail cho hiển thị nhanh
+  - Preferences: theme, language...
+end note
+
+note right of UserStats
+  **Thống kê ván đấu**
+  - Tổng số ván, thắng/thua/hòa
+  - Win rate = wins / totalGames
+  - Streak: chuỗi thắng liên tiếp
+end note
+
+note right of Rating
+  **Điểm Elo theo mode**
+  - eloRanked: Đấu xếp hạng
+  - eloBot: Đấu với bot
+  - eloTournament: Giải đấu
+  
+  Tính theo chuẩn quốc tế
+  Khởi tạo: 1000 điểm
+end note
+
+@enduml

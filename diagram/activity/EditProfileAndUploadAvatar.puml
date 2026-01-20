@@ -1,0 +1,98 @@
+@startuml EditProfileAndUploadAvatar
+skinparam defaultTextAlignment center
+skinparam ActivityBackgroundColor LightYellow
+skinparam ActivityBorderColor Black
+skinparam ActivityDiamondBackgroundColor LightBlue
+skinparam ActivityDiamondBorderColor Blue
+
+title Quy trình chỉnh sửa hồ sơ và tải lên avatar
+
+|Người dùng|
+start
+
+:Truy cập trang\nchỉnh sửa hồ sơ;
+
+:Xem thông tin hiện tại;
+
+partition "Chỉnh sửa thông tin" {
+  if (Có thay đổi thông tin?) then (Có)
+    :Cập nhật thông tin\nEmail, Tên, Bio;
+    
+    |Hệ thống|
+    :Validate thông tin mới;
+    
+    if (Thông tin hợp lệ?) then (Không)
+      #Pink :Hiển thị lỗi validation;
+      stop
+    else (Có)
+      if (Email thay đổi?) then (Có)
+        :Kiểm tra email\nđã tồn tại;
+        
+        if (Email đã được dùng?) then (Có)
+          #Pink :Thông báo lỗi\nEmail đã sử dụng;
+          stop
+        else (Không)
+          :Lưu thông tin\nvào database;
+          :Gửi email xác nhận;
+        endif
+      else (Không)
+        :Lưu thông tin\nvào database;
+      endif
+    endif
+  else (Không)
+  endif
+}
+
+partition "Upload Avatar" {
+  |Người dùng|
+  if (Có thay đổi avatar?) then (Có)
+    :Chọn file ảnh\ntừ thiết bị;
+    
+    |Hệ thống|
+    :Kiểm tra file;
+    
+    if (File hợp lệ?) then (Không)
+      #Pink :Hiển thị lỗi\nđịnh dạng/kích thước;
+      stop
+    else (Có)
+      :Preview ảnh;
+      
+      |Người dùng|
+      :Xác nhận upload;
+      
+      |Hệ thống|
+      :Nén và resize ảnh;
+      
+      |API Cloud Storage|
+      :Upload ảnh lên\nCloud Storage;
+      
+      if (Upload thành công?) then (Không)
+        #Pink :Thông báo lỗi upload;
+        stop
+      else (Có)
+        :Nhận URL ảnh;
+        
+        |Hệ thống|
+        if (Avatar cũ tồn tại?) then (Có)
+          :Xóa ảnh cũ;
+        endif
+        
+        :Lưu URL mới\nvào database;
+        #LightGreen :Cập nhật avatar\nthành công;
+      endif
+    endif
+  else (Không)
+  endif
+}
+
+|Hệ thống|
+if (Có thay đổi nào?) then (Có)
+  #LightGreen :Hiển thị thông báo\nCập nhật thành công;
+  :Làm mới trang;
+else (Không)
+  :Không có thay đổi;
+endif
+
+stop
+
+@enduml
