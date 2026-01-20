@@ -1,0 +1,32 @@
+@startuml
+title Activity A1 - Play vs Bot
+start
+
+:User chooses difficulty;
+:User starts bot game;
+:Initialize Game & Board from initial position;
+
+while (Game not finished?) is (yes)
+  :User makes a move;
+  :Validate move (legal?);
+
+  if (Move legal?) then (yes)
+    :Apply move to board;
+    :Check end condition\n(checkmate/stalemate/draw);
+    if (Game finished after user move?) then (yes)
+      break
+    endif
+
+    :Request bot move;
+    :Bot computes best move\n(Stockfish / engine);
+    :Apply bot move to board;
+    :Check end condition\n(checkmate/stalemate/draw);
+  else (no)
+    :Show invalid move message;
+  endif
+endwhile (no)
+
+:End game (result);
+:Save game to history\n(moves, result, timestamps, bot config);
+stop
+@enduml

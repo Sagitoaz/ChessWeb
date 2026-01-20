@@ -1,0 +1,44 @@
+@startuml
+title Use Case - Bot & Replay
+left to right direction
+
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor White
+  BorderColor Black
+}
+skinparam actorStyle awesome
+
+actor User
+
+package "Bot Module" {
+  usecase "Choose Bot\nDifficulty" as UC1
+  usecase "Start Bot Game" as UC2
+  usecase "Make Move" as UC3
+  usecase "Pause / Resume" as UC4
+  usecase "End Game\n(win/lose/draw)" as UC5
+  usecase "Save Game\n(History)" as UC6
+}
+
+package "Replay Module" {
+  usecase "View Replay" as UC7
+  usecase "Step Forward" as UC8
+  usecase "Step Backward" as UC9
+}
+
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC7
+User --> UC8
+User --> UC9
+
+UC3 ..> UC5: <<extend>>
+UC2 ..> UC1 : <<include>>
+UC5 ..> UC6 : <<include>>
+UC7 ..> UC6 : <<include>>
+UC7 ..> UC8 : <<include>>
+UC7 ..> UC9 : <<include>>
+
+@enduml

@@ -1,0 +1,37 @@
+@startuml
+title Activity A2 - Replay Flow
+start
+
+:User opens History;
+:Select a saved game;
+:Load game details + move list;
+
+:Create ReplaySession;
+:Set cursor = 0;
+:Render board at initial position;
+
+while (User still replaying?) is (yes)
+  if (User clicks Next?) then (yes)
+    if (cursor < lastMoveIndex) then (yes)
+      :cursor++;
+      :Apply move[cursor];
+      :Render board;
+    else (no)
+      :Already at end;
+    endif
+  elseif (User clicks Prev?) then (yes)
+    if (cursor > 0) then (yes)
+      :cursor--;
+      :Rebuild board\n(from initial + moves[0..cursor]);
+      :Render board;
+    else (no)
+      :Already at start;
+    endif
+  else (other)
+    :Idle / wait input;
+  endif
+endwhile (no)
+
+:Exit replay;
+stop
+@enduml
