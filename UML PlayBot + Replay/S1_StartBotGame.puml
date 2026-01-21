@@ -1,0 +1,75 @@
+@startuml
+title Sequence S1 - Start Bot Game & Get Bot Move (HTTP-aware)
+
+actor User
+boundary "GamePage(UI)" as GamePage
+control "GameService" as GameService
+control "BotService" as BotService
+entity "StockfishEngine" as Engine
+
+== Setup ==
+User -> GamePage : ChooseDifficulty(level)
+User -> GamePage : StartBotGame()
+GamePage -> GameService : POST /games/bot {level}
+
+alt 400 Bad Request
+  GameService --> GamePage : 400 Invalid difficulty
+  break
+else 201 Created
+  GameService -> BotService : setConfig(level)
+  BotService --> GameService : 200 OK
+  GameService --> GamePage : 201 gameCreated(gameId, initialFEN)
+end
+
+== Gameplay loop ==
+loop Each turn
+  User -> GamePage : MakeMove(move)
+  GamePage -> GameService : POST /games/{id}/move {move}
+
+  alt 401 Unauthorized
+    GameService --> GamePage : 401 Login required
+    break
+
+  else 403 Forbidden
+    GameService --> GamePage : 403 Not your game
+    break
+
+  else 400 Bad Request
+    GameService --> GamePage : 400 Illegal move
+    ' user retry
+
+  else 200 OK
+    GameService -> GameService : applyPlayerMove()
+
+    alt Game finished
+      GameService --> GamePage : 200 gameFinished(result)
+      break
+
+    else Bot turn
+      GameService -> BotService : requestBotMove(FEN)
+
+      BotService -> Engine : getBestMove(FEN)
+
+      alt 408 Request Timeout
+        Engine --> BotService : timeout
+        BotService --> GameService : 408 Timeout
+        GameService --> GamePage : 503 Bot unavailable
+        break
+
+      else 500 Internal Error
+        Engine --> BotService : crash
+        BotService --> GameService : 500 Engine error
+        GameService --> GamePage : 503 Bot unavailable
+        break
+
+      else 200 OK
+        Engine --> BotService : bestMove
+        BotService --> GameService : 200 bestMove
+        GameService -> GameService : applyBotMove()
+        GameService --> GamePage : 200 renderUpdate(FEN)
+      end
+    end
+  end
+end
+
+@enduml

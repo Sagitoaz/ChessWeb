@@ -15,8 +15,9 @@ while (Game not finished?) is (yes)
     :Check end condition\n(checkmate/stalemate/draw);
     if (Game finished after user move?) then (yes)
       break
+    else (no)
     endif
-
+    
     :Request bot move;
     :Bot computes best move\n(Stockfish / engine);
     :Apply bot move to board;

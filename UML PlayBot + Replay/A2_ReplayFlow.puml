@@ -1,37 +1,56 @@
 @startuml
-title Activity A2 - Replay Flow
+title Activity A2 - Replay Flow (Open -> Load -> Next/Prev -> Exit)
+
 start
 
 :User opens History;
-:Select a saved game;
-:Load game details + move list;
+:User selects a saved game;
 
-:Create ReplaySession;
-:Set cursor = 0;
-:Render board at initial position;
+:Request replay data (moves, initial position, meta);
 
-while (User still replaying?) is (yes)
-  if (User clicks Next?) then (yes)
-    if (cursor < lastMoveIndex) then (yes)
-      :cursor++;
-      :Apply move[cursor];
-      :Render board;
-    else (no)
-      :Already at end;
+if (Replay data loaded?) then (yes)
+  :Create ReplaySession;
+  :cursor = 0;
+  :Load initial position (initialFEN);
+  :Render board (initial);
+
+  repeat
+    :Wait for user action;
+
+    if (Action == Next) then (yes)
+      if (cursor < lastMoveIndex) then (yes)
+        :cursor++;
+        :Apply moves[cursor] (or apply next move);
+        :Render board;
+      else (no)
+        :Show "Already at end";
+      endif
+
+    elseif (Action == Prev) then (yes)
+      if (cursor > 0) then (yes)
+        :cursor--;
+        :Rebuild board from initial\n+ moves[1..cursor];
+        :Render board;
+      else (no)
+        :Show "Already at start";
+      endif
+
+    elseif (Action == Exit) then (yes)
+      break
+
+    else (other)
+      :No-op / keep waiting;
     endif
-  elseif (User clicks Prev?) then (yes)
-    if (cursor > 0) then (yes)
-      :cursor--;
-      :Rebuild board\n(from initial + moves[0..cursor]);
-      :Render board;
-    else (no)
-      :Already at start;
-    endif
-  else (other)
-    :Idle / wait input;
-  endif
-endwhile (no)
 
-:Exit replay;
+  repeat while (true)
+
+  :Close ReplaySession;
+  :Return to History;
+
+else (no)
+  :Show error / not found / permission denied;
+  :Return to History;
+endif
+
 stop
 @enduml
