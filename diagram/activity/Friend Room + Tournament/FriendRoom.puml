@@ -69,31 +69,41 @@ end fork
 |Hệ thống (System)|
 :Theo dõi diễn biến ván đấu;
 
-if (Ván đấu kết thúc?) then (Chiếu hết/Hết giờ/Hòa/Đầu hàng)
-  :Xác định kết quả;
-  :Lưu lịch sử ván đấu;
-  note right
-    Kết quả được lưu nhưng
-    KHÔNG ảnh hưởng xếp hạng
-  end note
-  :Cập nhật trạng thái phòng "Closed";
-  
-  |Chủ phòng (Host)|
-  if (Chơi tiếp?) then (Có)
-    :Nhấn "Tạo ván mới";
-    |Hệ thống (System)|
-    :Reset bàn cờ;
-    :Cập nhật trạng thái "Ready";
-  else (Không)
-    :Rời phòng;
-    |Hệ thống (System)|
-    :Đóng phòng;
-    stop
-  endif
-else (Đang chơi)
-  :Tiếp tục theo dõi;
-endif
+repeat
+  :Kiểm tra trạng thái trận đấu;
+repeat while (Ván đấu còn tiếp tục?) is (Có)
+->Kết thúc (Chiếu hết/Hết giờ/Hòa/Đầu hàng);
 
-stop
+:Xác định kết quả;
+:Lưu lịch sử ván đấu;
+note right
+  Kết quả được lưu nhưng
+  KHÔNG ảnh hưởng xếp hạng
+end note
+:Cập nhật trạng thái phòng "Closed";
+
+|Chủ phòng (Host)|
+if (Chơi tiếp?) then (Có)
+  :Nhấn "Tạo ván mới";
+  |Hệ thống (System)|
+  :Reset bàn cờ;
+  :Cập nhật trạng thái phòng "Ready";
+  :Bắt đầu đếm thời gian;
+  
+  fork
+    |Chủ phòng (Host)|
+    :Chơi cờ ván mới;
+  fork again
+    |Người chơi (Player)|
+    :Chơi cờ ván mới;
+  end fork
+  
+  detach
+else (Không)
+  :Rời phòng;
+  |Hệ thống (System)|
+  :Đóng phòng;
+  stop
+endif
 
 @enduml
