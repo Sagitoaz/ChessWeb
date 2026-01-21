@@ -1,0 +1,90 @@
+@startuml FriendRoom_Tournament_UseCase
+!theme plain
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+
+title Use Case Diagram - Friend Room + Tournament
+
+left to right direction
+
+' ============ ACTORS ============
+actor "Người chơi\n(Player)" as Player
+actor "Chủ phòng\n(Host)" as Host
+actor "Người tổ chức\n(Organizer)" as Organizer
+actor "Hệ thống\n(System)" as System
+
+Host -|> Player
+Organizer -|> Player
+
+' ============ FRIEND ROOM PACKAGE ============
+rectangle "Friend Room" as FriendRoom {
+    usecase "Tạo phòng\n(Create Room)" as UC_CreateRoom
+    usecase "Mời qua Code/Link\n(Invite via Code/Link)" as UC_Invite
+    usecase "Tham gia phòng\n(Join Room)" as UC_JoinRoom
+    usecase "Bắt đầu trận đấu\n(Start Match)" as UC_StartMatch
+    usecase "Kết thúc trận đấu\n(End Match)" as UC_EndMatch
+    usecase "Lưu lịch sử\n(Save History)" as UC_SaveHistory
+    usecase "Xác thực mã phòng\n(Validate Room Code)" as UC_ValidateCode
+    usecase "Kiểm tra phòng đầy\n(Check Room Full)" as UC_CheckFull
+}
+
+' ============ TOURNAMENT PACKAGE ============
+rectangle "Tournament" as Tournament {
+    usecase "Tạo giải đấu\n(Create Tournament)" as UC_CreateTournament
+    usecase "Công bố giải đấu\n(Publish Tournament)" as UC_Publish
+    usecase "Đăng ký tham gia\n(Join Tournament)" as UC_JoinTournament
+    usecase "Tạo bảng đấu\n(Generate Bracket)" as UC_GenerateBracket
+    usecase "Bắt đầu giải đấu\n(Start Tournament)" as UC_StartTournament
+    usecase "Cập nhật kết quả\n(Update Results)" as UC_UpdateResults
+    usecase "Chuyển vòng đấu\n(Advance Round)" as UC_AdvanceRound
+    usecase "Xem bảng xếp hạng\n(View Standings)" as UC_ViewStandings
+    usecase "Hủy giải đấu\n(Cancel Tournament)" as UC_CancelTournament
+}
+
+' ============ FRIEND ROOM RELATIONSHIPS ============
+Host --> UC_CreateRoom
+Host --> UC_Invite
+Host --> UC_StartMatch
+Player --> UC_JoinRoom
+Player --> UC_EndMatch
+
+UC_CreateRoom ..> UC_Invite : <<include>>
+UC_JoinRoom ..> UC_ValidateCode : <<include>>
+UC_JoinRoom ..> UC_CheckFull : <<include>>
+UC_EndMatch ..> UC_SaveHistory : <<include>>
+
+UC_ValidateCode <.. System
+UC_CheckFull <.. System
+UC_SaveHistory <.. System
+
+' ============ TOURNAMENT RELATIONSHIPS ============
+Organizer --> UC_CreateTournament
+Organizer --> UC_Publish
+Organizer --> UC_StartTournament
+Organizer --> UC_AdvanceRound
+Organizer --> UC_CancelTournament
+Player --> UC_JoinTournament
+Player --> UC_ViewStandings
+
+UC_StartTournament ..> UC_GenerateBracket : <<include>>
+UC_AdvanceRound ..> UC_UpdateResults : <<include>>
+UC_AdvanceRound ..> UC_GenerateBracket : <<include>>
+
+System --> UC_GenerateBracket
+System --> UC_UpdateResults
+
+' ============ NOTES ============
+note right of UC_SaveHistory
+  Lưu kết quả ván đấu
+  nhưng không ảnh hưởng
+  đến xếp hạng chung
+end note
+
+note right of UC_GenerateBracket
+  Hỗ trợ các thể thức:
+  - Loại trực tiếp
+  - Vòng tròn
+  - Nhiều vòng
+end note
+
+@enduml

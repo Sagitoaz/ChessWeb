@@ -1,0 +1,287 @@
+@startuml FriendRoom_Tournament_Class
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+
+title Class Diagram - Friend Room + Tournament Module
+
+' ============ ENUMS ============
+enum RoomStatus {
+    OPEN
+    READY
+    IN_MATCH
+    CLOSED
+}
+
+enum TournamentStatus {
+    DRAFT
+    PUBLISHED
+    REGISTRATION
+    RUNNING
+    COMPLETED
+    CANCELLED
+}
+
+enum TournamentFormat {
+    SINGLE_ELIMINATION
+    DOUBLE_ELIMINATION
+    ROUND_ROBIN
+    SWISS
+}
+
+enum MatchResult {
+    WHITE_WIN
+    BLACK_WIN
+    DRAW
+    ONGOING
+    CANCELLED
+}
+
+enum ParticipantStatus {
+    REGISTERED
+    ACTIVE
+    ELIMINATED
+    WITHDRAWN
+}
+
+' ============ ROOM CLASSES ============
+class Room {
+    - id: Long
+    - code: String
+    - hostId: Long
+    - guestId: Long
+    - status: RoomStatus
+    - timeControl: Integer
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + generateCode(): String
+    + isAvailable(): Boolean
+    + isFull(): Boolean
+    + addPlayer(playerId: Long): void
+    + removePlayer(playerId: Long): void
+    + startMatch(): void
+    + endMatch(): void
+}
+
+class RoomSettings {
+    - id: Long
+    - roomId: Long
+    - timePerPlayer: Integer
+    - incrementPerMove: Integer
+    - isRated: Boolean = false
+    --
+    + validate(): Boolean
+}
+
+' ============ TOURNAMENT CLASSES ============
+class Tournament {
+    - id: Long
+    - name: String
+    - description: String
+    - organizerId: Long
+    - status: TournamentStatus
+    - startTime: DateTime
+    - endTime: DateTime
+    - maxParticipants: Integer
+    - currentParticipants: Integer
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + publish(): void
+    + openRegistration(): void
+    + closeRegistration(): void
+    + start(): void
+    + complete(): void
+    + cancel(): void
+    + isRegistrationOpen(): Boolean
+    + isFull(): Boolean
+}
+
+class TournamentRule {
+    - id: Long
+    - tournamentId: Long
+    - format: TournamentFormat
+    - timeControl: Integer
+    - incrementPerMove: Integer
+    - roundsCount: Integer
+    - tiebreakRules: String
+    --
+    + validate(): Boolean
+    + calculateRoundsNeeded(participants: Integer): Integer
+}
+
+class Participant {
+    - id: Long
+    - tournamentId: Long
+    - userId: Long
+    - status: ParticipantStatus
+    - seedNumber: Integer
+    - registeredAt: DateTime
+    --
+    + withdraw(): void
+    + eliminate(): void
+    + isActive(): Boolean
+}
+
+class Round {
+    - id: Long
+    - tournamentId: Long
+    - roundNumber: Integer
+    - startTime: DateTime
+    - endTime: DateTime
+    - isCompleted: Boolean
+    --
+    + start(): void
+    + complete(): void
+    + getAllMatches(): List<Match>
+    + getPendingMatches(): List<Match>
+}
+
+class Pairing {
+    - id: Long
+    - roundId: Long
+    - whitePlayerId: Long
+    - blackPlayerId: Long
+    - matchId: Long
+    - tableNumber: Integer
+    --
+    + createMatch(): Match
+    + swapColors(): void
+}
+
+class Match {
+    - id: Long
+    - tournamentId: Long
+    - roundId: Long
+    - whitePlayerId: Long
+    - blackPlayerId: Long
+    - result: MatchResult
+    - pgn: String
+    - startTime: DateTime
+    - endTime: DateTime
+    - winnerId: Long
+    --
+    + start(): void
+    + end(result: MatchResult): void
+    + recordMove(move: String): void
+    + getWinner(): Long
+    + getDuration(): Duration
+}
+
+class Standings {
+    - id: Long
+    - tournamentId: Long
+    - participantId: Long
+    - rank: Integer
+    - points: Float
+    - wins: Integer
+    - losses: Integer
+    - draws: Integer
+    - buchholz: Float
+    - sonnebornBerger: Float
+    --
+    + addResult(result: MatchResult): void
+    + calculateTiebreakers(): void
+    + updateRank(newRank: Integer): void
+}
+
+' ============ USER CLASS (Reference) ============
+class User {
+    - id: Long
+    - username: String
+    - email: String
+    - rating: Integer
+    --
+    + getProfile(): UserProfile
+}
+
+' ============ GAME HISTORY ============
+class GameHistory {
+    - id: Long
+    - matchId: Long
+    - roomId: Long
+    - whitePlayerId: Long
+    - blackPlayerId: Long
+    - result: MatchResult
+    - pgn: String
+    - moves: List<String>
+    - playedAt: DateTime
+    - gameMode: String
+    --
+    + replayGame(): void
+    + exportPGN(): String
+}
+
+' ============ SERVICES ============
+class RoomService <<Service>> {
+    + createRoom(hostId: Long, settings: RoomSettings): Room
+    + joinRoom(code: String, playerId: Long): Room
+    + leaveRoom(code: String, playerId: Long): void
+    + startMatch(code: String): Match
+    + endMatch(code: String, result: MatchResult): void
+    + findRoomByCode(code: String): Room
+}
+
+class TournamentService <<Service>> {
+    + createTournament(dto: CreateTournamentDTO): Tournament
+    + publishTournament(id: Long): void
+    + startTournament(id: Long): void
+    + cancelTournament(id: Long): void
+    + registerParticipant(tournamentId: Long, userId: Long): void
+    + withdrawParticipant(tournamentId: Long, userId: Long): void
+    + advanceRound(tournamentId: Long): void
+}
+
+class BracketService <<Service>> {
+    + generateBracket(tournament: Tournament, participants: List<Participant>): List<Round>
+    + createSingleEliminationBracket(participants: List<Participant>): List<Round>
+    + createRoundRobinSchedule(participants: List<Participant>): List<Round>
+    + generateNextRoundPairings(round: Round, results: List<Match>): List<Pairing>
+}
+
+class StandingsService <<Service>> {
+    + initializeStandings(tournamentId: Long, participants: List<Participant>): void
+    + updateStandings(tournamentId: Long, matchResult: Match): void
+    + calculateRankings(tournamentId: Long): List<Standings>
+    + getLeaderboard(tournamentId: Long): List<Standings>
+}
+
+' ============ RELATIONSHIPS ============
+' Room relationships
+Room "1" -- "1" RoomSettings : has >
+Room "1" -- "0..1" Match : currentMatch >
+Room "1" -- "0..*" GameHistory : generates >
+Room "2" -- "1..*" User : players >
+
+' Tournament relationships
+Tournament "1" -- "1" TournamentRule : has >
+Tournament "1" -- "0..*" Participant : has >
+Tournament "1" -- "0..*" Round : contains >
+Tournament "1" -- "1..*" Standings : has >
+Tournament "1" -- "1" User : organizer >
+
+' Round and Match relationships
+Round "1" -- "0..*" Pairing : contains >
+Round "1" -- "0..*" Match : contains >
+Pairing "1" -- "1" Match : creates >
+
+' Participant relationships
+Participant "1" -- "1" User : is >
+Participant "1" -- "0..*" Match : plays >
+Participant "1" -- "1" Standings : has >
+
+' Match and GameHistory
+Match "1" -- "0..1" GameHistory : recorded in >
+
+' Service relationships
+RoomService ..> Room : manages
+RoomService ..> RoomSettings : uses
+TournamentService ..> Tournament : manages
+TournamentService ..> Participant : manages
+TournamentService ..> BracketService : uses
+BracketService ..> Round : creates
+BracketService ..> Pairing : creates
+StandingsService ..> Standings : manages
+
+@enduml

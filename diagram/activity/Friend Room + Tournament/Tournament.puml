@@ -1,0 +1,147 @@
+@startuml Tournament_Activity
+!theme plain
+skinparam activityBackgroundColor #E8F4FD
+skinparam activityBorderColor #1E88E5
+skinparam activityDiamondBackgroundColor #FFF3E0
+skinparam activityDiamondBorderColor #FF9800
+
+title Activity Diagram - Tournament Lifecycle
+|#LightCoral| Người tổ chức (Organizer) |
+|#LightGreen| Người chơi (Player) |
+|#LightYellow| Hệ thống (System) |
+
+|Người tổ chức (Organizer)|
+start
+:Nhấn "Tạo giải đấu";
+:Nhập thông tin giải đấu;
+note right
+  - Tên giải đấu
+  - Mô tả
+  - Thời gian bắt đầu
+  - Số người tham gia tối đa
+  - Thể thức (loại trực tiếp/vòng tròn)
+end note
+
+|Hệ thống (System)|
+:Tạo giải đấu với trạng thái "Draft";
+:Lưu thông tin giải đấu;
+
+|Người tổ chức (Organizer)|
+if (Sẵn sàng công bố?) then (Có)
+  :Nhấn "Công bố giải đấu";
+  
+  |Hệ thống (System)|
+  :Cập nhật trạng thái "Published";
+  :Hiển thị giải đấu trên danh sách công khai;
+  :Mở đăng ký tham gia;
+else (Không)
+  :Chỉnh sửa thêm thông tin;
+  :Nhấn "Công bố giải đấu";
+  |Hệ thống (System)|
+  :Cập nhật trạng thái "Published";
+endif
+
+' ============ REGISTRATION PHASE ============
+|Hệ thống (System)|
+:Bắt đầu giai đoạn đăng ký;
+:Trạng thái "Registration";
+
+|Người chơi (Player)|
+repeat
+  :Xem danh sách giải đấu;
+  :Chọn giải đấu muốn tham gia;
+  :Nhấn "Đăng ký tham gia";
+  
+  |Hệ thống (System)|
+  if (Còn slot trống?) then (Có)
+    :Thêm người chơi vào danh sách;
+    :Cập nhật số người đăng ký;
+    |Người chơi (Player)|
+    :Nhận thông báo đăng ký thành công;
+  else (Không)
+    :Thông báo "Giải đấu đã đủ người";
+    |Người chơi (Player)|
+  endif
+repeat while (Còn người đăng ký?) is (Có)
+->Không;
+
+|Người tổ chức (Organizer)|
+if (Đủ số người tối thiểu?) then (Có)
+  :Nhấn "Bắt đầu giải đấu";
+else (Không)
+  if (Hủy giải đấu?) then (Có)
+    |Hệ thống (System)|
+    :Cập nhật trạng thái "Cancelled";
+    :Thông báo đến người đăng ký;
+    stop
+  else (Không)
+    :Đợi thêm người đăng ký;
+    :Nhấn "Bắt đầu giải đấu";
+  endif
+endif
+
+' ============ TOURNAMENT RUNNING ============
+|Hệ thống (System)|
+:Cập nhật trạng thái "Running";
+:Đóng đăng ký;
+
+partition "Tạo bảng đấu" {
+  if (Thể thức?) then (Loại trực tiếp)
+    :Tạo bracket loại trực tiếp;
+    :Ghép cặp ngẫu nhiên;
+  else (Vòng tròn)
+    :Tạo lịch thi đấu vòng tròn;
+    :Mỗi người đấu với tất cả;
+  endif
+}
+
+:Khởi tạo bảng xếp hạng (Standings);
+:Thông báo lịch thi đấu đến người chơi;
+
+' ============ ROUNDS LOOP ============
+repeat
+  |Hệ thống (System)|
+  :Bắt đầu vòng đấu mới;
+  :Tạo các trận đấu theo cặp;
+  
+  fork
+    |Người chơi (Player)|
+    :Tham gia trận đấu;
+    :Chơi cờ;
+  fork again
+    |Người chơi (Player)|
+    :Tham gia trận đấu;
+    :Chơi cờ;
+  end fork
+  
+  |Hệ thống (System)|
+  :Thu thập kết quả trận đấu;
+  :Cập nhật điểm số;
+  :Cập nhật bảng xếp hạng;
+  
+  |Người tổ chức (Organizer)|
+  :Xem kết quả vòng đấu;
+  
+  |Người chơi (Player)|
+  :Xem bảng xếp hạng;
+
+repeat while (Còn vòng đấu tiếp theo?) is (Có)
+->Không;
+
+' ============ TOURNAMENT END ============
+|Hệ thống (System)|
+:Xác định người thắng cuộc;
+:Cập nhật trạng thái "Completed";
+:Lưu kết quả giải đấu;
+:Cập nhật thống kê người chơi;
+
+|Người chơi (Player)|
+:Xem kết quả cuối cùng;
+:Xem thứ hạng của mình;
+
+|Người tổ chức (Organizer)|
+:Xem báo cáo giải đấu;
+
+stop
+
+@enduml

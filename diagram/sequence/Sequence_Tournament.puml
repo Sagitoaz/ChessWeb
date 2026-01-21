@@ -1,0 +1,242 @@
+@startuml Sequence_Tournament
+!theme plain
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Tournament: Start → Generate Pairings → Create Matches → Update Standings
+
+actor "Người tổ chức\n(Organizer)" as Organizer
+actor "Người chơi 1\n(Player1)" as Player1
+actor "Người chơi 2\n(Player2)" as Player2
+participant "Frontend\n(UI)" as UI
+participant "TournamentController" as TournCtrl
+participant "TournamentService" as TournSvc
+participant "BracketService" as BracketSvc
+participant "MatchService" as MatchSvc
+participant "StandingsService" as StandSvc
+participant "TournamentRepository" as TournRepo
+participant "MatchRepository" as MatchRepo
+database "Database" as DB
+
+' ============ START TOURNAMENT ============
+== Bắt đầu giải đấu (Start Tournament) ==
+
+Organizer -> UI : Nhấn "Bắt đầu giải đấu"
+activate UI
+
+UI -> TournCtrl : POST /api/tournaments/{id}/start
+activate TournCtrl
+
+TournCtrl -> TournSvc : startTournament(tournamentId)
+activate TournSvc
+
+TournSvc -> TournRepo : findById(tournamentId)
+activate TournRepo
+TournRepo -> DB : SELECT * FROM tournaments
+DB --> TournRepo : Tournament
+TournRepo --> TournSvc : Tournament
+deactivate TournRepo
+
+TournSvc -> TournSvc : validateTournament()
+note right
+  Kiểm tra:
+  - Đủ số người tối thiểu
+  - Trạng thái = REGISTRATION
+  - Organizer hợp lệ
+end note
+
+TournSvc -> TournRepo : updateStatus(RUNNING)
+activate TournRepo
+TournRepo -> DB : UPDATE status = 'RUNNING'
+TournRepo --> TournSvc : OK
+deactivate TournRepo
+
+|||
+
+' ============ GENERATE BRACKET ============
+== Tạo bảng đấu (Generate Bracket/Pairings) ==
+
+TournSvc -> BracketSvc : generateBracket(tournament, participants)
+activate BracketSvc
+
+BracketSvc -> BracketSvc : shuffleParticipants()
+note right: Xáo trộn ngẫu nhiên\nđể ghép cặp công bằng
+
+alt Thể thức Loại trực tiếp (Single Elimination)
+    BracketSvc -> BracketSvc : createSingleEliminationBracket()
+    note right
+      8 người → 4 trận vòng 1
+      4 người → 2 trận vòng 2
+      2 người → 1 trận chung kết
+    end note
+    
+else Thể thức Vòng tròn (Round Robin)
+    BracketSvc -> BracketSvc : createRoundRobinSchedule()
+    note right
+      Mỗi người đấu với
+      tất cả người còn lại
+    end note
+end
+
+BracketSvc --> TournSvc : List<Round> with Pairings
+deactivate BracketSvc
+
+TournSvc -> TournRepo : saveRounds(rounds)
+activate TournRepo
+TournRepo -> DB : INSERT INTO rounds, pairings
+TournRepo --> TournSvc : OK
+deactivate TournRepo
+
+|||
+
+' ============ CREATE MATCHES FOR ROUND 1 ============
+== Tạo các trận đấu vòng 1 (Create Matches) ==
+
+TournSvc -> MatchSvc : createMatchesForRound(round1)
+activate MatchSvc
+
+loop Với mỗi cặp đấu trong vòng
+    MatchSvc -> MatchSvc : createMatch(pairing)
+    MatchSvc -> MatchRepo : save(match)
+    activate MatchRepo
+    MatchRepo -> DB : INSERT INTO matches
+    MatchRepo --> MatchSvc : Match
+    deactivate MatchRepo
+end
+
+MatchSvc --> TournSvc : List<Match>
+deactivate MatchSvc
+
+' ============ INITIALIZE STANDINGS ============
+TournSvc -> StandSvc : initializeStandings(participants)
+activate StandSvc
+StandSvc -> DB : INSERT INTO standings\n(points=0, wins=0, losses=0)
+StandSvc --> TournSvc : List<Standing>
+deactivate StandSvc
+
+TournSvc --> TournCtrl : TournamentStarted{rounds, matches}
+deactivate TournSvc
+
+TournCtrl --> UI : 200 OK\n{tournament, currentRound, matches}
+deactivate TournCtrl
+
+UI --> Organizer : Hiển thị bảng đấu
+UI --> Player1 : Thông báo trận đấu
+UI --> Player2 : Thông báo trận đấu
+
+deactivate UI
+
+|||
+
+' ============ PLAY MATCH ============
+== Chơi trận đấu (Play Match) ==
+
+Player1 -> UI : Vào trận đấu
+Player2 -> UI : Vào trận đấu
+activate UI
+
+note over Player1, Player2
+    Trận đấu diễn ra qua WebSocket
+    (giống Friend Room)
+end note
+
+... Trận đấu diễn ra ...
+
+UI -> MatchSvc : Kết thúc trận\n{matchId, result}
+activate MatchSvc
+
+MatchSvc -> MatchRepo : updateResult(matchId, result)
+activate MatchRepo
+MatchRepo -> DB : UPDATE matches SET\nresult = ?, winnerId = ?
+MatchRepo --> MatchSvc : Match
+deactivate MatchRepo
+
+MatchSvc --> UI : Match completed
+deactivate MatchSvc
+
+|||
+
+' ============ UPDATE STANDINGS ============
+== Cập nhật bảng xếp hạng (Update Standings) ==
+
+UI -> TournCtrl : POST /api/tournaments/{id}/update-standings
+activate TournCtrl
+
+TournCtrl -> StandSvc : updateStandings(tournamentId, matchResult)
+activate StandSvc
+
+StandSvc -> StandSvc : calculatePoints(result)
+note right
+  Thắng: +1 điểm
+  Hòa: +0.5 điểm
+  Thua: +0 điểm
+end note
+
+StandSvc -> DB : UPDATE standings SET\npoints = points + ?,\nwins = wins + ?,\nlosses = losses + ?
+DB --> StandSvc : OK
+
+StandSvc -> StandSvc : recalculateRankings()
+StandSvc -> DB : UPDATE standings SET rank = ?
+DB --> StandSvc : OK
+
+StandSvc --> TournCtrl : Updated Standings
+deactivate StandSvc
+
+TournCtrl --> UI : 200 OK\n{standings}
+deactivate TournCtrl
+
+UI --> Player1 : Hiển thị bảng xếp hạng mới
+UI --> Player2 : Hiển thị bảng xếp hạng mới
+UI --> Organizer : Hiển thị bảng xếp hạng mới
+
+deactivate UI
+
+|||
+
+' ============ ADVANCE ROUND ============
+== Chuyển vòng đấu (Advance Round) ==
+
+Organizer -> UI : Xác nhận kết thúc vòng
+activate UI
+
+UI -> TournCtrl : POST /api/tournaments/{id}/advance-round
+activate TournCtrl
+
+TournCtrl -> TournSvc : advanceRound(tournamentId)
+activate TournSvc
+
+alt Còn vòng đấu tiếp theo
+    TournSvc -> BracketSvc : generateNextRoundPairings(winners)
+    activate BracketSvc
+    BracketSvc --> TournSvc : Pairings for next round
+    deactivate BracketSvc
+    
+    TournSvc -> MatchSvc : createMatchesForRound(nextRound)
+    activate MatchSvc
+    MatchSvc --> TournSvc : List<Match>
+    deactivate MatchSvc
+    
+    TournSvc --> TournCtrl : NextRound{matches}
+    TournCtrl --> UI : 200 OK\n{nextRound, matches}
+    
+else Giải đấu kết thúc
+    TournSvc -> TournSvc : determineFinalRankings()
+    TournSvc -> TournRepo : updateStatus(COMPLETED)
+    activate TournRepo
+    TournRepo -> DB : UPDATE status = 'COMPLETED'
+    TournRepo --> TournSvc : OK
+    deactivate TournRepo
+    
+    TournSvc --> TournCtrl : TournamentCompleted{finalStandings, winner}
+    deactivate TournSvc
+    TournCtrl --> UI : 200 OK\n{status: COMPLETED, winner}
+    deactivate TournCtrl
+    
+    UI --> Organizer : Hiển thị kết quả cuối cùng
+    UI --> Player1 : Hiển thị thứ hạng
+    UI --> Player2 : Hiển thị thứ hạng
+end
+
+deactivate UI
+
+@enduml

@@ -1,0 +1,99 @@
+@startuml FriendRoom_Activity
+!theme plain
+skinparam activityBackgroundColor #E8F4FD
+skinparam activityBorderColor #1E88E5
+skinparam activityDiamondBackgroundColor #FFF3E0
+skinparam activityDiamondBorderColor #FF9800
+
+title Activity Diagram - Friend Room Flow
+|#LightBlue| Chủ phòng (Host) |
+|#LightGreen| Người chơi (Player) |
+|#LightYellow| Hệ thống (System) |
+
+|Chủ phòng (Host)|
+start
+:Nhấn "Tạo phòng";
+:Chọn cài đặt phòng
+(thời gian, luật chơi);
+
+|Hệ thống (System)|
+:Tạo mã phòng duy nhất;
+:Khởi tạo phòng với trạng thái "Open";
+:Hiển thị mã phòng và link mời;
+
+|Chủ phòng (Host)|
+:Chia sẻ mã phòng/link cho bạn bè;
+
+|Người chơi (Player)|
+:Nhận mã phòng/link;
+:Nhập mã phòng hoặc click link;
+
+|Hệ thống (System)|
+if (Mã phòng hợp lệ?) then (Có)
+  if (Phòng còn chỗ?) then (Có)
+    :Cho phép tham gia phòng;
+    :Cập nhật trạng thái phòng "Ready";
+  else (Không)
+    :Thông báo "Phòng đã đầy";
+    |Người chơi (Player)|
+    stop
+  endif
+else (Không)
+  :Thông báo "Mã phòng không hợp lệ";
+  |Người chơi (Player)|
+  stop
+endif
+
+|Chủ phòng (Host)|
+:Thấy người chơi đã vào phòng;
+if (Sẵn sàng bắt đầu?) then (Có)
+  :Nhấn "Bắt đầu trận đấu";
+else (Không)
+  :Đợi người chơi sẵn sàng;
+  :Nhấn "Bắt đầu trận đấu";
+endif
+
+|Hệ thống (System)|
+:Cập nhật trạng thái phòng "InMatch";
+:Khởi tạo bàn cờ;
+:Bắt đầu đếm thời gian;
+
+fork
+  |Chủ phòng (Host)|
+  :Chơi cờ;
+fork again
+  |Người chơi (Player)|
+  :Chơi cờ;
+end fork
+
+|Hệ thống (System)|
+:Theo dõi diễn biến ván đấu;
+
+if (Ván đấu kết thúc?) then (Chiếu hết/Hết giờ/Hòa/Đầu hàng)
+  :Xác định kết quả;
+  :Lưu lịch sử ván đấu;
+  note right
+    Kết quả được lưu nhưng
+    KHÔNG ảnh hưởng xếp hạng
+  end note
+  :Cập nhật trạng thái phòng "Closed";
+  
+  |Chủ phòng (Host)|
+  if (Chơi tiếp?) then (Có)
+    :Nhấn "Tạo ván mới";
+    |Hệ thống (System)|
+    :Reset bàn cờ;
+    :Cập nhật trạng thái "Ready";
+  else (Không)
+    :Rời phòng;
+    |Hệ thống (System)|
+    :Đóng phòng;
+    stop
+  endif
+else (Đang chơi)
+  :Tiếp tục theo dõi;
+endif
+
+stop
+
+@enduml
