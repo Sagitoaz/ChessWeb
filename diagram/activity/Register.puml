@@ -52,7 +52,7 @@ partition "Create Account" {
   :Tạo bản ghi\ntài khoản mới;
   
   :Khởi tạo thông tin\nmặc định:
-  - Rating = 1000
+  - Rating = 500
   - Avatar mặc định
   - Stats = 0;
   
@@ -81,7 +81,7 @@ note right
   - Password phải tối thiểu 8 ký tự
   - Có chứa chữ hoa, chữ thường, số
   - Email verification có thể bất đồng bộ
-  - Rating khởi tạo: 1000 (chuẩn Elo)
+  - Rating khởi tạo: 500 Elo
 end note
 
 @enduml

@@ -171,7 +171,7 @@ note right of Rating
   - eloTournament: Giải đấu
   
   Tính theo chuẩn quốc tế
-  Khởi tạo: 1000 điểm
+  Khởi tạo: 500 Elo
 end note
 
 @enduml

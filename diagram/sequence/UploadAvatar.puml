@@ -23,69 +23,198 @@ User -> ProfilePage: Chọn file ảnh từ thiết bị
 activate ProfilePage
 ProfilePage -> ProfilePage: Validate file\n(type, size, format)
 
-alt File không hợp lệ
-    ProfilePage --> User: Hiển thị lỗi:\n"File không đúng định dạng hoặc quá lớn"
+alt File không hợp lệ - định dạng sai
+    ProfilePage --> User: Hiển thị lỗi:\n"File phải là JPG, PNG, GIF hoặc WebP"
+    deactivate ProfilePage
+    
+else File không hợp lệ - quá lớn
+    ProfilePage --> User: Hiển thị lỗi:\n"Kích thước file tối đa 5MB"
     deactivate ProfilePage
     
 else File hợp lệ
     ProfilePage --> User: Hiển thị preview ảnh
     User -> ProfilePage: Click "Upload"
     
-    ProfilePage -> UploadService: POST /api/upload/avatar\n{file, userId}
+    ProfilePage -> UploadService: POST /api/upload/avatar\n{file, userId, token}
     activate UploadService
     
-    UploadService -> UploadService: Kiểm tra authentication
+    UploadService -> UploadService: Kiểm tra authentication token
     
-    UploadService -> ImageProcessor: processImage(file)
-    activate ImageProcessor
-    
-    ImageProcessor -> ImageProcessor: Resize to 512x512
-    ImageProcessor -> ImageProcessor: Compress (optimize quality)
-    ImageProcessor -> ImageProcessor: Generate thumbnail 128x128
-    ImageProcessor --> UploadService: {mainImage, thumbnail}
-    deactivate ImageProcessor
-    
-    UploadService -> CloudAPI: uploadFile(mainImage)
-    activate CloudAPI
-    CloudAPI -> CloudAPI: Store file in bucket
-    CloudAPI --> UploadService: {mainUrl, uploadId}
-    deactivate CloudAPI
-    
-    UploadService -> CloudAPI: uploadFile(thumbnail)
-    activate CloudAPI
-    CloudAPI -> CloudAPI: Store thumbnail
-    CloudAPI --> UploadService: {thumbnailUrl}
-    deactivate CloudAPI
-    
-    UploadService -> ProfileService: updateAvatar(userId, mainUrl, thumbnailUrl)
-    activate ProfileService
-    
-    ProfileService -> DB: SELECT avatarUrl FROM users WHERE id = userId
-    activate DB
-    DB --> ProfileService: oldAvatarUrl
-    deactivate DB
-    
-    ProfileService -> DB: UPDATE users SET avatarUrl = mainUrl,\navatarThumbnail = thumbnailUrl\nWHERE id = userId
-    activate DB
-    DB --> ProfileService: Updated successfully
-    deactivate DB
-    
-    alt Có avatar cũ
-        ProfileService -> CloudAPI: deleteFile(oldAvatarUrl)
-        activate CloudAPI
-        CloudAPI --> ProfileService: File deleted
-        deactivate CloudAPI
+    alt Token không hợp lệ hoặc thiếu
+        UploadService --> ProfilePage: 401 Unauthorized\n{"error": "Vui lòng đăng nhập"}
+        deactivate UploadService
+        ProfilePage --> User: Chuyển hướng đến trang đăng nhập
+        deactivate ProfilePage
+        
+    else Token hết hạn
+        UploadService --> ProfilePage: 401 Unauthorized\n{"error": "Phiên đăng nhập hết hạn"}
+        deactivate UploadService
+        ProfilePage --> User: Hiển thị: "Phiên đăng nhập hết hạn,\nvui lòng đăng nhập lại"
+        deactivate ProfilePage
+        
+    else User không có quyền
+        UploadService --> ProfilePage: 403 Forbidden\n{"error": "Không có quyền cập nhật avatar"}
+        deactivate UploadService
+        ProfilePage --> User: Hiển thị lỗi: "Bạn không có quyền thực hiện"
+        deactivate ProfilePage
+        
+    else Token hợp lệ
+        UploadService -> UploadService: Validate file từ server\n(type, size, content)
+        
+        alt File không đúng định dạng (server-side check)
+            UploadService --> ProfilePage: 400 Bad Request\n{"error": "File không đúng định dạng"}
+            deactivate UploadService
+            ProfilePage --> User: Hiển thị lỗi: "File không hợp lệ"
+            deactivate ProfilePage
+            
+        else File quá lớn (server-side check)
+            UploadService --> ProfilePage: 413 Payload Too Large\n{"error": "File vượt quá kích thước cho phép"}
+            deactivate UploadService
+            ProfilePage --> User: Hiển thị lỗi: "File quá lớn (tối đa 5MB)"
+            deactivate ProfilePage
+            
+        else File hợp lệ
+            UploadService -> ImageProcessor: processImage(file)
+            activate ImageProcessor
+            
+            ImageProcessor -> ImageProcessor: Resize to 512x512
+            ImageProcessor -> ImageProcessor: Compress (optimize quality)
+            ImageProcessor -> ImageProcessor: Generate thumbnail 128x128
+            
+            alt Lỗi xử lý ảnh (file corrupt)
+                ImageProcessor --> UploadService: Error: Cannot process image
+                deactivate ImageProcessor
+                UploadService --> ProfilePage: 422 Unprocessable Entity\n{"error": "Không thể xử lý ảnh,\nfile có thể bị lỗi"}
+                deactivate UploadService
+                ProfilePage --> User: Hiển thị lỗi: "File ảnh bị lỗi,\nvui lòng chọn ảnh khác"
+                deactivate ProfilePage
+                
+            else Xử lý ảnh thành công
+                ImageProcessor --> UploadService: {mainImage, thumbnail}
+                deactivate ImageProcessor
+                ImageProcessor --> UploadService: {mainImage, thumbnail}
+                deactivate ImageProcessor
+                
+                UploadService -> CloudAPI: uploadFile(mainImage)
+                activate CloudAPI
+                CloudAPI -> CloudAPI: Store file in bucket
+                
+                alt Lỗi kết nối Cloud API
+                    CloudAPI --> UploadService: Error: Connection timeout
+                    deactivate CloudAPI
+                    UploadService --> ProfilePage: 503 Service Unavailable\n{"error": "Dịch vụ lưu trữ tạm thời\nkhông khả dụng"}
+                    deactivate UploadService
+                    ProfilePage --> User: Hiển thị lỗi: "Không thể upload,\nvui lòng thử lại sau"
+                    deactivate ProfilePage
+                    
+                else Cloud API trả về lỗi
+                    CloudAPI --> UploadService: Error 500: Storage error
+                    deactivate CloudAPI
+                    UploadService --> ProfilePage: 502 Bad Gateway\n{"error": "Lỗi từ dịch vụ lưu trữ"}
+                    deactivate UploadService
+                    ProfilePage --> User: Hiển thị lỗi: "Lỗi upload,\nvui lòng thử lại"
+                    deactivate ProfilePage
+                    
+                else Cloud API hết quota/storage
+                    CloudAPI --> UploadService: Error 507: Insufficient storage
+                    deactivate CloudAPI
+                    UploadService --> ProfilePage: 507 Insufficient Storage\n{"error": "Hệ thống hết dung lượng"}
+                    deactivate UploadService
+                    ProfilePage --> User: Hiển thị lỗi: "Hệ thống tạm thời không thể\nnhận thêm ảnh"
+                    deactivate ProfilePage
+                    
+                else Upload thành công
+                    CloudAPI --> UploadService: {mainUrl, uploadId}
+                    deactivate CloudAPI
+                    
+                    UploadService -> CloudAPI: uploadFile(thumbnail)
+                    activate CloudAPI
+                    CloudAPI -> CloudAPI: Store thumbnail
+                    
+                    alt Lỗi upload thumbnail
+                        CloudAPI --> UploadService: Error: Upload failed
+                        deactivate CloudAPI
+                        UploadService -> CloudAPI: deleteFile(mainUrl)
+                        activate CloudAPI
+                        CloudAPI --> UploadService: Rollback completed
+                        deactivate CloudAPI
+                        UploadService --> ProfilePage: 500 Internal Server Error\n{"error": "Không thể hoàn tất upload"}
+                        deactivate UploadService
+                        ProfilePage --> User: Hiển thị lỗi: "Upload thất bại,\nvui lòng thử lại"
+                        deactivate ProfilePage
+                        
+                    else Upload thumbnail thành công
+                        CloudAPI --> UploadService: {thumbnailUrl}
+                        deactivate CloudAPI
+                        
+                        UploadService -> ProfileService: updateAvatar(userId, mainUrl, thumbnailUrl)
+                        activate ProfileService
+                        
+                        ProfileService -> DB: SELECT avatarUrl FROM users WHERE id = userId
+                        activate DB
+                        
+                        alt User không tồn tại
+                            DB --> ProfileService: null
+                            deactivate DB
+                            ProfileService --> UploadService: Error: User not found
+                            deactivate ProfileService
+                            UploadService -> CloudAPI: deleteFile(mainUrl, thumbnailUrl)
+                            activate CloudAPI
+                            CloudAPI --> UploadService: Files deleted
+                            deactivate CloudAPI
+                            UploadService --> ProfilePage: 404 Not Found\n{"error": "User không tồn tại"}
+                            deactivate UploadService
+                            ProfilePage --> User: Hiển thị lỗi: "Lỗi hệ thống"
+                            deactivate ProfilePage
+                            
+                        else User tồn tại
+                            DB --> ProfileService: oldAvatarUrl
+                            deactivate DB
+                            
+                            ProfileService -> DB: UPDATE users SET avatarUrl = mainUrl,\navatarThumbnail = thumbnailUrl\nWHERE id = userId
+                            activate DB
+                            
+                            alt Lỗi database
+                                DB --> ProfileService: Error: Database error
+                                deactivate DB
+                                ProfileService --> UploadService: Error: Cannot update
+                                deactivate ProfileService
+                                UploadService -> CloudAPI: deleteFile(mainUrl, thumbnailUrl)
+                                activate CloudAPI
+                                CloudAPI --> UploadService: Files deleted (rollback)
+                                deactivate CloudAPI
+                                UploadService --> ProfilePage: 500 Internal Server Error\n{"error": "Không thể cập nhật avatar"}
+                                deactivate UploadService
+                                ProfilePage --> User: Hiển thị lỗi: "Lỗi hệ thống,\nvui lòng thử lại"
+                                deactivate ProfilePage
+                                
+                            else Cập nhật thành công
+                                DB --> ProfileService: Updated successfully
+                                deactivate DB
+                                
+                                alt Có avatar cũ (không phải default)
+                                    ProfileService -> CloudAPI: deleteFile(oldAvatarUrl)
+                                    activate CloudAPI
+                                    CloudAPI --> ProfileService: File deleted
+                                    deactivate CloudAPI
+                                end
+                                
+                                ProfileService --> UploadService: {success: true, avatarUrl: mainUrl}
+                                deactivate ProfileService
+                                
+                                UploadService --> ProfilePage: 200 OK\n{avatarUrl, thumbnailUrl,\nmessage: "Cập nhật thành công"}
+                                deactivate UploadService
+                                
+                                ProfilePage -> ProfilePage: Cập nhật hiển thị avatar mới
+                                ProfilePage --> User: Hiển thị thông báo:\n"Cập nhật avatar thành công"
+                                deactivate ProfilePage
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
-    
-    ProfileService --> UploadService: {success: true, avatarUrl: mainUrl}
-    deactivate ProfileService
-    
-    UploadService --> ProfilePage: 200 OK\n{avatarUrl, thumbnailUrl}
-    deactivate UploadService
-    
-    ProfilePage -> ProfilePage: Cập nhật hiển thị avatar mới
-    ProfilePage --> User: Hiển thị thông báo:\n"Cập nhật avatar thành công"
-    deactivate ProfilePage
 end
 
 note right of CloudAPI
