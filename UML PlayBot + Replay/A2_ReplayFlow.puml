@@ -1,0 +1,56 @@
+@startuml
+title Activity A2 - Replay Flow (Open -> Load -> Next/Prev -> Exit)
+
+start
+
+:User opens History;
+:User selects a saved game;
+
+:Request replay data (moves, initial position, meta);
+
+if (Replay data loaded?) then (yes)
+  :Create ReplaySession;
+  :cursor = 0;
+  :Load initial position (initialFEN);
+  :Render board (initial);
+
+  repeat
+    :Wait for user action;
+
+    if (Action == Next) then (yes)
+      if (cursor < lastMoveIndex) then (yes)
+        :cursor++;
+        :Apply moves[cursor] (or apply next move);
+        :Render board;
+      else (no)
+        :Show "Already at end";
+      endif
+
+    elseif (Action == Prev) then (yes)
+      if (cursor > 0) then (yes)
+        :cursor--;
+        :Rebuild board from initial\n+ moves[1..cursor];
+        :Render board;
+      else (no)
+        :Show "Already at start";
+      endif
+
+    elseif (Action == Exit) then (yes)
+      break
+
+    else (other)
+      :No-op / keep waiting;
+    endif
+
+  repeat while (true)
+
+  :Close ReplaySession;
+  :Return to History;
+
+else (no)
+  :Show error / not found / permission denied;
+  :Return to History;
+endif
+
+stop
+@enduml

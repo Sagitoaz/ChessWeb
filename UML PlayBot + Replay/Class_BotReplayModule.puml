@@ -1,0 +1,79 @@
+@startuml
+title Class Diagram - Bot & Replay Module
+
+class Game {
+  +id: string
+  +mode: GameMode
+  +state: GameState
+  +initialFEN: string
+  +currentFEN: string
+  +moves: List<Move>
+  +result: GameResult
+  +createdAt: DateTime
+  +finishedAt: DateTime
+  +applyMove(m: Move): void
+  +isFinished(): bool
+}
+
+enum GameMode { 
+    HumanVsBot 
+}
+enum GameState { 
+    Waiting 
+    InGame 
+    Paused 
+    Finished 
+    Saved 
+}
+enum GameResult { 
+ WhiteWin
+ BlackWin 
+ Draw
+Ongoing
+ }
+
+class Move {
+  +ply: int
+  +from: string
+  +to: string
+  +promotion: string
+  +san: string
+  +uci: string
+  +timestamp: DateTime
+}
+
+class Board {
+  +fen: string
+  +loadFEN(fen: string): void
+  +toFEN(): string
+  +isLegal(m: Move): bool
+  +makeMove(m: Move): void
+}
+
+class BotConfig {
+  +difficulty: int
+  +depth: int
+  +skillLevel: int
+  +timeLimitMs: int
+}
+
+class ReplaySession {
+  +gameId: string
+  +moves: List<Move>
+  +cursor: int
+  +board: Board
+  +load(game: Game): void
+  +stepForward(): bool
+  +stepBackward(): bool
+  +currentFEN(): string
+}
+
+Game "1" o-- "1" Board
+Game "1" *-- "0..*" Move
+Game "0..1" o-- BotConfig
+
+ReplaySession "1" o-- "1" Board
+ReplaySession "1" o-- "0..*" Move
+ReplaySession ..> Game : loads from
+
+@enduml
