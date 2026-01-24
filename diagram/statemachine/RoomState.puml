@@ -1,0 +1,89 @@
+@startuml RoomState
+!theme plain
+skinparam stateBackgroundColor #E8F4FD
+skinparam stateBorderColor #1E88E5
+skinparam stateArrowColor #333333
+
+title State Machine Diagram - Room State (Friend Room)
+
+[*] --> Open : createRoom()
+
+state Open {
+    [*] --> WaitingForGuest
+    WaitingForGuest : Chủ phòng đang chờ\nbạn bè tham gia
+    WaitingForGuest : - Hiển thị mã phòng
+    WaitingForGuest : - Hiển thị link mời
+}
+
+Open --> Ready : joinRoom()\n[Người chơi tham gia]
+Open --> Closed : leaveRoom()\n[Host rời phòng] OR\ntimeout()\n[Quá thời gian chờ]
+
+state Ready {
+    [*] --> BothPlayersPresent
+    
+    BothPlayersPresent : Cả hai người chơi\nđã vào phòng
+    BothPlayersPresent : - Có thể chat
+    BothPlayersPresent : - Chờ Host bắt đầu
+}
+
+Ready --> Open : leaveRoom()\n[Guest rời phòng]
+Ready --> InMatch : startMatch()\n[Host bắt đầu trận đấu]
+Ready --> Closed : leaveRoom()\n[Host rời phòng]
+
+state InMatch {
+    [*] --> GameOngoing
+    
+    GameOngoing : Trận đấu đang diễn ra
+    GameOngoing : - Đồng bộ nước đi
+    GameOngoing : - Đếm thời gian
+    
+    GameOngoing --> GameOngoing : makeMove()
+    GameOngoing --> GameEnded : Chiếu hết / Hết giờ /\nHòa / Đầu hàng
+    
+    state GameEnded {
+        [*] --> SavingHistory
+        SavingHistory : Lưu lịch sử ván đấu
+        SavingHistory --> ResultDisplayed : Lưu thành công
+        ResultDisplayed : Hiển thị kết quả
+    }
+}
+
+InMatch --> Ready : rematch()\n[Chơi ván mới]
+InMatch --> Closed : endMatch() AND\nleaveRoom()
+
+state Closed {
+    [*] --> CleaningUp
+    CleaningUp : Giải phóng tài nguyên
+    CleaningUp --> Archived : Lưu trữ thông tin
+    Archived : Phòng đã đóng
+}
+
+Closed --> [*]
+
+note right of Open
+    **Trạng thái Open:**
+    - Mã phòng active
+    - Chờ 1 người chơi nữa
+    - Timeout sau 10 phút
+end note
+
+note right of Ready
+    **Trạng thái Ready:**
+    - Đủ 2 người chơi
+    - Chỉ Host có thể start
+    - Có thể đổi màu quân
+end note
+
+note right of InMatch
+    **Trạng thái InMatch:**
+    - Không ai có thể join thêm
+    - Kết quả KHÔNG ảnh hưởng rating
+    - Có thể xem lại sau khi kết thúc
+end note
+
+note bottom of Closed
+    **Kết quả được lưu vào GameHistory**
+    nhưng không thay đổi điểm xếp hạng
+end note
+
+@enduml
