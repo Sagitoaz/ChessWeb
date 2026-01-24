@@ -1,0 +1,42 @@
+@startuml UML_P3_Ranked_Match_StateMachine
+
+title State Machine - Ranked Match
+
+[*] --> Queuing : User join queue
+
+Queuing : Đang tìm đối thủ
+Queuing --> Matched : Tìm thấy
+Queuing --> [*] : Timeout 5p
+
+Matched : 2 players ready
+Matched --> Playing : Start game
+
+Playing : Game đang diễn ra
+Playing : Clock chạy
+Playing --> Finished : Checkmate/Draw
+Playing --> Forfeited : AFK/Disconnect
+
+Forfeited : Vi phạm luật
+Forfeited --> Finished : Apply penalty
+
+Finished : Game kết thúc
+Finished : Update Elo
+Finished --> [*]
+
+note right of Queuing
+  Tìm opponent
+  rating ±100 Elo
+end note
+
+note right of Playing
+  Clock: 10 phút/người
+  Inactivity: 2 phút
+end note
+
+note right of Forfeited
+  AFK >2 phút → Thua
+  Disconnect >30s → Thua
+  Chưa đi + <1 phút → Hủy
+end note
+
+@enduml

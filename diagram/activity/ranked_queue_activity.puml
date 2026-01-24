@@ -1,0 +1,40 @@
+@startuml UML_P3_Ranked_Queue_Activity
+
+title Activity Diagram 1 - Ranked Game Flow
+
+start
+
+:User click "Tìm trận";
+
+:Thêm vào hàng đợi;
+
+:Tìm đối thủ (±100 Elo);
+
+if (Tìm thấy?) then (Có)
+    
+    :Tạo Match;
+    :Notify 2 players (WebSocket);
+    :Load Game Board;
+    :Start Clock (10 phút);
+    :Start Inactivity Timer (2 phút);
+    
+    repeat
+        :Player đi nước;
+        :Reset Inactivity Timer;
+        :Gửi move cho đối thủ;
+    repeat while (Game kết thúc?) is (Chưa)
+    
+    :Xác định Winner/Loser/Draw;
+    :Tính Elo: ΔR = K×(S-E);
+    :Lưu vào DB;
+    :Hiển thị kết quả;
+    
+else (Không - Timeout)
+    
+    :Thông báo "Không tìm thấy";
+    
+endif
+
+stop
+
+@enduml

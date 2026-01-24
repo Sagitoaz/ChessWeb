@@ -1,0 +1,46 @@
+@startuml UML_P3_Ranked_Matchmaking_Sequence
+
+title Sequence Diagram 1 - Ranked Matchmaking
+
+actor "User A" as A
+participant "Frontend" as FE
+participant "Backend API" as API
+database "Database" as DB
+actor "User B" as B
+
+== Join Queue ==
+
+A -> FE: Click "Tìm trận"
+FE -> API: POST /queue {userId, rating}
+API -> DB: INSERT queue
+DB --> API: OK
+API --> FE: {position: 5}
+FE --> A: "Đang tìm đối thủ..."
+
+B -> FE: Click "Tìm trận"
+FE -> API: POST /queue
+API -> DB: INSERT queue
+DB --> API: OK
+FE --> B: "Đang tìm đối thủ..."
+
+== Matchmaking ==
+
+API -> DB: SELECT từ queue\nWHERE rating ±100
+DB --> API: [User A, User B]
+
+API -> DB: INSERT match (A, B)
+DB --> API: matchId = 1
+
+API -> DB: UPDATE queue SET matched
+DB --> API: OK
+
+== Notify Players ==
+
+API --> FE: WebSocket: "match_found"
+FE --> A: "Đã tìm thấy đối thủ!"
+FE --> B: "Đã tìm thấy đối thủ!"
+
+A -> FE: Load game board
+B -> FE: Load game board
+
+@enduml

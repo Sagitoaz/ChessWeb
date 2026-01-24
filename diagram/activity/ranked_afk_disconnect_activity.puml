@@ -1,0 +1,88 @@
+@startuml UML_P3_Ranked_AFK_Disconnect_Activity
+
+title Activity Diagram 2 - AFK/Disconnect Handling
+
+start
+
+:Game đang diễn ra;
+
+fork
+    :Monitor Inactivity;
+    
+    while (Player có move?) is (Có)
+        :Reset timer = 120s;
+    endwhile (Không >120s)
+    
+    :AFK detected;
+    
+fork again
+    :Monitor Connection;
+    
+    while (Heartbeat OK?) is (Có)
+        :Connection OK;
+    endwhile (Mất >30s)
+    
+    :Disconnect detected;
+    
+end fork
+
+if (Có ít nhất 1 move?) then (Có)
+    
+    :Xử thua player vi phạm;
+    :Opponent thắng;
+    :Trừ Elo player thua;
+    :Cộng Elo opponent;
+    
+else (Không - chưa đi nước nào)
+    
+    if (Game < 1 phút?) then (Có)
+        :Hủy match;
+        :Không mất Elo;
+    else (Không)
+        :Xử thua bình thường;
+    endif
+    
+endif
+
+:Lưu kết quả vào DB;
+:Thông báo cho 2 players;
+
+stop
+
+@enduml
+                :Kết thúc game;
+                :Xử thua do Disconnect;
+                
+                |#Pink|EloService|
+                :Tính toán Elo penalty;
+                :Người disconnect: -Elo;
+                :Đối thủ: +Elo;
+                :Cập nhật vào DB;
+                
+                |#LightGreen|System|
+                :Tạo ForfeitRecord;
+                note right
+                  Lý do: DISCONNECT
+                  Không thể kết nối lại
+                  trong 30 giây
+                end note
+                
+                detach
+            endif
+        endif
+        
+    repeat while (Game đang chơi?) is (yes)
+    
+end fork
+
+|#LightGreen|System|
+:Lưu Game History;
+:Cập nhật User Stats;
+
+|#LightBlue|User|
+:Nhận thông báo kết quả;
+:Xem lý do thua (nếu có);
+
+stop
+
+@enduml

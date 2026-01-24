@@ -1,0 +1,105 @@
+@startuml UML_P3_Ranked_Class
+
+title Class Diagram - Ranked Match Module
+
+' ===== MAIN CLASSES =====
+
+class Match {
+    + id: int
+    + player1Id: int
+    + player2Id: int
+    + winnerId: int
+    + status: String
+    + startTime: DateTime
+    + endTime: DateTime
+    --
+    + start()
+    + end()
+}
+
+class User {
+    + id: int
+    + username: String
+    + rating: int
+    + wins: int
+    + losses: int
+    + draws: int
+}
+
+class EloHistory {
+    + id: int
+    + matchId: int
+    + userId: int
+    + oldRating: int
+    + newRating: int
+    + change: int
+    + createdAt: DateTime
+}
+
+class Clock {
+    + matchId: int
+    + player1Time: int
+    + player2Time: int
+    + currentTurn: int
+    --
+    + start()
+    + switchTurn()
+    + getRemaining(playerId): int
+}
+
+class InactivityTimer {
+    + matchId: int
+    + playerId: int
+    + lastActivity: DateTime
+    + maxSeconds: int = 120
+    --
+    + reset()
+    + isExpired(): bool
+}
+
+' ===== ENUMS =====
+
+enum MatchStatus {
+    WAITING
+    PLAYING
+    FINISHED
+    CANCELLED
+}
+
+enum ForfeitReason {
+    AFK
+    DISCONNECT
+    NONE
+}
+
+' ===== RELATIONSHIPS =====
+
+Match "1" -- "2" User : players
+Match "1" -- "1" Clock
+Match "1" -- "2" InactivityTimer
+Match "1" -- "*" EloHistory
+Match --> MatchStatus
+
+' ===== NOTES =====
+
+note right of Match
+  mode = "ranked"
+  Thời gian: 10 phút/người
+end note
+
+note right of Clock
+  player1Time, player2Time
+  = 600000 ms (10 phút)
+end note
+
+note right of InactivityTimer
+  maxSeconds = 120 (2 phút)
+  Reset mỗi khi player đi nước
+end note
+
+note bottom of EloHistory
+  Lưu lịch sử thay đổi Elo
+  sau mỗi ván đấu ranked
+end note
+
+@enduml
