@@ -9,15 +9,25 @@ class Game {
   +currentFEN: string
   +moves: List<Move>
   +result: GameResult
+  +whitePlayer: Player
+  +blackPlayer: Player
+  +botSessionId: string?
+  +metadata: GameMetadata?
   +createdAt: DateTime
-  +finishedAt: DateTime
+  +updatedAt: DateTime
+  +finishedAt: DateTime?
   +applyMove(m: Move): void
+  +validateMove(m: Move): bool
   +isFinished(): bool
+  +canUndo(): bool
+  +getCurrentTurn(): Color
 }
 
 enum GameMode { 
-    HumanVsBot 
+    HumanVsBot
+    HumanVsHuman
 }
+
 enum GameState { 
     Waiting 
     InGame 
@@ -25,21 +35,36 @@ enum GameState {
     Finished 
     Saved 
 }
+
 enum GameResult { 
- WhiteWin
- BlackWin 
- Draw
-Ongoing
- }
+    WhiteWin
+    BlackWin 
+    Draw
+    Ongoing
+}
+
+enum Color {
+    White
+    Black
+}
 
 class Move {
   +ply: int
+  +color: Color
   +from: string
   +to: string
-  +promotion: string
+  +piece: string
+  +captured: string?
+  +promotion: string?
   +san: string
   +uci: string
+  +isCheck: bool
+  +isCheckmate: bool
+  +isCastle: bool
+  +isEnPassant: bool
   +timestamp: DateTime
+  +validate(): bool
+  +toString(): string
 }
 
 class Board {
@@ -48,32 +73,96 @@ class Board {
   +toFEN(): string
   +isLegal(m: Move): bool
   +makeMove(m: Move): void
+  +undoMove(): void
+  +getPiece(square: string): string?
+  +getValidMoves(square: string?): List<Move>
+  +isCheck(color: Color): bool
+  +isCheckmate(color: Color): bool
+  +isStalemate(): bool
+  +isDraw(): bool
+  +clone(): Board
 }
 
 class BotConfig {
   +difficulty: int
+  +engine: string
   +depth: int
   +skillLevel: int
   +timeLimitMs: int
+  +threads: int
+  +validate(): bool
+  +toEngineParams(): Map<string, any>
+  {static} +fromDifficulty(level: int): BotConfig
 }
 
 class ReplaySession {
+  +sessionId: string
   +gameId: string
   +moves: List<Move>
   +cursor: int
   +board: Board
+  +gameMetadata: GameMetadata
   +load(game: Game): void
   +stepForward(): bool
   +stepBackward(): bool
+  +jumpTo(moveIndex: int): bool
+  +canStepForward(): bool
+  +canStepBackward(): bool
+  +getCurrentMove(): Move?
   +currentFEN(): string
+  +getProgress(): float
+  +reset(): void
+}
+
+class Player {
+  +id: string
+  +username: string
+  +color: Color
+  +isBot: bool
+  +rating: int?
+  +isAuthenticated(): bool
+}
+
+class BotSession {
+  +sessionId: string
+  +gameId: string
+  +config: BotConfig
+  +enginePID: int?
+  +isActive: bool
+  +createdAt: DateTime
+  +lastMoveAt: DateTime?
+  +start(): void
+  +terminate(): void
+  +computeMove(fen: string): Move
+  +validate(): bool
+}
+
+class GameMetadata {
+  +opening: string?
+  +openingECO: string?
+  +totalMoves: int
+  +whiteRating: int?
+  +blackRating: int?
+  +timeControl: string?
+  +venue: string?
+  +tags: Map<string, string>
 }
 
 Game "1" o-- "1" Board
 Game "1" *-- "0..*" Move
-Game "0..1" o-- BotConfig
+Game "1" o-- "2" Player : has
+Game "0..1" o-- "0..1" BotConfig
+Game "0..1" o-- "0..1" GameMetadata
+Game "0..1" -- "0..1" BotSession : associated
+
+Move "1" -- "1" Color
+Player "1" -- "1" Color
+
+BotSession "1" *-- "1" BotConfig
 
 ReplaySession "1" o-- "1" Board
 ReplaySession "1" o-- "0..*" Move
+ReplaySession "1" o-- "1" GameMetadata
 ReplaySession ..> Game : loads from
 
 @enduml
