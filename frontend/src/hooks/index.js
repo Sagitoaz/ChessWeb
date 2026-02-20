@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { Chess } from 'chess.js'
 import socketService from '../services/socketService'
 
+// Export auth hook
+export { default as useAuth } from './useAuth'
+
 /**
  * Custom hook for WebSocket connection
  */
