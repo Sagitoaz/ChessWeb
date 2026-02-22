@@ -16,12 +16,10 @@ const GameStatus = ({
   onAcceptDraw,
   onDeclineDraw,
 }) => {
-  // Determine whose turn
   const isMyTurn = useMemo(() => {
     return currentTurn === playerColor
   }, [currentTurn, playerColor])
 
-  // Get status info
   const statusInfo = useMemo(() => {
     if (!gameState) {
       return { icon: AlertCircle, color: 'gray', message: 'Loading...' }
@@ -69,7 +67,6 @@ const GameStatus = ({
 
   return (
     <div className="space-y-3">
-      {/* Main Status */}
       <div
         className={clsx('flex items-center gap-3 px-4 py-3 rounded-lg border-2', {
           'border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800':
@@ -101,7 +98,6 @@ const GameStatus = ({
         </div>
       </div>
 
-      {/* Draw Offer */}
       {drawOffer && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 rounded-lg p-4">
           <div className="flex items-start gap-3">

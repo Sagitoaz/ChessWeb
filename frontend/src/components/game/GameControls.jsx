@@ -45,7 +45,6 @@ const GameControls = ({
 
   return (
     <div className="flex items-center gap-2">
-      {/* Resign Button */}
       <button
         onClick={handleResignClick}
         disabled={disabled}
@@ -68,7 +67,6 @@ const GameControls = ({
         )}
       </button>
 
-      {/* Offer Draw Button */}
       <button
         onClick={handleDrawClick}
         disabled={disabled || drawOffered}
@@ -81,7 +79,6 @@ const GameControls = ({
         <span>{drawOffered ? 'Draw Offered' : 'Offer Draw'}</span>
       </button>
 
-      {/* Pause/Resume Button (Bot games only) */}
       {showPause && (
         <button
           onClick={handlePauseToggle}

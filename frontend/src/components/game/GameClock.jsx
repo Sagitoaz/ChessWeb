@@ -8,7 +8,7 @@ import { Clock } from 'lucide-react'
  * Đồng hồ đếm ngược với increment support
  */
 const GameClock = ({
-  initialTime = 600000, // 10 minutes
+  initialTime = 600000,
   increment = 0,
   isRunning = false,
   isMySide = false,
@@ -18,7 +18,6 @@ const GameClock = ({
   const [timeLeft, setTimeLeft] = useState(initialTime)
   const intervalRef = useRef(null)
 
-  // Format time
   const formatTime = (ms) => {
     const totalSeconds = Math.floor(ms / 1000)
     const hours = Math.floor(totalSeconds / 3600)
@@ -37,7 +36,6 @@ const GameClock = ({
     return `${minutes}:${String(seconds).padStart(2, '0')}`
   }
 
-  // Timer logic
   useEffect(() => {
     if (isRunning) {
       const startTime = Date.now()
@@ -53,7 +51,7 @@ const GameClock = ({
           clearInterval(intervalRef.current)
           onTimeOut?.()
         }
-      }, 50) // Update every 50ms for smooth countdown
+      }, 50)
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
@@ -67,14 +65,12 @@ const GameClock = ({
     }
   }, [isRunning, timeLeft, onTimeOut])
 
-  // Reset when initialTime changes
   useEffect(() => {
     setTimeLeft(initialTime)
   }, [initialTime])
 
-  // Determine urgency level
-  const isUrgent = timeLeft < 30000 // < 30 seconds
-  const isCritical = timeLeft < 10000 // < 10 seconds
+  const isUrgent = timeLeft < 30000
+  const isCritical = timeLeft < 10000
   const isTimeout = timeLeft === 0
 
   return (
@@ -82,24 +78,13 @@ const GameClock = ({
       className={clsx(
         'flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all duration-200',
         {
-          // Normal state
           'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800':
             !isRunning && !isTimeout,
-
-          // Running state
           'border-blue-500 bg-blue-50 dark:bg-blue-900/20': isRunning && !isUrgent,
-
-          // Urgent state (< 30s)
           'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20':
             isRunning && isUrgent && !isCritical,
-
-          // Critical state (< 10s) - pulsing
           'border-red-500 bg-red-50 dark:bg-red-900/20 animate-pulse': isRunning && isCritical,
-
-          // Timeout
           'border-red-600 bg-red-100 dark:bg-red-900/40': isTimeout,
-
-          // My side highlight
           'shadow-lg': isMySide && isRunning,
         }
       )}

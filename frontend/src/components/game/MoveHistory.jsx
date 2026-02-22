@@ -16,7 +16,6 @@ const MoveHistory = ({
   const historyRef = useRef(null)
   const currentMoveRef = useRef(null)
 
-  // Group moves into pairs (White + Black)
   const movePairs = []
   for (let i = 0; i < moves.length; i += 2) {
     movePairs.push({
@@ -28,7 +27,6 @@ const MoveHistory = ({
     })
   }
 
-  // Auto scroll to current move
   useEffect(() => {
     if (currentMoveRef.current && scrollBehavior !== 'none') {
       currentMoveRef.current.scrollIntoView({
@@ -61,12 +59,10 @@ const MoveHistory = ({
             key={pair.moveNumber}
             className="flex items-center gap-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 rounded px-2 py-1"
           >
-            {/* Move Number */}
             <span className="text-gray-500 dark:text-gray-400 font-mono text-xs w-8">
               {pair.moveNumber}.
             </span>
 
-            {/* White Move */}
             <button
               ref={currentMoveIndex === pair.whiteIndex ? currentMoveRef : null}
               onClick={() => onMoveClick?.(pair.whiteIndex)}
@@ -83,7 +79,6 @@ const MoveHistory = ({
               {pair.white?.san || ''}
             </button>
 
-            {/* Black Move */}
             {pair.black && (
               <button
                 ref={currentMoveIndex === pair.blackIndex ? currentMoveRef : null}

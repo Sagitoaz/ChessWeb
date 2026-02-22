@@ -18,7 +18,6 @@ const GameChat = ({
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -41,17 +40,14 @@ const GameChat = ({
     }
   }
 
-  // Limit displayed messages
   const displayedMessages = messages.slice(-maxMessages)
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-      {/* Header */}
       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Chat</h3>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {displayedMessages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
@@ -110,7 +106,6 @@ const GameChat = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <form onSubmit={handleSubmit} className="p-3 border-t border-gray-200 dark:border-gray-700">
         <div className="flex gap-2">
           <input
