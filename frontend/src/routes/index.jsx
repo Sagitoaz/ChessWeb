@@ -4,6 +4,7 @@ import { Loader } from '@components/common'
 
 // Lazy load pages
 const GameComponentsDemo = lazy(() => import('@pages/demo/GameComponentsDemo'))
+const CommonComponentsDemo = lazy(() => import('@pages/demo/CommonComponentsDemo'))
 
 // Loading component
 const PageLoader = () => (
@@ -32,8 +33,10 @@ function AppRoutes() {
         {/* Test Route */}
         <Route path="/" element={<TestPage />} />
         
-        {/* Demo Route */}
+        {/* Demo Routes */}
         <Route path="/demo" element={<GameComponentsDemo />} />
+        <Route path="/demo/game" element={<GameComponentsDemo />} />
+        <Route path="/demo/components" element={<CommonComponentsDemo />} />
 
         {/* 404 */}
         <Route path="*" element={<div className="min-h-screen flex items-center justify-center text-2xl">404 - Page Not Found</div>} />

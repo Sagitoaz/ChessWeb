@@ -1,6 +1,7 @@
 import { BrowserRouter as Router } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
+import { NotificationProvider } from '@/components/common'
 import AppRoutes from './routes'
 
 // Create a client for React Query
@@ -16,9 +17,10 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <AppRoutes />
+      <NotificationProvider position="top-right">
+        <Router>
+          <div className="min-h-screen bg-gray-50">
+            <AppRoutes />
           <Toaster
             position="top-right"
             toastOptions={{
@@ -43,8 +45,9 @@ function App() {
               },
             }}
           />
-        </div>
-      </Router>
+          </div>
+        </Router>
+      </NotificationProvider>
     </QueryClientProvider>
   )
 }
