@@ -1,70 +1,45 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { Loader } from '@components/common'
-import MainLayout from '@components/layout/MainLayout'
 
 // Lazy load pages
-const HomePage = lazy(() => import('@pages/home/HomePage'))
-const LoginPage = lazy(() => import('@pages/auth/LoginPage'))
-const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
-const DashboardPage = lazy(() => import('@pages/home/DashboardPage'))
+const GameComponentsDemo = lazy(() => import('@pages/demo/GameComponentsDemo'))
+const CommonComponentsDemo = lazy(() => import('@pages/demo/CommonComponentsDemo'))
 
 // Loading component
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
+  <div className="min-h-screen flex items-center justify-center bg-white">
     <Loader size="lg" text="Loading..." />
   </div>
 )
 
-// Protected Route
-const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('token')
-  return token ? children : <Navigate to="/login" replace />
-}
-
-// Public Route (redirect if logged in)
-const PublicRoute = ({ children }) => {
-  const token = localStorage.getItem('token')
-  return token ? <Navigate to="/dashboard" replace /> : children
-}
+// Simple test component
+const TestPage = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
+    <div className="text-center text-white">
+      <h1 className="text-4xl font-bold mb-4">✅ ChessWeb is Running!</h1>
+      <p className="text-xl mb-4">All components are ready</p>
+      <a href="/demo" className="text-blue-200 underline hover:text-blue-100">
+        Go to Demo Page →
+      </a>
+    </div>
+  </div>
+)
 
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <PublicRoute>
-              <RegisterPage />
-            </PublicRoute>
-          }
-        />
-
-        {/* Private Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <DashboardPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
+        {/* Test Route */}
+        <Route path="/" element={<TestPage />} />
+        
+        {/* Demo Routes */}
+        <Route path="/demo" element={<GameComponentsDemo />} />
+        <Route path="/demo/game" element={<GameComponentsDemo />} />
+        <Route path="/demo/components" element={<CommonComponentsDemo />} />
 
         {/* 404 */}
-        <Route path="*" element={<div>404 - Page Not Found</div>} />
+        <Route path="*" element={<div className="min-h-screen flex items-center justify-center text-2xl">404 - Page Not Found</div>} />
       </Routes>
     </Suspense>
   )

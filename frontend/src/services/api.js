@@ -158,6 +158,7 @@ export const apiCall = async (method, endpoint, data = null) => {
   if (USE_MOCK) {
     // Use mock data in development
     if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
       console.log(`[MOCK API] ${method.toUpperCase()} ${endpoint}`, data)
     }
     
