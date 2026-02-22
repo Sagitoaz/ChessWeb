@@ -1,32 +1,62 @@
-import PropTypes from 'prop-types'
+import { useState } from 'react'
+import Header from './Header'
+import Sidebar from './Sidebar'
+import Footer from './Footer'
 
 /**
- * MainLayout Component
- * Basic layout wrapper for authenticated pages
+ * MainLayout - Wrapper layout chính cho các trang cần auth
+ *
+ * Cấu trúc:
+ *   ┌──────────── Header ─────────────┐
+ *   │ Sidebar │      Main Content     │
+ *   ├─────────┤                       │
+ *   │  (nav)  │   {children}          │
+ *   └─────────┴───────────────────────┘
+ *   │           Footer                │
+ *   └─────────────────────────────────┘
+ *
+ * @param {Object} props
+ * @param {React.ReactNode} props.children - Nội dung trang
+ * @param {boolean} props.hideSidebar - Ẩn sidebar (dùng cho trang game fullscreen)
+ * @param {boolean} props.hideFooter - Ẩn footer
  */
-const MainLayout = ({ children }) => {
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            ♟️ ChessWeb
-          </h1>
-        </div>
-      </header>
+const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {children}
-      </main>
+  return (
+    <div className="flex flex-col min-h-screen bg-gray-950">
+      {/* Header cố định trên cùng */}
+      <Header />
+
+      {/* Body: Sidebar + Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar - ẩn trên mobile, hiện trên desktop */}
+        {!hideSidebar && (
+          <>
+            {/* Desktop Sidebar */}
+            <div className="hidden md:flex flex-col relative">
+              <Sidebar collapsed={sidebarCollapsed} />
+
+              {/* Toggle collapse button */}
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="absolute -right-3 top-6 bg-gray-700 hover:bg-gray-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-lg transition-colors z-10"
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {sidebarCollapsed ? '›' : '‹'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Main content area */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="min-h-full p-4 md:p-6 lg:p-8">{children}</div>
+        </main>
+      </div>
 
       {/* Footer */}
-      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
-        <div className="container mx-auto px-4 py-4 text-center text-gray-600 dark:text-gray-400">
-          <p>&copy; 2025 ChessWeb. All rights reserved.</p>
-        </div>
-      </footer>
+      {!hideFooter && <Footer />}
     </div>
   )
 }
