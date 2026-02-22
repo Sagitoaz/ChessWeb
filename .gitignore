@@ -1,7 +1,44 @@
-# ide
+# =============================================
+# ChessWeb - Root .gitignore
+# =============================================
+
+# ==================== Dependencies ====================
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ==================== IDE & Editors ====================
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# github
-.github/
-frontend/src/components/common/README.md
+# ==================== OS Files ====================
+Thumbs.db
+*.pem
+.DS_Store
+
+# ==================== Environment ====================
+.env
+.env.local
+.env.*.local
+
+# ==================== Logs ====================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ==================== Build & Cache ====================
+dist/
+build/
+.cache/
+.temp/
+
+# ==================== Project Specific ====================
+# Xóa dòng này nếu muốn commit README cho components
+# frontend/src/components/common/README.md

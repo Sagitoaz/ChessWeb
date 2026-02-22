@@ -15,18 +15,14 @@ export { useTimer } from './useTimer'
 export { useNotification } from './useNotification'
 export { useModal, useConfirmModal } from './useModal'
 
-/**
- * Custom hook for WebSocket connection
- */
-export const useWebSocket = () => {
-  const [isConnected, setIsConnected] = useState(false)
-  const [error, setError] = useState(null)
-
 export {
   useChessGame,
   useOnlineChessGame,
 } from './useChessGame'
 
+/**
+ * Custom hook for localStorage
+ */
 export const useLocalStorage = (key, initialValue) => {
   const [storedValue, setStoredValue] = useState(() => {
     try {
