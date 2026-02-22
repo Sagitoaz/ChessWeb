@@ -10,10 +10,7 @@ export { default as Avatar, AvatarGroup } from './avatar'
 export { default as Loader, Spinner, Skeleton } from './Loader'
 export { default as Modal } from './Modal'
 export { default as Dropdown } from './Dropdown'
-export { 
-  default as NotificationProvider, 
-  useNotification 
-} from './Notification'
+export { default as NotificationProvider, useNotification } from './Notification'
 
 // TODO: Create these components
 // export { default as Button } from './Button'

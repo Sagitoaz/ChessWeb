@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Chess } from 'chess.js'
-import socketService from '../services/socketService'
 
+// Re-export enhanced hooks from dedicated files
+export {
+  useWebSocket,
+  useGameSocket,
+  useRankedSocket,
+  useRoomSocket,
+  useTournamentSocket,
+} from './useWebSocket'
 // Export auth hook
 export { default as useAuth } from './useAuth'
 
@@ -12,98 +18,10 @@ export const useWebSocket = () => {
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    
-    if (token) {
-      socketService.connect(token)
-      
-      socketService.on('connect', () => {
-        setIsConnected(true)
-        setError(null)
-      })
-
-      socketService.on('disconnect', () => {
-        setIsConnected(false)
-      })
-
-      socketService.on('connect_error', (err) => {
-        setError(err.message)
-      })
-    }
-
-    return () => {
-      socketService.removeAllListeners()
-    }
-  }, [])
-
-  return {
-    socket: socketService,
-    isConnected,
-    error,
-  }
-}
-
-/**
- * Custom hook for chess game state
- */
-export const useChessGame = (initialFen = null) => {
-  const [game] = useState(() => new Chess(initialFen))
-  const [fen, setFen] = useState(game.fen())
-  const [history, setHistory] = useState([])
-  const [turn, setTurn] = useState(game.turn())
-
-  const makeMove = (move) => {
-    const result = game.move(move)
-    if (result) {
-      setFen(game.fen())
-      setHistory(game.history({ verbose: true }))
-      setTurn(game.turn())
-      return result
-    }
-    return null
-  }
-
-  const undoMove = () => {
-    const result = game.undo()
-    if (result) {
-      setFen(game.fen())
-      setHistory(game.history({ verbose: true }))
-      setTurn(game.turn())
-    }
-    return result
-  }
-
-  const reset = () => {
-    game.reset()
-    setFen(game.fen())
-    setHistory([])
-    setTurn('w')
-  }
-
-  const loadFen = (newFen) => {
-    game.load(newFen)
-    setFen(newFen)
-    setHistory(game.history({ verbose: true }))
-    setTurn(game.turn())
-  }
-
-  return {
-    game,
-    fen,
-    history,
-    turn,
-    makeMove,
-    undoMove,
-    reset,
-    loadFen,
-    isCheck: game.inCheck(),
-    isCheckmate: game.isCheckmate(),
-    isStalemate: game.isStalemate(),
-    isDraw: game.isDraw(),
-    isGameOver: game.isGameOver(),
-  }
-}
+export {
+  useChessGame,
+  useOnlineChessGame,
+} from './useChessGame'
 
 /**
  * Custom hook for countdown timer
