@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 import PropTypes from 'prop-types'
 
 /**
@@ -24,6 +24,13 @@ export const useNotification = () => {
 const Toast = ({ id, type, title, message, duration, onClose }) => {
   const [isExiting, setIsExiting] = useState(false)
 
+  const handleClose = useCallback(() => {
+    setIsExiting(true)
+    setTimeout(() => {
+      onClose(id)
+    }, 300) // Match animation duration
+  }, [id, onClose])
+
   useEffect(() => {
     if (duration > 0) {
       const timer = setTimeout(() => {
@@ -31,14 +38,7 @@ const Toast = ({ id, type, title, message, duration, onClose }) => {
       }, duration)
       return () => clearTimeout(timer)
     }
-  }, [duration])
-
-  const handleClose = () => {
-    setIsExiting(true)
-    setTimeout(() => {
-      onClose(id)
-    }, 300) // Match animation duration
-  }
+  }, [duration, handleClose])
 
   // Icon và màu sắc theo type
   const typeConfig = {
