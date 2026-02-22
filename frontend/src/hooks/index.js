@@ -45,7 +45,7 @@ export const useWebSocket = () => {
  * Custom hook for chess game state
  */
 export const useChessGame = (initialFen = null) => {
-  const [game, setGame] = useState(() => new Chess(initialFen))
+  const [game] = useState(() => new Chess(initialFen))
   const [fen, setFen] = useState(game.fen())
   const [history, setHistory] = useState([])
   const [turn, setTurn] = useState(game.turn())

@@ -14,6 +14,7 @@ class SocketService {
 
   connect(token) {
     if (this.socket?.connected) {
+      // eslint-disable-next-line no-console
       console.log('Socket already connected')
       return
     }
@@ -30,12 +31,14 @@ class SocketService {
 
     this.socket.on('connect', () => {
       if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
         console.log('✅ Socket connected:', this.socket.id)
       }
     })
 
     this.socket.on('disconnect', (reason) => {
       if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
         console.log('❌ Socket disconnected:', reason)
       }
     })
@@ -52,6 +55,7 @@ class SocketService {
       this.socket.disconnect()
       this.socket = null
       this.listeners.clear()
+      // eslint-disable-next-line no-console
       console.log('Socket disconnected manually')
     }
   }
@@ -94,6 +98,7 @@ class SocketService {
 
     this.socket.emit(event, data)
     if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
       console.log(`📤 Emitted ${event}:`, data)
     }
   }
