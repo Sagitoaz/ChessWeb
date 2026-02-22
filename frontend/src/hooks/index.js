@@ -11,6 +11,10 @@ export {
 // Export auth hook
 export { default as useAuth } from './useAuth'
 
+export { useTimer } from './useTimer'
+export { useNotification } from './useNotification'
+export { useModal, useConfirmModal } from './useModal'
+
 /**
  * Custom hook for WebSocket connection
  */
@@ -23,50 +27,6 @@ export {
   useOnlineChessGame,
 } from './useChessGame'
 
-/**
- * Custom hook for countdown timer
- */
-export const useTimer = (initialTime, autoStart = false) => {
-  const [time, setTime] = useState(initialTime)
-  const [isRunning, setIsRunning] = useState(autoStart)
-
-  useEffect(() => {
-    if (!isRunning || time <= 0) return
-
-    const interval = setInterval(() => {
-      setTime((prev) => {
-        if (prev <= 1) {
-          setIsRunning(false)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [isRunning, time])
-
-  const start = () => setIsRunning(true)
-  const pause = () => setIsRunning(false)
-  const reset = (newTime = initialTime) => {
-    setTime(newTime)
-    setIsRunning(false)
-  }
-  const add = (seconds) => setTime((prev) => prev + seconds)
-
-  return {
-    time,
-    isRunning,
-    start,
-    pause,
-    reset,
-    add,
-  }
-}
-
-/**
- * Custom hook for local storage
- */
 export const useLocalStorage = (key, initialValue) => {
   const [storedValue, setStoredValue] = useState(() => {
     try {
