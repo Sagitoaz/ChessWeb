@@ -5,8 +5,9 @@ import { Chess } from 'chess.js'
  * Provides a cleaner API for chess operations in React components
  */
 export class ChessGame {
-  constructor(fen = null) {
-    this.game = new Chess(fen)
+  constructor(fen) {
+    // Only pass fen if it's provided, otherwise start with default position
+    this.game = fen ? new Chess(fen) : new Chess()
   }
 
   // Get current FEN
@@ -59,13 +60,28 @@ export class ChessGame {
     return this.game.isCheckmate()
   }
 
+  // Alias for inCheckmate
+  isCheckmate() {
+    return this.game.isCheckmate()
+  }
+
   // Check if in stalemate
   inStalemate() {
     return this.game.isStalemate()
   }
 
+  // Alias for inStalemate
+  isStalemate() {
+    return this.game.isStalemate()
+  }
+
   // Check if in draw
   inDraw() {
+    return this.game.isDraw()
+  }
+
+  // Alias for inDraw
+  isDraw() {
     return this.game.isDraw()
   }
 

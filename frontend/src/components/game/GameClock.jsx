@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'prop-types'
+import { useState, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { clsx } from 'clsx'
 import { Clock } from 'lucide-react'
