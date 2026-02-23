@@ -38,7 +38,7 @@ const LoginPage = () => {
   } = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues,
-    mode: 'onTouched',
+    mode: 'onTouch',
   })
 
   const busy = loading || isSubmitting
@@ -63,64 +63,99 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center">
-      <div className="mx-auto w-full max-w-5xl px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          {/* LEFT SIDE */}
-          <div className="text-center md:text-left">
-            <h1 className="text-4xl md:text-5xl font-bold text-blue-600">WebChess</h1>
-            <p className="mt-4 text-gray-600 text-lg">
-              WebChess giúp bạn kết nối và chơi cờ với mọi người trên khắp thế giới.
-            </p>
+    <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">
+      <div className="w-full max-w-5xl flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-8">
+        <div className="w-full lg:w-1/2 text-center lg:text-left">
+          <div className="mb-4">
+            <span className="text-6xl text-blue-600 leading-none select-none">♟</span>
           </div>
+          <h1 className="text-5xl font-bold text-blue-600 tracking-tight mb-4">WebChess</h1>
+          <p className="text-2xl font-medium text-gray-800 leading-tight max-w-md mx-auto lg:mx-0">
+            Nền tảng cờ vua trực tuyến. Kết nối và thi đấu cùng các kỳ thủ toàn cầu.
+          </p>
+        </div>
 
-          {/* RIGHT SIDE */}
-          <div className="flex justify-center md:justify-end">
-            <Card variant="default" padding="lg" className="w-full max-w-sm">
+        <div className="w-full lg:w-[400px]">
+          <Card
+            variant="elevated"
+            padding="none"
+            className="bg-white shadow-md border-none rounded-xl overflow-hidden"
+          >
+            <div className="p-8">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-blue-400">Đăng nhập</h2>
+                <p className="text-sm text-gray-500 mt-1">Chào mừng bạn trở lại bàn cờ.</p>
+              </div>
+
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div>
-                  <Input
-                    type="text"
-                    placeholder="Email hoặc Username"
-                    {...register('identifier')}
-                    disabled={busy}
-                  />
-                  {errors.identifier && (
-                    <p className="text-xs text-red-600 mt-1">{errors.identifier.message}</p>
-                  )}
-                </div>
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm font-medium">
+                    {error}
+                  </div>
+                )}
 
-                <div>
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Email hoặc tên đăng nhập"
+                    fullWidth
+                    {...register('identifier')}
+                    error={errors.identifier?.message}
+                    disabled={busy}
+                    className="py-3 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-0 transition-none"
+                  />
+
                   <Input
                     type="password"
                     placeholder="Mật khẩu"
+                    fullWidth
                     {...register('password')}
+                    error={errors.password?.message}
                     disabled={busy}
+                    className="py-3 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-0 transition-none"
                   />
-                  {errors.password && (
-                    <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>
-                  )}
                 </div>
 
-                <Button type="submit" disabled={busy} className="w-full">
-                  {busy ? 'Đang đăng nhập...' : 'Đăng nhập'}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  fullWidth
+                  size="lg"
+                  loading={busy}
+                  className="py-3 text-lg font-bold bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
+                >
+                  Đăng nhập
                 </Button>
 
-                <div className="text-center text-sm text-gray-600">
-                  <Link to="/forgot-password" className="hover:underline">
+                <div className="flex items-center justify-between pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer group select-none">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-0 cursor-pointer"
+                      {...register('remember')}
+                    />
+                    <span className="text-sm text-gray-600 group-hover:text-blue-400 font-medium transition-colors">
+                      Ghi nhớ đăng nhập
+                    </span>
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm text-gray-600 hover:underline hover:text-blue-400 font-semibold"
+                  >
                     Quên mật khẩu?
                   </Link>
                 </div>
 
-                <div className="border-t pt-4 text-center text-sm">
-                  Chưa có tài khoản?{' '}
-                  <Link to="/register" className="text-blue-600 hover:underline">
-                    Đăng ký
-                  </Link>
+                <div className="pt-6 mt-4 border-t border-gray-100 text-center">
+                  <p className="text-sm text-gray-600">
+                    Chưa có tài khoản?{' '}
+                    <Link to="/register" className="text-blue-400 font-bold hover:underline ml-1">
+                      Đăng ký ngay
+                    </Link>
+                  </p>
                 </div>
               </form>
-            </Card>
-          </div>
+            </div>
+          </Card>
         </div>
       </div>
     </div>
