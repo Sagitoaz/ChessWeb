@@ -14,7 +14,8 @@ const CommonComponentsDemo = lazy(() => import('@pages/demo/CommonComponentsDemo
 // TODO: PAGES TO BE IMPLEMENTED BY TEAM
 // ============================================
 // Auth Pages (Team Member 1)
-// const LoginPage = lazy(() => import('@pages/auth/LoginPage'))
+const LoginPage = lazy(() => import('@pages/auth/LoginPage'))
+const LogoutPage = lazy(() => import('@pages/auth/LogoutPage'))
 // const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
 
 // Profile Pages (Team Member 1)
@@ -92,6 +93,10 @@ const HomePage = () => (
           <div className="text-3xl mb-2">🔐</div>
           <div>Login</div>
         </a>
+        <a href="/logout" className="bg-red-500/30 hover:bg-red-500/50 rounded-lg p-4 transition border-2 border-red-400">
+          <div className="text-3xl mb-2">🚪</div>
+          <div>Logout / Clear</div>
+        </a>
         <a href="/ranked" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
           <div className="text-3xl mb-2">🏆</div>
           <div>Ranked</div>
@@ -141,9 +146,10 @@ function AppRoutes() {
         {/* ==================== PUBLIC ROUTES (Auth) ==================== */}
         <Route path="/login" element={
           <PublicRoute>
-            <PlaceholderPage title="Login Page" module="Auth & Profile" assignedTo="Team Member 1" />
+            <LoginPage />
           </PublicRoute>
         } />
+        <Route path="/logout" element={<LogoutPage />} />
         <Route path="/register" element={
           <PublicRoute>
             <PlaceholderPage title="Register Page" module="Auth & Profile" assignedTo="Team Member 1" />
