@@ -90,26 +90,30 @@ export default function CreateRoomPage() {
   // Waiting for player screen
   if (roomCreated && waitingForPlayer) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center p-4">
-        <Card padding="none" className="max-w-2xl w-full">
+      <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">
+        <Card
+          variant="elevated"
+          padding="none"
+          className="max-w-2xl w-full bg-white shadow-md border-none rounded-xl overflow-hidden"
+        >
           <div className="p-8">
             {/* Success Header */}
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check size={32} className="text-green-600" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              <h1 className="text-2xl font-bold text-blue-400 mb-2">
                 Phòng đã được tạo!
               </h1>
               <p className="text-gray-600">
-                Chia sẻ mã phòng hoặc link để mời bạn bè tham gia
+                Chia sẻ mã phòng để mời bạn bè tham gia
               </p>
             </div>
 
             {/* Room Code Display */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+            <div className="bg-blue-50 rounded-lg p-6 mb-6">
               <div className="text-center mb-4">
-                <p className="text-sm text-gray-600 mb-2">Mã phòng của bạn</p>
+                <p className="text-sm text-gray-700 mb-2 font-medium">Mã phòng của bạn</p>
                 <div className="text-4xl font-bold tracking-widest text-blue-600 font-mono mb-4">
                   {roomCode}
                 </div>
@@ -117,7 +121,6 @@ export default function CreateRoomPage() {
                   <Button
                     variant="outline"
                     onClick={handleCopyCode}
-                    className="bg-white"
                   >
                     {copiedCode ? <Check size={16} /> : <Copy size={16} />}
                     {copiedCode ? 'Đã sao chép!' : 'Sao chép mã'}
@@ -125,7 +128,6 @@ export default function CreateRoomPage() {
                   <Button
                     variant="outline"
                     onClick={handleCopyLink}
-                    className="bg-white"
                   >
                     {copiedLink ? <Check size={16} /> : <Share2 size={16} />}
                     {copiedLink ? 'Đã sao chép!' : 'Sao chép link'}
@@ -140,24 +142,24 @@ export default function CreateRoomPage() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-gray-600">Tên phòng:</p>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-semibold text-gray-900">
                     {roomName || 'Không có tên'}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-600">Thời gian:</p>
-                  <p className="font-medium text-gray-900">{timeControl}</p>
+                  <p className="font-semibold text-gray-900">{timeControl}</p>
                 </div>
                 <div>
                   <p className="text-gray-600">Chế độ:</p>
-                  <p className="font-medium text-gray-900 flex items-center gap-1">
+                  <p className="font-semibold text-gray-900 flex items-center gap-1">
                     {isPrivate ? <Lock size={14} /> : <Globe size={14} />}
                     {isPrivate ? 'Riêng tư' : 'Công khai'}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-600">Increment:</p>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-semibold text-gray-900">
                     {increment > 0 ? `+${increment}s` : 'Không'}
                   </p>
                 </div>
@@ -166,11 +168,11 @@ export default function CreateRoomPage() {
 
             {/* Waiting Status */}
             <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-yellow-50 text-yellow-800 px-4 py-3 rounded-lg">
+              <div className="inline-flex items-center gap-2 bg-yellow-50 text-yellow-800 px-4 py-3 rounded-lg border border-yellow-200">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
                 <span className="font-medium">Đang chờ đối thủ tham gia...</span>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-gray-600 mt-2">
                 Bạn bè có thể tham gia bằng cách nhập mã phòng
               </p>
             </div>
@@ -185,9 +187,10 @@ export default function CreateRoomPage() {
                 Hủy phòng
               </Button>
               <Button
-                variant="success"
+                variant="primary"
                 onClick={handleStartGame}
                 fullWidth
+                className="bg-blue-600 hover:bg-blue-700"
               >
                 <Play size={18} />
                 Bắt đầu (Test)
@@ -201,10 +204,10 @@ export default function CreateRoomPage() {
 
   // Create room form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <div className="max-w-3xl mx-auto p-4 py-8">
+    <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">
+      <div className="w-full max-w-3xl">
         {/* Header */}
-        <div className="mb-6">
+        <div className="text-center mb-6">
           <Button
             variant="ghost"
             onClick={() => navigate('/rooms')}
@@ -213,19 +216,28 @@ export default function CreateRoomPage() {
             <ArrowLeft size={18} />
             Quay lại
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">
             Tạo phòng mới
           </h1>
-          <p className="text-gray-600">
+          <p className="text-lg text-gray-800">
             Tùy chỉnh cài đặt phòng và mời bạn bè chơi cùng
           </p>
         </div>
 
-        <Card padding="none">
-          <div className="p-6 space-y-6">
+        <Card
+          variant="elevated"
+          padding="none"
+          className="bg-white shadow-md border-none rounded-xl overflow-hidden"
+        >
+          <div className="p-8 space-y-6">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-blue-400 mb-1">Cài đặt phòng</h2>
+              <p className="text-gray-600">Chọn thời gian và chế độ chơi cho phòng</p>
+            </div>
+
             {/* Room Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Tên phòng (tùy chọn)
               </label>
               <Input
@@ -242,7 +254,7 @@ export default function CreateRoomPage() {
 
             {/* Time Control */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
                 Thời gian mỗi người
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -271,7 +283,7 @@ export default function CreateRoomPage() {
 
             {/* Increment */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
                 Thời gian thêm mỗi nước đi
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -281,7 +293,7 @@ export default function CreateRoomPage() {
                     onClick={() => setIncrement(option.value)}
                     className={`p-3 rounded-lg border-2 transition-all text-center ${
                       increment === option.value
-                        ? 'border-purple-500 bg-purple-50'
+                        ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300 bg-white'
                     }`}
                   >
@@ -293,7 +305,7 @@ export default function CreateRoomPage() {
 
             {/* Privacy */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
                 Chế độ phòng
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -310,7 +322,7 @@ export default function CreateRoomPage() {
                     className={`mx-auto mb-2 ${isPrivate ? 'text-blue-600' : 'text-gray-400'}`}
                   />
                   <div className="font-semibold text-gray-900">Riêng tư</div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-gray-600 mt-1">
                     Chỉ người có mã mới vào được
                   </div>
                 </button>
@@ -318,24 +330,24 @@ export default function CreateRoomPage() {
                   onClick={() => setIsPrivate(false)}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     !isPrivate
-                      ? 'border-green-500 bg-green-50'
+                      ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300 bg-white'
                   }`}
                 >
                   <Globe
                     size={24}
-                    className={`mx-auto mb-2 ${!isPrivate ? 'text-green-600' : 'text-gray-400'}`}
+                    className={`mx-auto mb-2 ${!isPrivate ? 'text-blue-600' : 'text-gray-400'}`}
                   />
                   <div className="font-semibold text-gray-900">Công khai</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Hiển thị trong danh sách phòng
+                  <div className="text-xs text-gray-600 mt-1">
+                    Hiển thị trong danh sách
                   </div>
                 </button>
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 pt-4 border-t">
+            <div className="flex gap-3 pt-6 border-t border-gray-100">
               <Button
                 variant="outline"
                 onClick={handleCancel}
@@ -349,6 +361,7 @@ export default function CreateRoomPage() {
                 loading={isCreating}
                 fullWidth
                 size="lg"
+                className="bg-blue-600 hover:bg-blue-700 py-3"
               >
                 <Users size={18} />
                 Tạo phòng
@@ -356,32 +369,6 @@ export default function CreateRoomPage() {
             </div>
           </div>
         </Card>
-
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          <Card padding="none" className="bg-blue-50 border-blue-200">
-            <div className="p-4">
-              <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                <Lock size={18} />
-                Phòng riêng tư
-              </h3>
-              <p className="text-sm text-blue-700">
-                Chỉ người có mã phòng mới có thể tham gia. Phù hợp để chơi với bạn bè.
-              </p>
-            </div>
-          </Card>
-          <Card padding="none" className="bg-green-50 border-green-200">
-            <div className="p-4">
-              <h3 className="font-semibold text-green-900 mb-2 flex items-center gap-2">
-                <Globe size={18} />
-                Phòng công khai
-              </h3>
-              <p className="text-sm text-green-700">
-                Phòng sẽ hiển thị trong danh sách. Ai cũng có thể tham gia chơi.
-              </p>
-            </div>
-          </Card>
-        </div>
       </div>
     </div>
   )
