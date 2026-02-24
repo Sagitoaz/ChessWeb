@@ -24,10 +24,10 @@ const Card = ({
 
   // Variant styles
   const variants = {
-    default: 'bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700',
-    elevated: 'bg-white shadow-md hover:shadow-lg dark:bg-gray-800',
-    outlined: 'bg-transparent border-2 border-gray-300 dark:border-gray-600',
-    flat: 'bg-gray-50 dark:bg-gray-900',
+    default: 'bg-white border border-gray-200',
+    elevated: 'bg-white shadow-md hover:shadow-lg',
+    outlined: 'bg-transparent border-2 border-gray-300',
+    flat: 'bg-gray-50',
   };
 
   // Padding styles
@@ -67,7 +67,7 @@ Card.propTypes = {
  * CardHeader - Header section của Card
  */
 export const CardHeader = ({ children, className = '', ...props }) => (
-  <div className={`border-b border-gray-200 pb-3 mb-4 dark:border-gray-700 ${className}`} {...props}>
+  <div className={`border-b border-gray-200 pb-3 mb-4 ${className}`} {...props}>
     {children}
   </div>
 );
@@ -81,7 +81,7 @@ CardHeader.propTypes = {
  * CardTitle - Title trong CardHeader
  */
 export const CardTitle = ({ children, className = '', ...props }) => (
-  <h3 className={`text-xl font-bold text-gray-900 dark:text-gray-100 ${className}`} {...props}>
+  <h3 className={`text-xl font-bold text-gray-900 ${className}`} {...props}>
     {children}
   </h3>
 );
@@ -95,7 +95,7 @@ CardTitle.propTypes = {
  * CardBody - Body section của Card
  */
 export const CardBody = ({ children, className = '', ...props }) => (
-  <div className={`text-gray-700 dark:text-gray-300 ${className}`} {...props}>
+  <div className={`text-gray-700 ${className}`} {...props}>
     {children}
   </div>
 );
@@ -109,7 +109,7 @@ CardBody.propTypes = {
  * CardFooter - Footer section của Card
  */
 export const CardFooter = ({ children, className = '', ...props }) => (
-  <div className={`border-t border-gray-200 pt-3 mt-4 dark:border-gray-700 ${className}`} {...props}>
+  <div className={`border-t border-gray-200 pt-3 mt-4 ${className}`} {...props}>
     {children}
   </div>
 );
