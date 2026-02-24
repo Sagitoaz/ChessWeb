@@ -185,7 +185,7 @@ const LoginPage = () => {
                     {...register('identifier')}
                     error={errors.identifier?.message}
                     disabled={busy}
-                    className="py-3 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-0 transition-none"
+                    className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                   />
 
                   <Input
@@ -195,7 +195,7 @@ const LoginPage = () => {
                     {...register('password')}
                     error={errors.password?.message}
                     disabled={busy}
-                    className="py-3 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-0 transition-none"
+                    className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                   />
                 </div>
 
