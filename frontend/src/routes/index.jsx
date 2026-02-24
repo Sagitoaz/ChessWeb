@@ -30,16 +30,16 @@ const LogoutPage = lazy(() => import('@pages/auth/LogoutPage'))
 // const RankedStatsPage = lazy(() => import('@pages/ranked/RankedStatsPage'))
 
 // Room Pages (Team Member 3)
-// const RoomListPage = lazy(() => import('@pages/rooms/RoomListPage'))
-// const CreateRoomPage = lazy(() => import('@pages/rooms/CreateRoomPage'))
-// const JoinRoomPage = lazy(() => import('@pages/rooms/JoinRoomPage'))
-// const RoomGamePage = lazy(() => import('@pages/rooms/RoomGamePage'))
+const RoomListPage = lazy(() => import('@pages/rooms/RoomListPage'))
+const CreateRoomPage = lazy(() => import('@pages/rooms/CreateRoomPage'))
+const JoinRoomPage = lazy(() => import('@pages/rooms/JoinRoomPage'))
+const RoomGamePage = lazy(() => import('@pages/rooms/RoomGamePage'))
 
 // Tournament Pages (Team Member 3)
-// const TournamentListPage = lazy(() => import('@pages/tournaments/TournamentListPage'))
-// const CreateTournamentPage = lazy(() => import('@pages/tournaments/CreateTournamentPage'))
-// const TournamentDetailPage = lazy(() => import('@pages/tournaments/TournamentDetailPage'))
-// const TournamentBracketPage = lazy(() => import('@pages/tournaments/TournamentBracketPage'))
+const TournamentListPage = lazy(() => import('@pages/tournaments/TournamentListPage'))
+const CreateTournamentPage = lazy(() => import('@pages/tournaments/CreateTournamentPage'))
+const TournamentDetailPage = lazy(() => import('@pages/tournaments/TournamentDetailPage'))
+const TournamentBracketPage = lazy(() => import('@pages/tournaments/TournamentBracketPage'))
 
 // Bot Pages (Team Member 4)
 // const BotSelectPage = lazy(() => import('@pages/bot/BotSelectPage'))
@@ -124,6 +124,37 @@ const HomePage = () => (
           View Component Demos
         </a>
       </div>
+
+      {/* TEST ROUTES - Member 3 */}
+      <div className="mt-8 pt-8 border-t border-white/20">
+        <p className="text-sm mb-4 text-white/80">🧪 Test Pages (No Login Required)</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <a href="/test/rooms" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">
+            Rooms List
+          </a>
+          <a href="/test/rooms/create" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">
+            Create Room
+          </a>
+          <a href="/test/rooms/join" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">
+            Join Room
+          </a>
+          <a href="/test/rooms/game" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">
+            Room Game
+          </a>
+          <a href="/test/tournaments" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">
+            Tournaments
+          </a>
+          <a href="/test/tournaments/create" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">
+            Create Tournament
+          </a>
+          <a href="/test/tournaments/detail" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">
+            Tournament Detail
+          </a>
+          <a href="/test/tournaments/bracket" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">
+            Tournament Bracket
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 )
@@ -196,44 +227,44 @@ function AppRoutes() {
         {/* ==================== ROOM ROUTES ==================== */}
         <Route path="/rooms" element={
           <PrivateRoute>
-            <PlaceholderPage title="Room List" module="Friend Rooms" assignedTo="Team Member 3" />
+            <RoomListPage />
           </PrivateRoute>
         } />
         <Route path="/rooms/create" element={
           <PrivateRoute>
-            <PlaceholderPage title="Create Room" module="Friend Rooms" assignedTo="Team Member 3" />
+            <CreateRoomPage />
           </PrivateRoute>
         } />
         <Route path="/rooms/join" element={
           <PrivateRoute>
-            <PlaceholderPage title="Join Room" module="Friend Rooms" assignedTo="Team Member 3" />
+            <JoinRoomPage />
           </PrivateRoute>
         } />
         <Route path="/rooms/:roomId" element={
           <PrivateRoute>
-            <PlaceholderPage title="Room Game" module="Friend Rooms" assignedTo="Team Member 3" />
+            <RoomGamePage />
           </PrivateRoute>
         } />
 
         {/* ==================== TOURNAMENT ROUTES ==================== */}
         <Route path="/tournaments" element={
           <PrivateRoute>
-            <PlaceholderPage title="Tournament List" module="Tournaments" assignedTo="Team Member 3" />
+            <TournamentListPage />
           </PrivateRoute>
         } />
         <Route path="/tournaments/create" element={
           <PrivateRoute>
-            <PlaceholderPage title="Create Tournament" module="Tournaments" assignedTo="Team Member 3" />
+            <CreateTournamentPage />
           </PrivateRoute>
         } />
         <Route path="/tournaments/:tournamentId" element={
           <PrivateRoute>
-            <PlaceholderPage title="Tournament Detail" module="Tournaments" assignedTo="Team Member 3" />
+            <TournamentDetailPage />
           </PrivateRoute>
         } />
         <Route path="/tournaments/:tournamentId/bracket" element={
           <PrivateRoute>
-            <PlaceholderPage title="Tournament Bracket" module="Tournaments" assignedTo="Team Member 3" />
+            <TournamentBracketPage />
           </PrivateRoute>
         } />
 
@@ -265,6 +296,17 @@ function AppRoutes() {
         <Route path="/demo" element={<GameComponentsDemo />} />
         <Route path="/demo/game" element={<GameComponentsDemo />} />
         <Route path="/demo/components" element={<CommonComponentsDemo />} />
+
+        {/* ==================== TEST ROUTES - Member 3 ==================== */}
+        {/* Route test riêng KHÔNG CẦN LOGIN - chỉ để test UI */}
+        <Route path="/test/rooms" element={<RoomListPage />} />
+        <Route path="/test/rooms/create" element={<CreateRoomPage />} />
+        <Route path="/test/rooms/join" element={<JoinRoomPage />} />
+        <Route path="/test/rooms/game" element={<RoomGamePage />} />
+        <Route path="/test/tournaments" element={<TournamentListPage />} />
+        <Route path="/test/tournaments/create" element={<CreateTournamentPage />} />
+        <Route path="/test/tournaments/detail" element={<TournamentDetailPage />} />
+        <Route path="/test/tournaments/bracket" element={<TournamentBracketPage />} />
 
         {/* ==================== 404 ==================== */}
         <Route path="*" element={
