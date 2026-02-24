@@ -15,7 +15,7 @@ const CommonComponentsDemo = lazy(() => import('@pages/demo/CommonComponentsDemo
 // ============================================
 // Auth Pages (Team Member 1)
 const LoginPage = lazy(() => import('@pages/auth/LoginPage'))
-// const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
+const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
 
 // Profile Pages (Team Member 1)
 // const ProfilePage = lazy(() => import('@pages/profile/ProfilePage'))
@@ -159,11 +159,7 @@ function AppRoutes() {
           path="/register"
           element={
             <PublicRoute>
-              <PlaceholderPage
-                title="Register Page"
-                module="Auth & Profile"
-                assignedTo="Team Member 1"
-              />
+              <RegisterPage />
             </PublicRoute>
           }
         />

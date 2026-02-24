@@ -42,13 +42,12 @@
 
 import { BrowserRouter as Router } from 'react-router-dom'
 import { NotificationProvider } from '@/components/common'
-import LoginPage from '@/pages/auth/LoginPage'
-
+import AppRouter from './routes'
 function App() {
   return (
     <NotificationProvider position="top-right">
       <Router>
-        <LoginPage />
+        <AppRouter />
       </Router>
     </NotificationProvider>
   )
