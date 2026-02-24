@@ -1,12 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 
 import { useAuth } from '@/hooks/useAuth'
-import { useNotification } from '@/components/common'
-import { Card, Button, Input } from '@/components/common'
+import { useNotification, Card, Button, Input } from '@/components/common'
 
 const loginSchema = z.object({
   identifier: z
@@ -16,6 +15,56 @@ const loginSchema = z.object({
   password: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
   remember: z.boolean().optional(),
 })
+
+const GOOGLE_MOCK_CREDENTIALS = {
+  username: 'google_user',
+  password: 'google_oauth',
+}
+
+const Divider = () => (
+  <div className="relative py-2">
+    <div className="absolute inset-0 flex items-center">
+      <div className="w-full border-t border-gray-200" />
+    </div>
+    <div className="relative flex justify-center">
+      <span className="bg-white px-3 text-xs text-gray-500">HOẶC</span>
+    </div>
+  </div>
+)
+
+const GoogleButton = ({ onClick, disabled }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+  >
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#FFC107"
+        d="M43.611 20.083H42V20H24v8h11.303C33.73 32.659 29.223 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.958 3.042l5.657-5.657C34.047 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"
+      />
+      <path
+        fill="#FF3D00"
+        d="M6.306 14.691l6.571 4.819C14.655 16.108 19.008 12 24 12c3.059 0 5.842 1.154 7.958 3.042l5.657-5.657C34.047 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.166 0 9.86-1.977 13.409-5.197l-6.19-5.238C29.182 35.091 26.715 36 24 36c-5.202 0-9.694-3.317-11.259-7.946l-6.523 5.025C9.505 39.556 16.227 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.611 20.083H42V20H24v8h11.303c-.746 2.062-2.231 3.809-4.094 4.995l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.651-.389-3.917z"
+      />
+    </svg>
+    Đăng nhập với Google
+  </button>
+)
+
+GoogleButton.propTypes = {
+  onClick: Function,
+  disabled: Boolean,
+}
 
 const LoginPage = () => {
   const navigate = useNavigate()
@@ -38,33 +87,67 @@ const LoginPage = () => {
   } = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues,
-    mode: 'onTouch',
+    mode: 'onTouched',
   })
 
   const busy = loading || isSubmitting
 
-  const onSubmit = async (data) => {
-    try {
-      clearError?.()
-      await login(data)
+  const notifySuccess = useCallback(
+    (title, message) =>
       showNotification({
         type: 'success',
-        title: 'Đăng nhập thành công',
-        message: `Chào mừng! Bạn đã đăng nhập thành công.`,
-      })
-      navigate('/', { replace: true })
-    } catch (err) {
+        title,
+        message,
+        duration: 2500,
+      }),
+    [showNotification]
+  )
+
+  const notifyError = useCallback(
+    (title, message) =>
       showNotification({
         type: 'error',
-        title: 'Đăng nhập thất bại',
-        message: err.message || 'Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại.',
+        title,
+        message,
+        duration: 4000,
+      }),
+    [showNotification]
+  )
+
+  const handleLogin = useCallback(
+    async ({ username, password }) => {
+      clearError?.()
+      await login({ username, password })
+      navigate('/', { replace: true })
+    },
+    [clearError, login, navigate]
+  )
+
+  const onSubmit = async (data) => {
+    try {
+      await handleLogin({
+        username: data.identifier,
+        password: data.password,
       })
+      notifySuccess('Đăng nhập thành công', 'Chào mừng bạn quay lại!')
+    } catch (err) {
+      notifyError('Đăng nhập thất bại', err?.message || 'Vui lòng thử lại.')
+    }
+  }
+
+  const onGoogleLogin = async () => {
+    try {
+      await handleLogin(GOOGLE_MOCK_CREDENTIALS)
+      notifySuccess('Đăng nhập Google thành công', 'Chào mừng bạn quay lại!')
+    } catch (err) {
+      notifyError('Đăng nhập Google thất bại', err?.message || 'Vui lòng thử lại.')
     }
   }
 
   return (
     <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">
       <div className="w-full max-w-5xl flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-8">
+        {/* LEFT */}
         <div className="w-full lg:w-1/2 text-center lg:text-left">
           <div className="mb-4">
             <span className="text-6xl text-blue-600 leading-none select-none">♟</span>
@@ -75,6 +158,7 @@ const LoginPage = () => {
           </p>
         </div>
 
+        {/* RIGHT */}
         <div className="w-full lg:w-[400px]">
           <Card
             variant="elevated"
@@ -101,7 +185,7 @@ const LoginPage = () => {
                     {...register('identifier')}
                     error={errors.identifier?.message}
                     disabled={busy}
-                    className="py-3 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-0 transition-none"
+                    className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                   />
 
                   <Input
@@ -111,7 +195,7 @@ const LoginPage = () => {
                     {...register('password')}
                     error={errors.password?.message}
                     disabled={busy}
-                    className="py-3 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-0 transition-none"
+                    className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                   />
                 </div>
 
@@ -126,17 +210,23 @@ const LoginPage = () => {
                   Đăng nhập
                 </Button>
 
+                <Divider />
+
+                <GoogleButton onClick={onGoogleLogin} disabled={busy} />
+
                 <div className="flex items-center justify-between pt-2">
                   <label className="flex items-center gap-2 cursor-pointer group select-none">
                     <input
                       type="checkbox"
                       className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-0 cursor-pointer"
                       {...register('remember')}
+                      disabled={busy}
                     />
                     <span className="text-sm text-gray-600 group-hover:text-blue-400 font-medium transition-colors">
                       Ghi nhớ đăng nhập
                     </span>
                   </label>
+
                   <Link
                     to="/forgot-password"
                     className="text-sm text-gray-600 hover:underline hover:text-blue-400 font-semibold"
