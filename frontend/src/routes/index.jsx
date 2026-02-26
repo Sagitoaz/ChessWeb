@@ -7,6 +7,7 @@ import PublicRoute from './PublicRoute'
 // ============================================
 // DEMO PAGES (For testing components)
 // ============================================
+const DemoHubPage = lazy(() => import('@pages/demo/DemoHubPage'))
 const GameComponentsDemo = lazy(() => import('@pages/demo/GameComponentsDemo'))
 const CommonComponentsDemo = lazy(() => import('@pages/demo/CommonComponentsDemo'))
 
@@ -114,9 +115,15 @@ const HomePage = () => (
         </a>
       </div>
       
-      <div className="space-x-4">
-        <a href="/demo" className="inline-block bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
-          View Component Demos
+      <div className="flex flex-wrap justify-center gap-4">
+        <a href="/demo" className="inline-flex items-center gap-2 bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
+          🎮 Demo Hub
+        </a>
+        <a href="/demo/ranked" className="inline-flex items-center gap-2 bg-yellow-400 text-gray-900 px-6 py-3 rounded-lg font-semibold hover:bg-yellow-300 transition">
+          🏆 Test Ranked
+        </a>
+        <a href="/demo/ranked/game" className="inline-flex items-center gap-2 bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-400 transition">
+          ⚔️ Play Demo Game
         </a>
       </div>
     </div>
@@ -256,7 +263,7 @@ function AppRoutes() {
         } />
 
         {/* ==================== DEMO ROUTES ==================== */}
-        <Route path="/demo" element={<GameComponentsDemo />} />
+        <Route path="/demo" element={<DemoHubPage />} />
         <Route path="/demo/game" element={<GameComponentsDemo />} />
         <Route path="/demo/components" element={<CommonComponentsDemo />} />
         <Route path="/demo/ranked" element={<RankedLobbyPage />} />
