@@ -50,7 +50,7 @@ const formatSearchTime = (seconds) => {
 const MOCK_USER = {
   id: 1,
   username: 'ChessPlayer',
-  rating: 1523,
+  rating: 3636,
   avatarUrl: 'https://i.pravatar.cc/150?img=1',
 }
 

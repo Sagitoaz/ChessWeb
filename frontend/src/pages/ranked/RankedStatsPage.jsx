@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   BarChart3,
   Trophy,
@@ -377,6 +377,8 @@ const RankProgressBar = ({ rating }) => {
 // ═════════════════════════════════════════════════════
 const RankedStatsPage = () => {
   const navigate = useNavigate()
+  const location = useLocation()
+  const isDemo = location.pathname.startsWith('/demo')
   const storeUser = useAuthStore((s) => s.user)
 
   const user = useMemo(
@@ -456,7 +458,7 @@ const RankedStatsPage = () => {
         {/* ─── Header ─── */}
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => navigate('/demo/ranked')}
+            onClick={() => navigate(isDemo ? '/demo/ranked' : '/ranked')}
             className="p-2 rounded-lg hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -471,7 +473,7 @@ const RankedStatsPage = () => {
             </p>
           </div>
           <Link
-            to="/demo/ranked/history"
+            to={isDemo ? '/demo/ranked/history' : '/ranked/history'}
             className="flex items-center gap-2 px-4 py-2 bg-[#262421] border border-gray-700 rounded-lg text-sm text-gray-300 hover:text-[#81b64c] hover:border-[#81b64c]/30 transition-colors"
           >
             <History className="w-4 h-4" />
@@ -664,14 +666,14 @@ const RankedStatsPage = () => {
         {/* ─── Bottom Actions ─── */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
-            onClick={() => navigate('/demo/ranked')}
+            onClick={() => navigate(isDemo ? '/demo/ranked' : '/ranked')}
             className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#81b64c] hover:bg-[#6a9a3f] text-white rounded-lg font-medium text-sm transition-colors"
           >
             <Swords className="w-4 h-4" />
             Play Ranked
           </button>
           <Link
-            to="/demo/ranked/history"
+            to={isDemo ? '/demo/ranked/history' : '/ranked/history'}
             className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#262421] border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg font-medium text-sm transition-colors"
           >
             <History className="w-4 h-4" />

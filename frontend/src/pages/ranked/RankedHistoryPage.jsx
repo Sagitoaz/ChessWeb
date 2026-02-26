@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   History,
   ChevronLeft,
@@ -273,6 +273,8 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
 // ═════════════════════════════════════════════════════
 const RankedHistoryPage = () => {
   const navigate = useNavigate()
+  const location = useLocation()
+  const isDemo = location.pathname.startsWith('/demo')
   const storeUser = useAuthStore((s) => s.user)
 
   const user = useMemo(
@@ -352,7 +354,7 @@ const RankedHistoryPage = () => {
         {/* ─── Header ─── */}
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => navigate('/demo/ranked')}
+            onClick={() => navigate(isDemo ? '/demo/ranked' : '/ranked')}
             className="p-2 rounded-lg hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
             title="Back to Lobby"
           >
@@ -414,7 +416,7 @@ const RankedHistoryPage = () => {
 
           {/* Link to stats */}
           <Link
-            to="/demo/ranked/stats"
+            to={isDemo ? '/demo/ranked/stats' : '/ranked/stats'}
             className="flex items-center gap-2 px-4 py-2 bg-[#262421] border border-gray-700 rounded-lg text-sm text-gray-300 hover:text-[#81b64c] hover:border-[#81b64c]/30 transition-colors"
           >
             <BarChart3 className="w-4 h-4" />
@@ -462,7 +464,7 @@ const RankedHistoryPage = () => {
             </p>
             {matches.length === 0 && (
               <Button
-                onClick={() => navigate('/demo/ranked')}
+                onClick={() => navigate(isDemo ? '/demo/ranked' : '/ranked')}
                 className="gap-2 bg-[#81b64c] hover:bg-[#6a9a3f] text-white"
               >
                 <Swords className="w-4 h-4" />

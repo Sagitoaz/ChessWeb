@@ -36,6 +36,8 @@ const INITIAL_TIME_MS = 600_000 // 10 minutes per side
 const CLOCK_TICK_MS = 100
 const AI_DELAY_MIN = 1200
 const AI_DELAY_MAX = 3500
+const INACTIVITY_WARNING_SEC = 90 // warn at 90s
+const INACTIVITY_TIMEOUT_SEC = 120 // auto-resign at 120s
 
 /** Starting piece counts (per side) */
 const STARTING_MATERIAL = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 }
@@ -529,6 +531,10 @@ const RankedGamePage = () => {
   const [moveFrom, setMoveFrom] = useState(null)
   const [optionSquares, setOptionSquares] = useState({})
 
+  // ─── Promotion state ───
+  const [promotionToSquare, setPromotionToSquare] = useState(null)
+  const [pendingPromoFrom, setPendingPromoFrom] = useState(null)
+
   // ─── Game phase ───
   const [gamePhase, setGamePhase] = useState(GAME_PHASE.LOADING)
 
@@ -554,6 +560,50 @@ const RankedGamePage = () => {
 
   // ─── Sound ───
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const soundRefs = useRef({
+    move: null,
+    capture: null,
+    check: null,
+    gameEnd: null,
+  })
+
+  // Initialize sound effects (using Web Audio API fallback)
+  useEffect(() => {
+    const createTone = (freq, duration, type = 'sine') => () => {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = type
+        osc.frequency.value = freq
+        gain.gain.setValueAtTime(0.15, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start()
+        osc.stop(ctx.currentTime + duration)
+      } catch { /* silent fallback */ }
+    }
+    soundRefs.current = {
+      move: createTone(600, 0.08),
+      capture: createTone(300, 0.15, 'square'),
+      check: createTone(880, 0.2, 'sawtooth'),
+      gameEnd: createTone(440, 0.4, 'triangle'),
+    }
+  }, [])
+
+  const playSound = useCallback((name) => {
+    if (!soundEnabled) return
+    soundRefs.current[name]?.()
+  }, [soundEnabled])
+
+  // ─── Inactivity Timer ───
+  const [inactivityTime, setInactivityTime] = useState(0)
+  const [showAFKWarning, setShowAFKWarning] = useState(false)
+  const inactivityRef = useRef(null)
+
+  // ─── Opponent disconnect ───
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false)
 
   // ─── WebSocket (for future online play) ───
   const gameSocket = useGameSocket(matchId)
@@ -663,7 +713,9 @@ const RankedGamePage = () => {
     endedRef.current = true
     setGamePhase(GAME_PHASE.ENDED)
     if (clockRef.current) clearInterval(clockRef.current)
+    if (inactivityRef.current) clearInterval(inactivityRef.current)
     setEndResult({ result, reason })
+    setShowAFKWarning(false)
 
     const txt =
       result === 'win'
@@ -675,8 +727,9 @@ const RankedGamePage = () => {
       ...prev,
       { text: `Game Over — ${txt} (${reason})`, isSystem: true },
     ])
+    playSound('gameEnd')
     setTimeout(() => setShowEndModal(true), 600)
-  }, [])
+  }, [playSound])
 
   // ─── Timeout detection (runs each clock tick) ───
   useEffect(() => {
@@ -713,6 +766,76 @@ const RankedGamePage = () => {
   }, [playerColor, endGame])
 
   // ═══════════════════════════════════════════
+  // INACTIVITY TIMER — warn at 90s, auto-resign at 120s
+  // ═══════════════════════════════════════════
+  useEffect(() => {
+    if (gamePhase !== GAME_PHASE.PLAYING || endedRef.current) {
+      if (inactivityRef.current) clearInterval(inactivityRef.current)
+      return
+    }
+
+    // Reset inactivity when turn changes
+    setInactivityTime(0)
+    setShowAFKWarning(false)
+
+    if (!isMyTurn) {
+      if (inactivityRef.current) clearInterval(inactivityRef.current)
+      return
+    }
+
+    inactivityRef.current = setInterval(() => {
+      setInactivityTime((prev) => {
+        const next = prev + 1
+        if (next === INACTIVITY_WARNING_SEC) {
+          setShowAFKWarning(true)
+          setChatMessages((p) => [
+            ...p,
+            { text: '⚠️ Make a move or you will lose! (30s remaining)', isSystem: true },
+          ])
+        }
+        if (next >= INACTIVITY_TIMEOUT_SEC) {
+          endGame('afk', 'lose')
+          if (gameSocket?.isConnected) {
+            gameSocket.emit?.('game:afkTimeout', { matchId })
+          }
+        }
+        return next
+      })
+    }, 1000)
+
+    return () => {
+      if (inactivityRef.current) clearInterval(inactivityRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMyTurn, gamePhase, endGame, matchId])
+
+  // ═══════════════════════════════════════════
+  // DISCONNECT HANDLING — listen for opponent events
+  // ═══════════════════════════════════════════
+  useEffect(() => {
+    if (!gameSocket) return
+
+    const handleOpponentDisconnect = () => {
+      setOpponentDisconnected(true)
+      setChatMessages((prev) => [
+        ...prev,
+        { text: '⚠️ Opponent disconnected. Waiting for reconnect...', isSystem: true },
+      ])
+    }
+
+    const handleOpponentReconnect = () => {
+      setOpponentDisconnected(false)
+      setChatMessages((prev) => [
+        ...prev,
+        { text: '✅ Opponent reconnected.', isSystem: true },
+      ])
+    }
+
+    gameSocket.onOpponentDisconnected(handleOpponentDisconnect)
+    gameSocket.onOpponentReconnected(handleOpponentReconnect)
+  }, [gameSocket])
+
+  // ═══════════════════════════════════════════
   // COMMIT MOVE  — shared by drag-drop & click
   // ═══════════════════════════════════════════
   const commitMove = useCallback(
@@ -723,7 +846,24 @@ const RankedGamePage = () => {
       setMoveFrom(null)
       setOptionSquares({})
       setDrawOffer(null)
-      checkGameEnd()
+
+      // Reset inactivity on own move
+      setInactivityTime(0)
+      setShowAFKWarning(false)
+
+      // Sound effects
+      if (move.captured) {
+        playSound('capture')
+      } else {
+        playSound('move')
+      }
+
+      const ended = checkGameEnd()
+
+      // Play check sound if in check and game didn't end
+      if (!ended && gameRef.current.inCheck()) {
+        playSound('check')
+      }
 
       if (gameSocket?.isConnected) {
         gameSocket.sendMove({
@@ -734,7 +874,79 @@ const RankedGamePage = () => {
         })
       }
     },
-    [checkGameEnd, gameSocket],
+    [checkGameEnd, gameSocket, playSound],
+  )
+
+  // ═══════════════════════════════════════════
+  // PROMOTION HELPERS
+  // ═══════════════════════════════════════════
+
+  /** Check whether a move from src→dst is a pawn promotion */
+  const isPromotionMove = useCallback((src, dst) => {
+    const piece = gameRef.current.get(src)
+    if (!piece || piece.type !== 'p') return false
+    const targetRank = dst[1]
+    return (
+      (piece.color === 'w' && targetRank === '8') ||
+      (piece.color === 'b' && targetRank === '1')
+    )
+  }, [])
+
+  /**
+   * Called by react-chessboard to decide if the built-in promotion dialog should show.
+   * Return true → show dialog, false → normal move.
+   */
+  const onPromotionCheck = useCallback(
+    (sourceSquare, targetSquare, _piece) => {
+      return isPromotionMove(sourceSquare, targetSquare)
+    },
+    [isPromotionMove],
+  )
+
+  /**
+   * Called when the user picks a piece from the built-in promotion dialog.
+   * `piece` is e.g. "wQ", "wR", "bN", "bB" or undefined if cancelled.
+   */
+  const onPromotionPieceSelect = useCallback(
+    (piece, promoteFromSquare, promoteToSquare) => {
+      // User cancelled
+      if (!piece) {
+        setPromotionToSquare(null)
+        setPendingPromoFrom(null)
+        setMoveFrom(null)
+        setOptionSquares({})
+        return false
+      }
+
+      // Extract promotion type: "wQ" → "q", "bN" → "n"
+      const promoType = piece[1].toLowerCase()
+      const from = promoteFromSquare || pendingPromoFrom
+      const to = promoteToSquare || promotionToSquare
+
+      if (!from || !to) {
+        setPromotionToSquare(null)
+        setPendingPromoFrom(null)
+        return false
+      }
+
+      const move = gameRef.current.move({
+        from,
+        to,
+        promotion: promoType,
+      })
+
+      setPromotionToSquare(null)
+      setPendingPromoFrom(null)
+      setMoveFrom(null)
+      setOptionSquares({})
+
+      if (move) {
+        commitMove(move)
+        return true
+      }
+      return false
+    },
+    [commitMove, pendingPromoFrom, promotionToSquare],
   )
 
   // ═══════════════════════════════════════════
@@ -745,16 +957,22 @@ const RankedGamePage = () => {
       if (gamePhase !== GAME_PHASE.PLAYING || endedRef.current || !isMyTurn)
         return false
 
+      // If promotion → let the built-in dialog handle it
+      if (isPromotionMove(src, dst)) {
+        setPendingPromoFrom(src)
+        setPromotionToSquare(dst)
+        return false // don't commit yet — wait for dialog
+      }
+
       const move = gameRef.current.move({
         from: src,
         to: dst,
-        promotion: 'q',
       })
       if (!move) return false
       commitMove(move)
       return true
     },
-    [gamePhase, isMyTurn, commitMove],
+    [gamePhase, isMyTurn, commitMove, isPromotionMove],
   )
 
   // ═══════════════════════════════════════════
@@ -785,10 +1003,16 @@ const RankedGamePage = () => {
 
       // Already selected a piece → try to move
       if (moveFrom) {
+        // If this is a promotion move, show the dialog instead
+        if (isPromotionMove(moveFrom, square)) {
+          setPendingPromoFrom(moveFrom)
+          setPromotionToSquare(square)
+          return
+        }
+
         const move = gameRef.current.move({
           from: moveFrom,
           to: square,
-          promotion: 'q',
         })
         if (move) {
           commitMove(move)
@@ -855,7 +1079,18 @@ const RankedGamePage = () => {
       setFen(gameRef.current.fen())
       setMoveHistory(gameRef.current.history({ verbose: true }))
       setLastMove({ from: move.from, to: move.to })
-      checkGameEnd()
+
+      // Sound for opponent moves
+      if (move.captured) {
+        playSound('capture')
+      } else {
+        playSound('move')
+      }
+
+      const aiEnded = checkGameEnd()
+      if (!aiEnded && gameRef.current.inCheck()) {
+        playSound('check')
+      }
 
       // Occasional bot chat
       if (Math.random() < 0.12) {
@@ -978,6 +1213,15 @@ const RankedGamePage = () => {
     () => navigate(isDemo ? '/demo/ranked/history' : '/ranked/history'),
     [navigate, isDemo]
   )
+
+  // ═══════════════════════════════════════════
+  // CLEANUP on unmount
+  // ═══════════════════════════════════════════
+  useEffect(() => {
+    return () => {
+      if (inactivityRef.current) clearInterval(inactivityRef.current)
+    }
+  }, [])
 
   // ═══════════════════════════════════════════
   // LOADING SCREEN
@@ -1112,6 +1356,10 @@ const RankedGamePage = () => {
                 customLightSquareStyle={{ backgroundColor: '#edeed1' }}
                 animationDuration={200}
                 showBoardNotation
+                promotionToSquare={promotionToSquare}
+                onPromotionCheck={onPromotionCheck}
+                onPromotionPieceSelect={onPromotionPieceSelect}
+                promotionDialogVariant="default"
               />
             </div>
 
@@ -1132,6 +1380,26 @@ const RankedGamePage = () => {
             className="w-full lg:flex-1 lg:min-w-[280px] flex flex-col bg-[#262421] rounded-lg border border-gray-700 overflow-hidden"
             style={{ maxHeight: 'calc(100vh - 120px)' }}
           >
+            {/* AFK Warning Banner */}
+            {showAFKWarning && gamePhase === GAME_PHASE.PLAYING && (
+              <div className="px-3 py-2 bg-red-900/40 border-b border-red-600/50 animate-pulse">
+                <div className="flex items-center justify-center gap-2 text-sm text-red-300 font-medium">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Make a move! Auto-resign in {INACTIVITY_TIMEOUT_SEC - inactivityTime}s</span>
+                </div>
+              </div>
+            )}
+
+            {/* Opponent Disconnected Banner */}
+            {opponentDisconnected && gamePhase === GAME_PHASE.PLAYING && (
+              <div className="px-3 py-2 bg-yellow-900/30 border-b border-yellow-600/50">
+                <div className="flex items-center justify-center gap-2 text-sm text-yellow-300 font-medium">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Opponent disconnected. Waiting for reconnect...</span>
+                </div>
+              </div>
+            )}
+
             {/* Status strip */}
             <div
               className={`px-4 py-2 text-sm font-semibold text-center border-b border-gray-700 ${
