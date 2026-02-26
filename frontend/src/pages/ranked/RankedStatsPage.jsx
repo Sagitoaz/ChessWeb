@@ -23,6 +23,7 @@ import { MainLayout } from '@components/layout'
 import { useAuthStore } from '@store'
 import gameService from '@services/gameService'
 import { RANKS } from '@utils/constants'
+import { THEME } from '@/styles/theme'
 
 // ─────────────────────────────────────────────────────
 // HELPERS
@@ -64,16 +65,16 @@ const generateMonthlyPerf = () => {
 // ═════════════════════════════════════════════════════
 // SUB-CMP: StatCard — reusable stat display card
 // ═════════════════════════════════════════════════════
-const StatCard = ({ icon: Icon, label, value, subValue, iconColor = 'text-[#81b64c]', valueColor = 'text-white' }) => (
-  <div className="bg-[#262421] rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
+const StatCard = ({ icon: Icon, label, value, subValue, iconColor = 'text-[#81b64c]', valueColor }) => (
+  <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} hover:border-gray-300 transition-colors ${THEME.shadow.DEFAULT}`}>
     <div className="flex items-center gap-2 mb-2">
       <Icon className={`w-4 h-4 ${iconColor}`} />
-      <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
+      <span className={`text-xs ${THEME.text.secondary} uppercase tracking-wider font-semibold`}>
         {label}
       </span>
     </div>
-    <p className={`text-2xl font-bold ${valueColor}`}>{value}</p>
-    {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
+    <p className={`text-2xl font-bold ${valueColor || THEME.text.primary}`}>{value}</p>
+    {subValue && <p className={`text-xs ${THEME.text.muted} mt-0.5`}>{subValue}</p>}
   </div>
 )
 
@@ -265,15 +266,15 @@ const WinRateDonut = ({ wins, losses, draws, total }) => {
       <div className="flex gap-4 mt-2">
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-          <span className="text-xs text-gray-400">{wins}W</span>
+          <span className={`text-xs ${THEME.text.secondary}`}>{wins}W</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-          <span className="text-xs text-gray-400">{losses}L</span>
+          <span className={`text-xs ${THEME.text.secondary}`}>{losses}L</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-          <span className="text-xs text-gray-400">{draws}D</span>
+          <span className={`text-xs ${THEME.text.secondary}`}>{draws}D</span>
         </div>
       </div>
     </div>
@@ -336,7 +337,7 @@ const RankProgressBar = ({ rating }) => {
   const progress = ((rating - prevMin) / (nextMin - prevMin)) * 100
 
   return (
-    <div className="bg-[#262421] rounded-lg p-4 border border-gray-700">
+    <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.DEFAULT}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Award className="w-4 h-4" style={{ color: rank.color }} />
@@ -345,14 +346,14 @@ const RankProgressBar = ({ rating }) => {
           </span>
         </div>
         {nextRank && (
-          <span className="text-xs text-gray-500">
+          <span className={`text-xs ${THEME.text.muted}`}>
             Next: <span style={{ color: nextRank.color }}>{nextRank.name}</span> ({nextRank.min})
           </span>
         )}
       </div>
 
       {/* Progress bar */}
-      <div className="w-full bg-gray-800 rounded-full h-3 mb-2">
+      <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
         <div
           className="h-3 rounded-full transition-all duration-700"
           style={{
@@ -363,9 +364,9 @@ const RankProgressBar = ({ rating }) => {
         />
       </div>
 
-      <div className="flex justify-between text-xs text-gray-500">
+      <div className={`flex justify-between text-xs ${THEME.text.muted}`}>
         <span>{prevMin}</span>
-        <span className="font-mono font-bold text-white">{rating}</span>
+        <span className={`font-mono font-bold ${THEME.text.primary}`}>{rating}</span>
         <span>{nextMin === Infinity ? '∞' : nextMin}</span>
       </div>
     </div>
@@ -430,7 +431,7 @@ const RankedStatsPage = () => {
       <MainLayout>
         <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
           <Loader size="lg" />
-          <p className="text-gray-400 text-sm">Loading stats...</p>
+          <p className={`${THEME.text.secondary} text-sm`}>Loading stats...</p>
         </div>
       </MainLayout>
     )
@@ -459,22 +460,22 @@ const RankedStatsPage = () => {
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => navigate(isDemo ? '/demo/ranked' : '/ranked')}
-            className="p-2 rounded-lg hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
+            className={`p-2 rounded-lg hover:bg-gray-100 ${THEME.text.secondary} hover:${THEME.text.primary} transition-colors`}
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h1 className={`text-2xl font-bold ${THEME.text.primary} flex items-center gap-3`}>
               <BarChart3 className="w-6 h-6 text-[#81b64c]" />
               Ranked Statistics
             </h1>
-            <p className="text-sm text-gray-400 mt-0.5">
+            <p className={`text-sm ${THEME.text.secondary} mt-0.5`}>
               Detailed performance analysis and progression
             </p>
           </div>
           <Link
             to={isDemo ? '/demo/ranked/history' : '/ranked/history'}
-            className="flex items-center gap-2 px-4 py-2 bg-[#262421] border border-gray-700 rounded-lg text-sm text-gray-300 hover:text-[#81b64c] hover:border-[#81b64c]/30 transition-colors"
+            className={`flex items-center gap-2 px-4 py-2 ${THEME.background.card} border ${THEME.border.DEFAULT} rounded-lg text-sm ${THEME.text.secondary} hover:text-[#81b64c] hover:border-[#81b64c]/30 transition-colors`}
           >
             <History className="w-4 h-4" />
             History
@@ -482,11 +483,11 @@ const RankedStatsPage = () => {
         </div>
 
         {/* ─── Player Profile Strip ─── */}
-        <div className="bg-[#262421] rounded-lg p-4 border border-gray-700 mb-6">
+        <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} mb-6 ${THEME.shadow.DEFAULT}`}>
           <div className="flex items-center gap-4">
             <Avatar src={user.avatarUrl} alt={user.username} size="lg" />
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-white">{user.username}</h2>
+              <h2 className={`text-xl font-bold ${THEME.text.primary}`}>{user.username}</h2>
               <div className="flex items-center gap-3 mt-1">
                 <span
                   className="text-lg font-mono font-bold"
@@ -576,10 +577,10 @@ const RankedStatsPage = () => {
         {/* ─── Charts Row ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Rating History Chart (2 cols) */}
-          <div className="lg:col-span-2 bg-[#262421] rounded-lg p-4 border border-gray-700">
+          <div className={`lg:col-span-2 ${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm}`}>
             <div className="flex items-center gap-2 mb-4">
               <Activity className="w-4 h-4 text-[#81b64c]" />
-              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+              <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
                 Rating History
               </h3>
             </div>
@@ -587,10 +588,10 @@ const RankedStatsPage = () => {
           </div>
 
           {/* Win Rate Donut (1 col) */}
-          <div className="bg-[#262421] rounded-lg p-4 border border-gray-700 flex flex-col items-center justify-center">
+          <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} flex flex-col items-center justify-center`}>
             <div className="flex items-center gap-2 mb-4 self-start">
               <Target className="w-4 h-4 text-[#81b64c]" />
-              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+              <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
                 Win Distribution
               </h3>
             </div>
@@ -604,10 +605,10 @@ const RankedStatsPage = () => {
         </div>
 
         {/* ─── Monthly Performance ─── */}
-        <div className="bg-[#262421] rounded-lg p-4 border border-gray-700 mb-6">
+        <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} mb-6`}>
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-4 h-4 text-[#81b64c]" />
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+            <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
               Monthly Performance
             </h3>
           </div>
@@ -615,24 +616,24 @@ const RankedStatsPage = () => {
           <div className="flex justify-center gap-6 mt-3">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm bg-green-500" />
-              <span className="text-xs text-gray-400">Wins</span>
+              <span className={`text-xs ${THEME.text.secondary}`}>Wins</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm bg-red-500" />
-              <span className="text-xs text-gray-400">Losses</span>
+              <span className={`text-xs ${THEME.text.secondary}`}>Losses</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm bg-blue-500" />
-              <span className="text-xs text-gray-400">Draws</span>
+              <span className={`text-xs ${THEME.text.secondary}`}>Draws</span>
             </div>
           </div>
         </div>
 
         {/* ─── Time Controls ─── */}
-        <div className="bg-[#262421] rounded-lg p-4 border border-gray-700 mb-6">
+        <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} mb-6`}>
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-4 h-4 text-[#81b64c]" />
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+            <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
               Time Controls
             </h3>
           </div>
@@ -644,16 +645,16 @@ const RankedStatsPage = () => {
               return (
                 <div
                   key={mode}
-                  className="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3"
+                  className={`flex items-center gap-3 ${THEME.background.card} rounded-lg p-3 border ${THEME.border.DEFAULT}`}
                 >
-                  <div className="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
                     <ModeIcon className="w-5 h-5 text-[#81b64c]" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-white capitalize">
+                    <p className={`text-sm font-semibold ${THEME.text.primary} capitalize`}>
                       {mode}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className={`text-xs ${THEME.text.secondary}`}>
                       {data.games} games · {data.rating} Elo
                     </p>
                   </div>
@@ -674,7 +675,7 @@ const RankedStatsPage = () => {
           </button>
           <Link
             to={isDemo ? '/demo/ranked/history' : '/ranked/history'}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#262421] border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg font-medium text-sm transition-colors"
+            className={`flex items-center justify-center gap-2 px-6 py-2.5 ${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.text.secondary} hover:${THEME.text.primary} hover:border-gray-400 rounded-lg font-medium text-sm transition-colors`}
           >
             <History className="w-4 h-4" />
             Match History

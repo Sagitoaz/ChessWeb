@@ -22,6 +22,7 @@ import { useAuthStore } from '@store'
 import { ChessGame } from '@utils/chessLogic'
 import { RANKS } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor } from '@utils/formatters'
+import { THEME } from '@/styles/theme'
 
 // ─────────────────────────────────────────────────────
 // CONSTANTS

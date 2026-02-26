@@ -6,6 +6,7 @@ import { useReplayControls } from '@hooks'
 import { replayAPI } from '@services/gameService'
 import { useNotification } from '@hooks'
 import { Loader } from '@components/common'
+import { THEME } from '@/styles/theme'
 
 export default function ReplayViewerPage() {
   const navigate = useNavigate()
@@ -103,20 +104,20 @@ export default function ReplayViewerPage() {
 
   if (isLoading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className={`min-h-screen flex items-center justify-center ${THEME.background.page}`}>
         <Loader size="lg" text="Đang tải replay..." />
       </div>
     )
 
   if (loadError)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className={`min-h-screen flex items-center justify-center ${THEME.background.page}`}>
         <div className="text-center">
           <div className="text-5xl mb-4">⚠️</div>
-          <p className="text-red-400 text-lg mb-6">{loadError}</p>
+          <p className="text-red-600 text-lg mb-6">{loadError}</p>
           <button
             onClick={handleExit}
-            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+            className="px-6 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg"
           >
             ← Quay lại Lịch Sử
           </button>
@@ -125,7 +126,7 @@ export default function ReplayViewerPage() {
     )
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white py-6 px-4">
+    <div className={`min-h-screen ${THEME.background.page} ${THEME.text.primary} py-6 px-4`}>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -175,7 +176,7 @@ export default function ReplayViewerPage() {
             </div>
 
             {/* Progress bar — ReplaySession.getProgress() */}
-            <div className="mt-4 bg-gray-800 rounded-full h-2">
+            <div className="mt-4 bg-gray-200 rounded-full h-2">
               <div
                 className="bg-blue-500 h-2 rounded-full transition-all duration-200"
                 style={{ width: `${progress * 100}%` }}
@@ -188,7 +189,7 @@ export default function ReplayViewerPage() {
               <button
                 onClick={reset}
                 disabled={isAtStart}
-                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-30 text-lg"
+                className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-30 text-lg"
                 title="Về đầu"
               >
                 ⏮
@@ -198,13 +199,13 @@ export default function ReplayViewerPage() {
               <button
                 onClick={stepBackward}
                 disabled={!canStepBackward}
-                className="p-3 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-30 text-xl"
+                className="p-3 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-30 text-xl"
                 title="← Prev"
               >
                 ◀
               </button>
 
-              <span className="px-4 py-2 bg-gray-800 rounded-lg text-sm min-w-[80px] text-center">
+              <span className="px-4 py-2 bg-gray-200 rounded-lg text-sm min-w-[80px] text-center">
                 {isAtStart ? 'Đầu' : `${currentMoveNumber} / ${totalMoves}`}
               </span>
 
@@ -212,7 +213,7 @@ export default function ReplayViewerPage() {
               <button
                 onClick={stepForward}
                 disabled={!canStepForward}
-                className="p-3 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-30 text-xl"
+                className="p-3 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-30 text-xl"
                 title="→ Next"
               >
                 ▶
@@ -222,7 +223,7 @@ export default function ReplayViewerPage() {
               <button
                 onClick={() => jumpTo(moves.length - 1)}
                 disabled={isAtEnd}
-                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-30 text-lg"
+                className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-30 text-lg"
                 title="Về cuối"
               >
                 ⏭
@@ -230,13 +231,13 @@ export default function ReplayViewerPage() {
             </div>
 
             {currentMove && (
-              <div className="mt-3 text-center text-sm text-gray-400">
+              <div className={`mt-3 text-center text-sm ${THEME.text.secondary}`}>
                 Nước {currentMove.ply}: <strong>{currentMove.san}</strong>
                 {currentMove.isCheck && !currentMove.isCheckmate && ' +'}
                 {currentMove.isCheckmate && ' # (Chiếu hết)'}
               </div>
             )}
-            <p className="text-center text-xs text-gray-600 mt-2">Phím ← → để điều hướng</p>
+            <p className={`text-center text-xs ${THEME.text.muted} mt-2`}>Phím ← → để điều hướng</p>
           </div>
 
           <div>
@@ -252,9 +253,9 @@ export default function ReplayViewerPage() {
             />
 
             {gameData?.result && gameData.result !== 'Ongoing' && (
-              <div className="mt-4 p-3 bg-gray-800 rounded-lg text-center">
-                <p className="text-sm text-gray-400 mb-1">Kết quả</p>
-                <p className="font-bold">
+              <div className={`mt-4 p-3 ${THEME.background.card} rounded-lg text-center border ${THEME.border.DEFAULT}`}>
+                <p className={`text-sm ${THEME.text.secondary} mb-1`}>Kết quả</p>
+                <p className={`font-bold ${THEME.text.primary}`}>
                   {gameData.result === 'WhiteWin' && '⬜ Trắng thắng'}
                   {gameData.result === 'BlackWin' && '⬛ Đen thắng'}
                   {gameData.result === 'Draw' && '🤝 Hòa'}

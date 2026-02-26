@@ -25,7 +25,7 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-950">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Header cố định trên cùng */}
       <Header />
 
@@ -41,7 +41,7 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
               {/* Toggle collapse button */}
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="absolute -right-3 top-6 bg-gray-700 hover:bg-gray-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-lg transition-colors z-10"
+                className="absolute -right-3 top-6 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-lg transition-colors z-10"
                 title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
                 {sidebarCollapsed ? '›' : '‹'}

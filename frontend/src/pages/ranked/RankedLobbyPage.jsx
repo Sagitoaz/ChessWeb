@@ -32,6 +32,7 @@ import {
   eloDeltaColor,
   formatRelativeTime,
 } from '@utils/formatters'
+import { THEME } from '@/styles/theme'
 
 // ─────────────── Helper: get rank info by rating ───────────────
 const getRankInfo = (rating) => {
@@ -144,32 +145,32 @@ const SearchingOverlay = ({ status, searchTime, queueCount, onCancel, matchData 
   if (!config) return null
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl animate-slideUp">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-8 max-w-md w-full mx-4 text-center ${THEME.shadow.lg} animate-slideUp`}>
         {/* Status Icon */}
         <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 rounded-full bg-gray-700/50 flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center">
             {config.icon}
           </div>
         </div>
 
         {/* Status Title */}
-        <h2 className="text-2xl font-bold text-white mb-2">{config.title}</h2>
-        <p className="text-gray-400 mb-6">{config.subtitle}</p>
+        <h2 className={`text-2xl font-bold ${THEME.text.primary} mb-2`}>{config.title}</h2>
+        <p className={`${THEME.text.secondary} mb-6`}>{config.subtitle}</p>
 
         {/* Timer */}
         {config.showTimer && (
           <div className="mb-6">
-            <div className="text-4xl font-mono font-bold text-green-400 mb-2">
+            <div className="text-4xl font-mono font-bold text-green-600 mb-2">
               {formatSearchTime(searchTime)}
             </div>
-            <p className="text-sm text-gray-500">Search time</p>
+            <p className={`text-sm ${THEME.text.muted}`}>Search time</p>
           </div>
         )}
 
         {/* Queue Stats */}
         {config.showTimer && queueCount > 0 && (
-          <div className="flex items-center justify-center gap-2 mb-6 text-sm text-gray-400">
+          <div className={`flex items-center justify-center gap-2 mb-6 text-sm ${THEME.text.secondary}`}>
             <Users className="w-4 h-4" />
             <span>~{queueCount} players in queue</span>
           </div>
@@ -232,10 +233,10 @@ const RecentGameCard = ({ game }) => {
           size="sm"
         />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-white truncate">
+          <p className={`text-sm font-medium ${THEME.text.primary} truncate`}>
             {game.opponent.username}
           </p>
-          <p className="text-xs text-gray-500">{game.opponent.rating} Elo</p>
+          <p className={`text-xs ${THEME.text.muted}`}>{game.opponent.rating} Elo</p>
         </div>
       </div>
 
@@ -246,8 +247,8 @@ const RecentGameCard = ({ game }) => {
 
       {/* Duration & Time */}
       <div className="text-right hidden sm:block">
-        <p className="text-xs text-gray-500">{duration}</p>
-        <p className="text-xs text-gray-600">{formatRelativeTime(game.playedAt)}</p>
+        <p className={`text-xs ${THEME.text.muted}`}>{duration}</p>
+        <p className={`text-xs ${THEME.text.muted} opacity-75`}>{formatRelativeTime(game.playedAt)}</p>
       </div>
     </div>
   )
@@ -422,11 +423,11 @@ const RankedLobbyPage = () => {
         {/* ============ PAGE HEADER ============ */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <h1 className={`text-3xl font-bold ${THEME.text.primary} flex items-center gap-3`}>
               <Trophy className="w-8 h-8 text-yellow-400" />
               Ranked Match
             </h1>
-            <p className="text-gray-400 mt-1">
+            <p className={`${THEME.text.secondary} mt-1`}>
               Compete against players of similar skill and climb the leaderboard
             </p>
           </div>
@@ -435,14 +436,14 @@ const RankedLobbyPage = () => {
           <div className="hidden md:flex items-center gap-3">
             <Link
               to={isDemo ? "/demo/ranked/history" : "/ranked/history"}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-gray-800"
+              className={`flex items-center gap-2 text-sm ${THEME.text.secondary} hover:${THEME.text.primary} transition-colors px-3 py-2 rounded-lg hover:bg-gray-100`}
             >
               <History className="w-4 h-4" />
               History
             </Link>
             <Link
               to={isDemo ? "/demo/ranked/stats" : "/ranked/stats"}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-gray-800"
+              className={`flex items-center gap-2 text-sm ${THEME.text.secondary} hover:${THEME.text.primary} transition-colors px-3 py-2 rounded-lg hover:bg-gray-100`}
             >
               <BarChart3 className="w-4 h-4" />
               Stats
@@ -454,7 +455,7 @@ const RankedLobbyPage = () => {
           {/* ============ LEFT COLUMN: Main Action Area ============ */}
           <div className="lg:col-span-2 space-y-6">
             {/* ──── Player Rating Card ──── */}
-            <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6">
+            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-6 ${THEME.shadow.DEFAULT}`}>
               <div className="flex items-center gap-5">
                 <Avatar
                   src={user.avatarUrl}
@@ -462,7 +463,7 @@ const RankedLobbyPage = () => {
                   size="xl"
                 />
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold text-white">{user.username}</h2>
+                  <h2 className={`text-xl font-bold ${THEME.text.primary}`}>{user.username}</h2>
                   <div className="flex items-center gap-4 mt-2">
                     {/* Rating */}
                     <div className="flex items-center gap-2">
@@ -487,11 +488,11 @@ const RankedLobbyPage = () => {
 
                   {/* Rating Progress Bar */}
                   <div className="mt-3">
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <div className={`flex justify-between text-xs ${THEME.text.muted} mb-1`}>
                       <span>{rankInfo.min}</span>
                       <span>{rankInfo.max === Infinity ? '∞' : rankInfo.max}</span>
                     </div>
-                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
@@ -510,13 +511,13 @@ const RankedLobbyPage = () => {
             </div>
 
             {/* ──── Find Match Button ──── */}
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-2xl p-8 text-center">
+            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-8 text-center ${THEME.shadow.DEFAULT}`}>
               <div className="mb-6">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 mb-4">
-                  <Swords className="w-10 h-10 text-green-400" />
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
+                  <Swords className="w-10 h-10 text-green-600" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Ready to Play?</h3>
-                <p className="text-gray-400 text-sm">
+                <h3 className={`text-xl font-bold ${THEME.text.primary} mb-2`}>Ready to Play?</h3>
+                <p className={`${THEME.text.secondary} text-sm`}>
                   10 minutes per player • Rated • ±100 Elo matching
                 </p>
               </div>
@@ -545,27 +546,27 @@ const RankedLobbyPage = () => {
                 {isConnected ? (
                   <>
                     <Wifi className="w-3 h-3 text-green-400" />
-                    <span className="text-green-400">Connected</span>
+                    <span className="text-green-600">Connected</span>
                   </>
                 ) : (
                   <>
                     <WifiOff className="w-3 h-3 text-red-400" />
-                    <span className="text-red-400">Disconnected</span>
+                    <span className="text-red-600">Disconnected</span>
                   </>
                 )}
               </div>
             </div>
 
             {/* ──── Recent Ranked Games ──── */}
-            <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6">
+            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-6 ${THEME.shadow.DEFAULT}`}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-gray-400" />
+                <h3 className={`text-lg font-bold ${THEME.text.primary} flex items-center gap-2`}>
+                  <Clock className={`w-5 h-5 ${THEME.text.secondary}`} />
                   Recent Games
                 </h3>
                 <Link
                   to={isDemo ? "/demo/ranked/history" : "/ranked/history"}
-                  className="text-sm text-green-400 hover:text-green-300 flex items-center gap-1 transition-colors"
+                  className="text-sm text-green-600 hover:text-green-500 flex items-center gap-1 transition-colors"
                 >
                   View All
                   <ChevronRight className="w-4 h-4" />
@@ -583,7 +584,7 @@ const RankedLobbyPage = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
+                <div className={`text-center py-8 ${THEME.text.muted}`}>
                   <Swords className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No ranked games yet.</p>
                   <p className="text-xs mt-1">Find a match to get started!</p>
@@ -595,27 +596,27 @@ const RankedLobbyPage = () => {
           {/* ============ RIGHT COLUMN: Info & Rules ============ */}
           <div className="space-y-6">
             {/* ──── Quick Stats ──── */}
-            <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}>
+              <h3 className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4`}>
                 Quick Stats
               </h3>
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-700/30 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-white">{user.rating}</p>
-                  <p className="text-xs text-gray-500 mt-1">Current Rating</p>
+                <div className="bg-gray-100 rounded-lg p-3 text-center">
+                  <p className={`text-2xl font-bold ${THEME.text.primary}`}>{user.rating}</p>
+                  <p className={`text-xs ${THEME.text.muted} mt-1`}>Current Rating</p>
                 </div>
-                <div className="bg-gray-700/30 rounded-lg p-3 text-center">
+                <div className="bg-gray-100 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold text-yellow-400" style={{ color: rankInfo.color }}>
                     {rankInfo.name.split(' ')[0]}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Rank</p>
+                  <p className={`text-xs ${THEME.text.muted} mt-1`}>Rank</p>
                 </div>
               </div>
             </div>
 
             {/* ──── Ranked Rules ──── */}
-            <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}>
+              <h3 className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4 flex items-center gap-2`}>
                 <Info className="w-4 h-4" />
                 Ranked Rules
               </h3>
@@ -646,7 +647,7 @@ const RankedLobbyPage = () => {
                     text: 'Fair play monitored',
                   },
                 ].map((rule, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
+                  <li key={i} className={`flex items-start gap-3 text-sm ${THEME.text.secondary}`}>
                     <span className="mt-0.5 flex-shrink-0">{rule.icon}</span>
                     <span>{rule.text}</span>
                   </li>
@@ -655,16 +656,16 @@ const RankedLobbyPage = () => {
             </div>
 
             {/* ──── Elo Formula ──── */}
-            <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}>
+              <h3 className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4 flex items-center gap-2`}>
                 <Zap className="w-4 h-4" />
                 Elo System
               </h3>
-              <div className="space-y-3 text-sm text-gray-400">
+              <div className={`space-y-3 text-sm ${THEME.text.secondary}`}>
                 <p>
                   Rating changes are calculated using the Elo formula:
                 </p>
-                <div className="bg-gray-700/40 rounded-lg p-3 font-mono text-xs text-center text-green-400">
+                <div className="bg-gray-100 rounded-lg p-3 font-mono text-xs text-center text-green-600">
                   ΔR = K × (S - E), K = 32
                 </div>
                 <div className="space-y-1 text-xs">
@@ -685,8 +686,8 @@ const RankedLobbyPage = () => {
             </div>
 
             {/* ──── Ranking Tiers ──── */}
-            <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}>
+              <h3 className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4`}>
                 Ranking Tiers
               </h3>
               <div className="space-y-2">
@@ -695,7 +696,7 @@ const RankedLobbyPage = () => {
                     key={rank.name}
                     className={`flex items-center justify-between p-2 rounded-lg text-sm ${
                       user.rating >= rank.min && user.rating < rank.max
-                        ? 'bg-gray-700/50'
+                        ? 'bg-gray-100'
                         : ''
                     }`}
                     style={
@@ -712,14 +713,14 @@ const RankedLobbyPage = () => {
                       <span
                         className={`font-medium ${
                           user.rating >= rank.min && user.rating < rank.max
-                            ? 'text-white'
-                            : 'text-gray-500'
+                            ? THEME.text.primary
+                            : THEME.text.muted
                         }`}
                       >
                         {rank.name}
                       </span>
                     </div>
-                    <span className="text-xs text-gray-600">
+                    <span className={`text-xs ${THEME.text.muted}`}>
                       {rank.min} - {rank.max === Infinity ? '∞' : rank.max}
                     </span>
                   </div>

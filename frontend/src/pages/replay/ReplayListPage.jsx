@@ -1,25 +1,30 @@
+/**
+ * ReplayListPage - Trang danh sách replay
+ * Member 4 - Bot & Replay Module
+ * Theme: Light mode (thống nhất)
+ */
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { replayAPI } from '@services/gameService'
 import { useNotification } from '@hooks'
-import { Loader } from '@components/common'
+import { THEME, STATUS_COLORS } from '@/styles/theme'
+import { Loader, Button } from '@components/common'
+import { PlayCircle, Users, Bot, Calendar } from 'lucide-react'
 
 function ResultBadge({ result }) {
   const cfg = {
-    WhiteWin: { label: '⬜ Trắng thắng', cls: 'bg-blue-900 text-blue-300' },
-    BlackWin: { label: '⬛ Đen thắng', cls: 'bg-gray-700 text-gray-300' },
-    Draw: { label: '🤝 Hòa', cls: 'bg-yellow-900 text-yellow-300' },
+    WhiteWin: { label: '⬜ Trắng thắng', bg: STATUS_COLORS.playing.bg, text: STATUS_COLORS.playing.text },
+    BlackWin: { label: '⬛ Đen thắng', bg: STATUS_COLORS.draw.bg, text: STATUS_COLORS.draw.text },
+    Draw: { label: '🤝 Hòa', bg: STATUS_COLORS.waiting.bg, text: STATUS_COLORS.waiting.text },
   }
-  const { label, cls } = cfg[result] ?? {
-    label: result,
-    cls: 'bg-gray-700 text-gray-300',
-  }
-  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{label}</span>
+  const { label, bg, text } = cfg[result] ?? { label: result, bg: STATUS_COLORS.draw.bg, text: STATUS_COLORS.draw.text }
+  return <span className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${bg} ${text}`}>{label}</span>
 }
 
 function ModeBadge({ mode }) {
   return (
-    <span className="px-2 py-0.5 rounded text-xs bg-purple-900 text-purple-300 font-medium">
+    <span className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${STATUS_COLORS.playing.bg} ${STATUS_COLORS.playing.text}`}>
       {mode === 'HumanVsBot' ? '🤖 vs Bot' : mode === 'HumanVsHuman' ? '👤 vs Human' : mode}
     </span>
   )
@@ -31,8 +36,8 @@ export default function ReplayListPage() {
 
   const [games, setGames] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [modeFilter, setModeFilter] = useState('') // GameMode enum
-  const [resultFilter, setResultFilter] = useState('') // GameResult enum
+  const [modeFilter, setModeFilter] = useState('')
+  const [resultFilter, setResultFilter] = useState('')
 
   useEffect(() => {
     setIsLoading(true)
@@ -46,38 +51,40 @@ export default function ReplayListPage() {
       .finally(() => setIsLoading(false))
   }, [modeFilter, resultFilter])
 
-  // A2_ReplayFlow.puml: "User selects a saved game" → navigate
   const handleSelect = (gameId) => navigate(`/replays/${gameId}`)
 
   return (
-    <div className="min-h-screen bg-gray-900 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className={`min-h-screen ${THEME.background.page} py-8 px-4`}>
+      <div className="max-w-5xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-1">📋 Lịch Sử Ván Đấu</h1>
-          <p className="text-gray-400 text-sm">Chỉ hiển thị game đã lưu (state = Saved)</p>
+          <div className="text-6xl mb-4 text-center">📹</div>
+          <h1 className={`text-3xl font-bold ${THEME.text.primary} mb-2 text-center`}>Lịch Sử Ván Đấu</h1>
+          <p className={`${THEME.text.secondary} text-center`}>Xem lại các ván đấu đã chơi</p>
         </div>
 
-        {/* Filters — GameMode + GameResult enums */}
-        <div className="flex flex-wrap gap-3 mb-6">
-          <select
-            value={modeFilter}
-            onChange={(e) => setModeFilter(e.target.value)}
-            className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">Tất cả chế độ</option>
-            <option value="HumanVsBot">vs Bot</option>
-            <option value="HumanVsHuman">vs Human</option>
-          </select>
-          <select
-            value={resultFilter}
-            onChange={(e) => setResultFilter(e.target.value)}
-            className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">Tất cả kết quả</option>
-            <option value="WhiteWin">Trắng thắng</option>
-            <option value="BlackWin">Đen thắng</option>
-            <option value="Draw">Hòa</option>
-          </select>
+        {/* Filters */}
+        <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-4 mb-6`}>
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={modeFilter}
+              onChange={(e) => setModeFilter(e.target.value)}
+              className={`${THEME.background.card} ${THEME.text.primary} border ${THEME.border.DEFAULT} ${THEME.rounded.DEFAULT} px-4 py-2 text-sm`}
+            >
+              <option value="">Tất cả chế độ</option>
+              <option value="HumanVsBot">vs Bot</option>
+              <option value="HumanVsHuman">vs Human</option>
+            </select>
+            <select
+              value={resultFilter}
+              onChange={(e) => setResultFilter(e.target.value)}
+              className={`${THEME.background.card} ${THEME.text.primary} border ${THEME.border.DEFAULT} ${THEME.rounded.DEFAULT} px-4 py-2 text-sm`}
+            >
+              <option value="">Tất cả kết quả</option>
+              <option value="WhiteWin">Trắng thắng</option>
+              <option value="BlackWin">Đen thắng</option>
+              <option value="Draw">Hòa</option>
+            </select>
+          </div>
         </div>
 
         {isLoading && (
@@ -87,15 +94,15 @@ export default function ReplayListPage() {
         )}
 
         {!isLoading && games.length === 0 && (
-          <div className="text-center py-16">
+          <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} text-center py-16`}>
             <span className="text-6xl">♟</span>
-            <p className="text-gray-400 mt-4">Chưa có ván đấu nào</p>
-            <button
+            <p className={`${THEME.text.secondary} mt-4`}>Chưa có ván đấu nào</p>
+            <Button
               onClick={() => navigate('/bot')}
-              className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold"
+              className={`mt-6 ${THEME.primary.DEFAULT} ${THEME.primary.hover}`}
             >
               Chơi Ván Đầu Tiên
-            </button>
+            </Button>
           </div>
         )}
 
@@ -105,18 +112,18 @@ export default function ReplayListPage() {
               <button
                 key={game.id}
                 onClick={() => handleSelect(game.id)}
-                className="w-full bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-gray-500 rounded-xl p-4 text-left transition-all group"
+                className={`w-full ${THEME.background.card} ${THEME.background.hover} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 text-left transition-all group ${THEME.shadow.sm}`}
               >
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-gray-300 font-medium">
-                      {game.whitePlayer.username} <span className="text-gray-500">vs</span>{' '}
+                    <span className={`${THEME.text.primary} font-semibold`}>
+                      {game.whitePlayer.username} <span className={THEME.text.muted}>vs</span>{' '}
                       {game.blackPlayer.username}
                     </span>
                     <ModeBadge mode={game.mode} />
                     <ResultBadge result={game.result} />
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <div className={`flex items-center gap-4 text-sm ${THEME.text.secondary}`}>
                     <span>{game.metadata?.totalMoves ?? '?'} nước</span>
                     {game.metadata?.opening && (
                       <span className="hidden md:inline truncate max-w-[160px]">
@@ -124,7 +131,10 @@ export default function ReplayListPage() {
                       </span>
                     )}
                     <span>{new Date(game.createdAt).toLocaleDateString('vi-VN')}</span>
-                    <span className="text-blue-400 group-hover:text-blue-300">▶ Replay</span>
+                    <span className={`${THEME.primary.text} group-hover:underline flex items-center gap-1`}>
+                      <PlayCircle className="w-4 h-4" />
+                      Replay
+                    </span>
                   </div>
                 </div>
               </button>

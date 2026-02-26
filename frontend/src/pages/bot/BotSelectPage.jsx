@@ -1,53 +1,65 @@
+/**
+ * BotSelectPage - Trang chọn độ khó bot
+ * Member 4 - Bot & Replay Module
+ * Theme: Light mode (thống nhất)
+ */
+
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { botGameAPI } from '@services/gameService'
 import { useNotification } from '@hooks'
-import { Loader } from '@components/common'
+import { THEME, STATUS_COLORS } from '@/styles/theme'
+import { Loader, Button } from '@components/common'
+import { Bot, Zap, Brain, Skull } from 'lucide-react'
 
 const BOT_LEVELS = [
   {
     level: 1,
     name: 'Easy',
+    icon: Bot,
     ratingRange: '500-800',
     depth: 1,
     timeLimitMs: 100,
     description: 'Phù hợp người mới bắt đầu',
-    borderColor: 'border-green-400',
-    textColor: 'text-green-400',
-    bgSel: 'bg-green-950',
+    bgLight: STATUS_COLORS.win.bg,
+    textColor: STATUS_COLORS.win.text,
+    borderColor: 'border-green-500',
   },
   {
     level: 2,
     name: 'Medium',
+    icon: Zap,
     ratingRange: '900-1200',
     depth: 3,
     timeLimitMs: 1000,
-    description: 'Thử thách vừa phải, tốt để luyện tập',
-    borderColor: 'border-yellow-400',
-    textColor: 'text-yellow-400',
-    bgSel: 'bg-yellow-950',
+    description: 'Thử thách vừa phải',
+    bgLight: STATUS_COLORS.waiting.bg,
+    textColor: STATUS_COLORS.waiting.text,
+    borderColor: 'border-yellow-500',
   },
   {
     level: 3,
     name: 'Hard',
+    icon: Brain,
     ratingRange: '1600-1900',
     depth: 10,
     timeLimitMs: 3000,
-    description: 'Đòi hỏi chiến thuật để thắng',
-    borderColor: 'border-orange-400',
-    textColor: 'text-orange-400',
-    bgSel: 'bg-orange-950',
+    description: 'Đòi hỏi chiến thuật',
+    bgLight: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-500',
   },
   {
     level: 4,
     name: 'Expert',
+    icon: Skull,
     ratingRange: '2200+',
     depth: 20,
     timeLimitMs: 5000,
-    description: 'Gần như không thể thắng',
-    borderColor: 'border-red-400',
-    textColor: 'text-red-400',
-    bgSel: 'bg-red-950',
+    description: 'Cực kỳ khó',
+    bgLight: STATUS_COLORS.lose.bg,
+    textColor: STATUS_COLORS.lose.text,
+    borderColor: 'border-red-500',
   },
 ]
 
@@ -57,14 +69,11 @@ export default function BotSelectPage() {
   const [selectedLevel, setSelectedLevel] = useState(null)
   const [isStarting, setIsStarting] = useState(false)
 
-  // S1_StartBotGame.puml: POST /games/bot { level }
   const handleStart = async () => {
     if (!selectedLevel) return
     setIsStarting(true)
     try {
-      // 201: { gameId, sessionId, initialFEN, playerColor, config, botPlayer, humanPlayer, status:'Waiting' }
       const gameData = await botGameAPI.startBotGame(selectedLevel)
-      // SM: Waiting → state starts; BotGamePage sẽ set InGame
       navigate(`/bot/game/${gameData.gameId}`, {
         state: { gameData, sessionId: gameData.sessionId },
       })
@@ -83,69 +92,69 @@ export default function BotSelectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div className={`min-h-screen ${THEME.background.page} py-12 px-4`}>
+      <div className="max-w-4xl mx-auto">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-white mb-3">♟ Chơi Với Bot</h1>
-          <p className="text-gray-400">GameMode: HumanVsBot — Không tính ELO</p>
+          <div className="text-6xl mb-4">🤖</div>
+          <h1 className={`text-4xl font-bold ${THEME.text.primary} mb-3`}>Chơi Với Bot</h1>
+          <p className={THEME.text.secondary}>GameMode: HumanVsBot — Không tính ELO</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {BOT_LEVELS.map((lvl) => {
             const isSelected = selectedLevel === lvl.level
+            const Icon = lvl.icon
             return (
               <button
                 key={lvl.level}
                 onClick={() => setSelectedLevel(lvl.level)}
-                className={`p-6 rounded-xl border-2 text-left transition-all ${
+                className={`${THEME.background.card} ${THEME.rounded.lg} border-2 p-6 text-left transition-all ${THEME.shadow.sm} ${
                   isSelected
-                    ? `${lvl.borderColor} ${lvl.bgSel}`
-                    : 'border-gray-700 bg-gray-800 hover:border-gray-500'
+                    ? `${lvl.borderColor} ${lvl.bgLight}`
+                    : `${THEME.border.DEFAULT} ${THEME.background.hover}`
                 }`}
               >
-                <div
-                  className={`font-bold text-lg mb-1 ${isSelected ? lvl.textColor : 'text-white'}`}
-                >
-                  {lvl.name}
-                  {isSelected && <span className="ml-2">✓</span>}
-                </div>
-                <p className="text-gray-400 text-sm mb-3">{lvl.description}</p>
-                <div
-                  className={`text-xs space-y-0.5 ${isSelected ? lvl.textColor : 'text-gray-500'}`}
-                >
-                  <div>Rating: ~{lvl.ratingRange}</div>
-                  <div>
-                    Depth: {lvl.depth} | Response: {lvl.timeLimitMs}ms
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-12 h-12 ${lvl.bgLight} ${THEME.rounded.DEFAULT} flex items-center justify-center`}>
+                    <Icon className={`w-6 h-6 ${lvl.textColor}`} />
                   </div>
+                  {isSelected && (
+                    <span className={`${lvl.bgLight} ${lvl.textColor} px-2 py-1 ${THEME.rounded.DEFAULT} text-xs font-bold`}>
+                      ✓ Đã chọn
+                    </span>
+                  )}
+                </div>
+                <h3 className={`text-xl font-bold ${THEME.text.primary} mb-1`}>{lvl.name}</h3>
+                <p className={`text-sm ${THEME.text.secondary} mb-3`}>{lvl.description}</p>
+                <div className={`text-xs ${THEME.text.muted} space-y-1`}>
+                  <div>ELO: {lvl.ratingRange}</div>
+                  <div>Depth: {lvl.depth} | Time: {lvl.timeLimitMs}ms</div>
                 </div>
               </button>
             )
           })}
         </div>
 
-        <button
-          onClick={handleStart}
-          disabled={!selectedLevel || isStarting}
-          className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-            selectedLevel && !isStarting
-              ? 'bg-blue-600 hover:bg-blue-500 text-white'
-              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {isStarting ? (
-            <span className="flex items-center justify-center gap-2">
-              <Loader size="sm" /> Đang chuẩn bị...
-            </span>
-          ) : selectedLevel ? (
-            `Bắt Đầu — ${BOT_LEVELS[selectedLevel - 1].name}`
-          ) : (
-            'Chọn Độ Khó Trước'
-          )}
-        </button>
-
-        <p className="text-center text-gray-600 text-xs mt-4">
-          Kết quả được lưu vào Lịch Sử. Không ảnh hưởng đến rating.
-        </p>
+        <div className="text-center">
+          <Button
+            size="lg"
+            onClick={handleStart}
+            disabled={!selectedLevel || isStarting}
+            className={`${THEME.primary.DEFAULT} ${THEME.primary.hover} font-bold px-12 py-4 ${THEME.rounded.lg}`}
+          >
+            {isStarting ? (
+              <>
+                <Loader size="sm" className="mr-2" />
+                Đang khởi tạo...
+              </>
+            ) : (
+              <>
+                <Bot className="w-5 h-5 mr-2" />
+                {selectedLevel ? `Bắt Đầu — ${BOT_LEVELS[selectedLevel - 1].name}` : 'Chọn Độ Khó'}
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   )

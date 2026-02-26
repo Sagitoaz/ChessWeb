@@ -5,6 +5,7 @@ import { ChessBoard, MoveHistory, GameControls, GameStatus } from '@components/g
 import { useNotification } from '@hooks'
 import { botGameAPI } from '@services/gameService'
 import { Loader } from '@components/common'
+import { THEME } from '@/styles/theme'
 
 export default function BotGamePage() {
   const navigate = useNavigate()
@@ -200,7 +201,7 @@ export default function BotGamePage() {
 
   if (!gameData)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className={`min-h-screen flex items-center justify-center ${THEME.background.page}`}>
         <Loader size="lg" />
       </div>
     )
@@ -212,12 +213,12 @@ export default function BotGamePage() {
   }[gameResult]
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className={`min-h-screen ${THEME.background.page} ${THEME.text.primary}`}>
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Result Modal */}
         {(gameState === 'Finished' || gameState === 'Saved') && gameResult && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-2xl p-8 text-center max-w-sm">
+            <div className={`${THEME.background.card} rounded-2xl p-8 text-center max-w-sm ${THEME.shadow.lg}`}>
               <div className="text-5xl mb-4">
                 {gameResult === 'Draw'
                   ? '🤝'
@@ -225,20 +226,20 @@ export default function BotGamePage() {
                     ? '🏆'
                     : '😔'}
               </div>
-              <h2 className="text-2xl font-bold mb-2">{resultText}</h2>
-              <p className="text-gray-400 mb-6">
+              <h2 className={`text-2xl font-bold mb-2 ${THEME.text.primary}`}>{resultText}</h2>
+              <p className={`${THEME.text.secondary} mb-6`}>
                 {gameState === 'Saved' ? 'Đã lưu vào lịch sử' : 'Đang lưu...'}
               </p>
               <div className="flex gap-3 justify-center">
                 <button
                   onClick={() => navigate('/bot')}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold text-white"
                 >
                   Chơi Lại
                 </button>
                 <button
                   onClick={() => navigate('/replays')}
-                  className="px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
+                  className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg"
                 >
                   Xem Lịch Sử
                 </button>

@@ -31,6 +31,7 @@ import {
   formatRelativeTime,
   formatDate,
 } from '@utils/formatters'
+import { THEME } from '@/styles/theme'
 
 // ─────────────────────────────────────────────────────
 // CONSTANTS
@@ -89,7 +90,7 @@ const HistoryRow = ({ match }) => {
   const oppRank = getRankInfo(match.opponent.rating)
 
   return (
-    <div className="group flex items-center gap-4 px-4 py-3 rounded-lg bg-[#262421] border border-transparent hover:border-gray-600/50 transition-all duration-200">
+    <div className={`group flex items-center gap-4 px-4 py-3 rounded-lg ${THEME.background.card} border ${THEME.border.DEFAULT} hover:border-gray-300 transition-all duration-200 ${THEME.shadow.sm}`}>
       {/* Result badge */}
       <div
         className={`flex-shrink-0 w-16 py-1 rounded text-center text-xs font-bold uppercase tracking-wider border ${badge.bg} ${badge.text} ${badge.border}`}
@@ -111,7 +112,7 @@ const HistoryRow = ({ match }) => {
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <Avatar src={match.opponent.avatarUrl} alt={match.opponent.username} size="sm" />
         <div className="min-w-0">
-          <p className="font-semibold text-white text-sm truncate">
+          <p className={`font-semibold ${THEME.text.primary} text-sm truncate`}>
             {match.opponent.username}
           </p>
           <p className="text-xs" style={{ color: oppRank.color }}>
@@ -123,13 +124,13 @@ const HistoryRow = ({ match }) => {
       {/* End reason */}
       <div className="hidden sm:flex items-center gap-1.5 min-w-[110px]">
         <EndIcon className={`w-3.5 h-3.5 ${endInfo.color}`} />
-        <span className="text-xs text-gray-400">{endInfo.label}</span>
+        <span className={`text-xs ${THEME.text.secondary}`}>{endInfo.label}</span>
       </div>
 
       {/* Moves / Duration */}
       <div className="hidden md:block text-center min-w-[70px]">
-        <p className="text-xs text-gray-300">{match.moves} moves</p>
-        <p className="text-xs text-gray-500">{fmtDuration(match.duration)}</p>
+        <p className={`text-xs ${THEME.text.primary}`}>{match.moves} moves</p>
+        <p className={`text-xs ${THEME.text.secondary}`}>{fmtDuration(match.duration)}</p>
       </div>
 
       {/* Rating change */}
@@ -141,13 +142,13 @@ const HistoryRow = ({ match }) => {
 
       {/* Date */}
       <div className="hidden lg:block min-w-[90px] text-right">
-        <p className="text-xs text-gray-500">{formatRelativeTime(match.playedAt)}</p>
+        <p className={`text-xs ${THEME.text.secondary}`}>{formatRelativeTime(match.playedAt)}</p>
       </div>
 
       {/* View link */}
       <Link
         to={`/replays/${match.id}`}
-        className="flex-shrink-0 p-1.5 rounded hover:bg-gray-700/50 text-gray-500 hover:text-[#81b64c] transition-colors opacity-0 group-hover:opacity-100"
+        className={`flex-shrink-0 p-1.5 rounded hover:bg-gray-100 ${THEME.text.secondary} hover:text-[#81b64c] transition-colors opacity-0 group-hover:opacity-100`}
         title="View replay"
       >
         <Eye className="w-4 h-4" />
@@ -170,20 +171,20 @@ const StatsStrip = ({ matches }) => {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-      <div className="bg-[#262421] rounded-lg p-3 text-center border border-green-800/30">
-        <p className="text-xs text-gray-400 mb-1">Wins</p>
-        <p className="text-xl font-bold text-green-400">{stats.wins}</p>
+      <div className={`${THEME.background.card} rounded-lg p-3 text-center border border-green-200 ${THEME.shadow.sm}`}>
+        <p className={`text-xs ${THEME.text.secondary} mb-1`}>Wins</p>
+        <p className="text-xl font-bold text-green-600">{stats.wins}</p>
       </div>
-      <div className="bg-[#262421] rounded-lg p-3 text-center border border-red-800/30">
-        <p className="text-xs text-gray-400 mb-1">Losses</p>
-        <p className="text-xl font-bold text-red-400">{stats.losses}</p>
+      <div className={`${THEME.background.card} rounded-lg p-3 text-center border border-red-200 ${THEME.shadow.sm}`}>
+        <p className={`text-xs ${THEME.text.secondary} mb-1`}>Losses</p>
+        <p className="text-xl font-bold text-red-600">{stats.losses}</p>
       </div>
-      <div className="bg-[#262421] rounded-lg p-3 text-center border border-blue-800/30">
-        <p className="text-xs text-gray-400 mb-1">Draws</p>
-        <p className="text-xl font-bold text-blue-400">{stats.draws}</p>
+      <div className={`${THEME.background.card} rounded-lg p-3 text-center border border-blue-200 ${THEME.shadow.sm}`}>
+        <p className={`text-xs ${THEME.text.secondary} mb-1`}>Draws</p>
+        <p className="text-xl font-bold text-blue-600">{stats.draws}</p>
       </div>
-      <div className="bg-[#262421] rounded-lg p-3 text-center border border-gray-700">
-        <p className="text-xs text-gray-400 mb-1">Net Rating</p>
+      <div className={`${THEME.background.card} rounded-lg p-3 text-center border ${THEME.border.DEFAULT} ${THEME.shadow.sm}`}>
+        <p className={`text-xs ${THEME.text.secondary} mb-1`}>Net Rating</p>
         <p className={`text-xl font-bold ${eloDeltaColor(stats.totalRatingChange)}`}>
           {formatEloDelta(stats.totalRatingChange)}
         </p>
@@ -212,7 +213,7 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page === 1}
-        className="p-2 rounded hover:bg-gray-700/50 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        className={`p-2 rounded hover:bg-gray-100 ${THEME.text.secondary} hover:${THEME.text.primary} disabled:opacity-30 disabled:cursor-not-allowed transition-colors`}
       >
         <ChevronLeft className="w-4 h-4" />
       </button>
@@ -221,11 +222,11 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
         <>
           <button
             onClick={() => onPageChange(1)}
-            className="w-8 h-8 rounded text-xs font-medium text-gray-400 hover:bg-gray-700/50 hover:text-white transition-colors"
+            className={`w-8 h-8 rounded text-xs font-medium ${THEME.text.secondary} hover:bg-gray-100 hover:${THEME.text.primary} transition-colors`}
           >
             1
           </button>
-          {start > 2 && <span className="text-gray-600 px-1">...</span>}
+          {start > 2 && <span className={`${THEME.text.muted} px-1`}>...</span>}
         </>
       )}
 
@@ -236,7 +237,7 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
           className={`w-8 h-8 rounded text-xs font-medium transition-colors ${
             p === page
               ? 'bg-[#81b64c] text-white'
-              : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'
+              : `${THEME.text.secondary} hover:bg-gray-100 hover:${THEME.text.primary}`
           }`}
         >
           {p}
@@ -246,11 +247,11 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
       {end < totalPages && (
         <>
           {end < totalPages - 1 && (
-            <span className="text-gray-600 px-1">...</span>
+            <span className={`${THEME.text.muted} px-1`}>...</span>
           )}
           <button
             onClick={() => onPageChange(totalPages)}
-            className="w-8 h-8 rounded text-xs font-medium text-gray-400 hover:bg-gray-700/50 hover:text-white transition-colors"
+            className={`w-8 h-8 rounded text-xs font-medium ${THEME.text.secondary} hover:bg-gray-100 hover:${THEME.text.primary} transition-colors`}
           >
             {totalPages}
           </button>
@@ -260,7 +261,7 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page === totalPages}
-        className="p-2 rounded hover:bg-gray-700/50 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        className={`p-2 rounded hover:bg-gray-100 ${THEME.text.secondary} hover:${THEME.text.primary} disabled:opacity-30 disabled:cursor-not-allowed transition-colors`}
       >
         <ChevronRight className="w-4 h-4" />
       </button>
@@ -355,24 +356,24 @@ const RankedHistoryPage = () => {
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => navigate(isDemo ? '/demo/ranked' : '/ranked')}
-            className="p-2 rounded-lg hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
+            className={`p-2 rounded-lg hover:bg-gray-100 ${THEME.text.secondary} hover:${THEME.text.primary} transition-colors`}
             title="Back to Lobby"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h1 className={`text-2xl font-bold ${THEME.text.primary} flex items-center gap-3`}>
               <History className="w-6 h-6 text-[#81b64c]" />
               Match History
             </h1>
-            <p className="text-sm text-gray-400 mt-0.5">
+            <p className={`text-sm ${THEME.text.secondary} mt-0.5`}>
               View your ranked game results and replay past matches
             </p>
           </div>
-          <div className="hidden sm:flex items-center gap-2 bg-[#262421] rounded-lg px-3 py-2 border border-gray-700">
+          <div className={`hidden sm:flex items-center gap-2 ${THEME.background.card} rounded-lg px-3 py-2 border ${THEME.border.DEFAULT}`}>
             <Avatar src={user.avatarUrl} alt={user.username} size="sm" />
             <div>
-              <p className="text-sm font-semibold text-white">{user.username}</p>
+              <p className={`text-sm font-semibold ${THEME.text.primary}`}>{user.username}</p>
               <p className="text-xs" style={{ color: rank.color }}>
                 {user.rating} · {rank.name}
               </p>
@@ -386,7 +387,7 @@ const RankedHistoryPage = () => {
         {/* ─── Filters Bar ─── */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
           {/* Result filter tabs */}
-          <div className="flex bg-[#262421] rounded-lg p-1 border border-gray-700">
+          <div className={`flex ${THEME.background.card} rounded-lg p-1 border ${THEME.border.DEFAULT}`}>
             {RESULT_FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -394,7 +395,7 @@ const RankedHistoryPage = () => {
                 className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
                   resultFilter === f.value
                     ? 'bg-[#81b64c] text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    : `${THEME.text.secondary} hover:${THEME.text.primary} hover:bg-gray-100`
                 }`}
               >
                 {f.label}
@@ -404,20 +405,20 @@ const RankedHistoryPage = () => {
 
           {/* Search */}
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${THEME.text.muted}`} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search opponent..."
-              className="w-full bg-[#262421] border border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#81b64c]/50 transition-colors"
+              className={`w-full ${THEME.background.card} border ${THEME.border.DEFAULT} rounded-lg pl-9 pr-4 py-2 text-sm ${THEME.text.primary} placeholder:${THEME.text.muted} focus:outline-none focus:border-[#81b64c]/50 transition-colors`}
             />
           </div>
 
           {/* Link to stats */}
           <Link
             to={isDemo ? '/demo/ranked/stats' : '/ranked/stats'}
-            className="flex items-center gap-2 px-4 py-2 bg-[#262421] border border-gray-700 rounded-lg text-sm text-gray-300 hover:text-[#81b64c] hover:border-[#81b64c]/30 transition-colors"
+            className={`flex items-center gap-2 px-4 py-2 ${THEME.background.card} border ${THEME.border.DEFAULT} rounded-lg text-sm ${THEME.text.secondary} hover:text-[#81b64c] hover:border-[#81b64c]/30 transition-colors`}
           >
             <BarChart3 className="w-4 h-4" />
             Stats
@@ -425,7 +426,7 @@ const RankedHistoryPage = () => {
         </div>
 
         {/* ─── Table Header ─── */}
-        <div className="hidden sm:flex items-center gap-4 px-4 py-2 text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">
+        <div className={`hidden sm:flex items-center gap-4 px-4 py-2 text-xs ${THEME.text.secondary} uppercase tracking-wider font-semibold mb-1`}>
           <div className="w-16 text-center">Result</div>
           <div className="w-4" />
           <div className="flex-1">Opponent</div>
@@ -440,24 +441,24 @@ const RankedHistoryPage = () => {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader size="lg" />
-            <p className="text-gray-400 mt-4 text-sm">Loading history...</p>
+            <p className={`${THEME.text.secondary} mt-4 text-sm`}>Loading history...</p>
           </div>
         ) : error ? (
           <div className="text-center py-20">
-            <p className="text-red-400 mb-4">{error}</p>
+            <p className="text-red-600 mb-4">{error}</p>
             <Button onClick={() => fetchHistory(currentPage)} className="gap-2">
               Retry
             </Button>
           </div>
         ) : filteredMatches.length === 0 ? (
           <div className="text-center py-20">
-            <Swords className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-300 mb-2">
+            <Swords className={`w-12 h-12 ${THEME.text.secondary} mx-auto mb-4`} />
+            <h3 className={`text-lg font-semibold ${THEME.text.primary} mb-2`}>
               {matches.length === 0
                 ? 'No games played yet'
                 : 'No matches found'}
             </h3>
-            <p className="text-gray-500 text-sm mb-6">
+            <p className={`${THEME.text.secondary} text-sm mb-6`}>
               {matches.length === 0
                 ? 'Play your first ranked game to see results here.'
                 : 'Try changing the filter or search query.'}
@@ -491,7 +492,7 @@ const RankedHistoryPage = () => {
 
         {/* ─── Bottom info ─── */}
         {!loading && matches.length > 0 && (
-          <p className="text-center text-xs text-gray-600 mt-4">
+          <p className={`text-center text-xs ${THEME.text.secondary} mt-4`}>
             Showing page {currentPage} of {totalPages} · {PAGE_SIZE} matches per page
           </p>
         )}

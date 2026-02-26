@@ -49,7 +49,7 @@ const Sidebar = ({ collapsed = false }) => {
   return (
     <aside
       className={`
-        bg-gray-900 text-gray-300 flex flex-col h-full transition-all duration-300
+        bg-white border-r border-gray-200 text-gray-700 flex flex-col h-full transition-all duration-300
         ${collapsed ? 'w-16' : 'w-60'}
       `}
     >
@@ -59,7 +59,7 @@ const Sidebar = ({ collapsed = false }) => {
           <div key={group.group} className="mb-4">
             {/* Group label - ẩn khi collapsed */}
             {!collapsed && (
-              <p className="text-xs uppercase text-gray-500 font-semibold px-3 mb-1 tracking-wider">
+              <p className="text-xs uppercase text-gray-400 font-semibold px-3 mb-1 tracking-wider">
                 {group.group}
               </p>
             )}
@@ -74,8 +74,8 @@ const Sidebar = ({ collapsed = false }) => {
                   transition-colors duration-150
                   ${
                     isActive(path)
-                      ? 'bg-green-700 text-white'
-                      : 'hover:bg-gray-800 hover:text-white'
+                      ? 'bg-green-600 text-white'
+                      : 'hover:bg-gray-100 hover:text-gray-900'
                   }
                   ${collapsed ? 'justify-center' : ''}
                 `}
@@ -89,13 +89,13 @@ const Sidebar = ({ collapsed = false }) => {
       </nav>
 
       {/* Bottom: Settings */}
-      <div className="border-t border-gray-700 py-3 px-2">
+      <div className="border-t border-gray-200 py-3 px-2">
         <Link
           to="/profile/edit"
           title={collapsed ? 'Settings' : undefined}
           className={`
             flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
-            hover:bg-gray-800 hover:text-white transition-colors
+            hover:bg-gray-100 hover:text-gray-900 transition-colors
             ${collapsed ? 'justify-center' : ''}
           `}
         >

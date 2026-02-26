@@ -26,13 +26,13 @@ const Header = () => {
   const isActive = (path) => location.pathname === path
 
   return (
-    <header className="bg-gray-900 text-white shadow-lg sticky top-0 z-50">
+    <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link
             to="/"
-            className="flex items-center gap-2 text-xl font-bold text-white hover:text-green-400 transition-colors"
+            className="flex items-center gap-2 text-xl font-bold text-gray-900 hover:text-green-600 transition-colors"
           >
             ♟️ <span>ChessWeb</span>
           </Link>
@@ -43,31 +43,31 @@ const Header = () => {
               <>
                 <Link
                   to="/dashboard"
-                  className={`text-sm font-medium transition-colors hover:text-green-400 ${isActive('/dashboard') ? 'text-green-400' : 'text-gray-300'}`}
+                  className={`text-sm font-medium transition-colors hover:text-green-600 ${isActive('/dashboard') ? 'text-green-600' : 'text-gray-600'}`}
                 >
                   Dashboard
                 </Link>
                 <Link
                   to="/ranked"
-                  className={`text-sm font-medium transition-colors hover:text-green-400 ${isActive('/ranked') ? 'text-green-400' : 'text-gray-300'}`}
+                  className={`text-sm font-medium transition-colors hover:text-green-600 ${isActive('/ranked') ? 'text-green-600' : 'text-gray-600'}`}
                 >
                   Ranked
                 </Link>
                 <Link
                   to="/rooms"
-                  className={`text-sm font-medium transition-colors hover:text-green-400 ${isActive('/rooms') ? 'text-green-400' : 'text-gray-300'}`}
+                  className={`text-sm font-medium transition-colors hover:text-green-600 ${isActive('/rooms') ? 'text-green-600' : 'text-gray-600'}`}
                 >
                   Rooms
                 </Link>
                 <Link
                   to="/tournaments"
-                  className={`text-sm font-medium transition-colors hover:text-green-400 ${isActive('/tournaments') ? 'text-green-400' : 'text-gray-300'}`}
+                  className={`text-sm font-medium transition-colors hover:text-green-600 ${isActive('/tournaments') ? 'text-green-600' : 'text-gray-600'}`}
                 >
                   Tournaments
                 </Link>
                 <Link
                   to="/bot"
-                  className={`text-sm font-medium transition-colors hover:text-green-400 ${isActive('/bot') ? 'text-green-400' : 'text-gray-300'}`}
+                  className={`text-sm font-medium transition-colors hover:text-green-600 ${isActive('/bot') ? 'text-green-600' : 'text-gray-600'}`}
                 >
                   Play vs Bot
                 </Link>
@@ -102,7 +102,7 @@ const Header = () => {
 
                 {/* Elo rating */}
                 {user?.rating && (
-                  <span className="hidden md:block text-xs text-yellow-400 font-semibold bg-yellow-400/10 px-2 py-1 rounded">
+                  <span className="hidden md:block text-xs text-yellow-600 font-semibold bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
                     ⭐ {user.rating}
                   </span>
                 )}
@@ -110,7 +110,7 @@ const Header = () => {
                 {/* Logout button */}
                 <button
                   onClick={handleLogout}
-                  className="text-sm text-gray-400 hover:text-red-400 transition-colors px-2 py-1 rounded"
+                  className="text-sm text-gray-600 hover:text-red-600 transition-colors px-2 py-1 rounded"
                 >
                   Logout
                 </button>
@@ -119,7 +119,7 @@ const Header = () => {
               <>
                 <Link
                   to="/login"
-                  className="text-sm text-gray-300 hover:text-white transition-colors"
+                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   Login
                 </Link>
@@ -134,7 +134,7 @@ const Header = () => {
 
             {/* Hamburger menu mobile */}
             <button
-              className="md:hidden text-gray-300 hover:text-white"
+              className="md:hidden text-gray-600 hover:text-gray-900"
               onClick={() => setMenuOpen(!menuOpen)}
             >
               {menuOpen ? '✕' : '☰'}
@@ -144,7 +144,7 @@ const Header = () => {
 
         {/* Mobile menu */}
         {menuOpen && isLoggedIn && (
-          <nav className="md:hidden pb-4 border-t border-gray-700 mt-2 pt-2 flex flex-col gap-2">
+          <nav className="md:hidden pb-4 border-t border-gray-200 mt-2 pt-2 flex flex-col gap-2">
             {[
               { path: '/dashboard', label: 'Dashboard' },
               { path: '/ranked', label: 'Ranked' },
@@ -157,8 +157,8 @@ const Header = () => {
                 key={path}
                 to={path}
                 onClick={() => setMenuOpen(false)}
-                className={`text-sm px-2 py-1 rounded transition-colors hover:text-green-400 ${
-                  isActive(path) ? 'text-green-400' : 'text-gray-300'
+                className={`text-sm px-2 py-1 rounded transition-colors hover:text-green-600 ${
+                  isActive(path) ? 'text-green-600' : 'text-gray-600'
                 }`}
               >
                 {label}
