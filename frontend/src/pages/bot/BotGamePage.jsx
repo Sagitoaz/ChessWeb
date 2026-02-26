@@ -38,6 +38,13 @@ export default function BotGamePage() {
     setGameState('InGame') // SM: Waiting → InGame
   }, [])
 
+  // Nếu player chọn Black, bot (White) đi trước — trigger ngay khi vào game
+  useEffect(() => {
+    if (gameState === 'InGame' && chess.turn() !== playerColorCode) {
+      executeBotMove(chess)
+    }
+  }, [gameState]) // chỉ chạy 1 lần khi gameState chuyển sang InGame
+
   // =============================================
   // CHECK END CONDITION
   // A1: "Check end condition (checkmate/stalemate/draw)"
@@ -91,9 +98,9 @@ export default function BotGamePage() {
       try {
         const legalMoves = chessInst.moves({ verbose: true })
         if (legalMoves.length === 0) return
-        // Simulate BotConfig.timeLimitMs
+        // Simulate BotConfig.timeLimitMs — cap at 500ms so Easy (100ms) feels instant
         await new Promise((r) =>
-          setTimeout(r, Math.min(gameData?.config?.timeLimitMs ?? 500, 1500))
+          setTimeout(r, Math.min(gameData?.config?.timeLimitMs ?? 300, 500))
         )
         const m = legalMoves[Math.floor(Math.random() * legalMoves.length)]
         const result = chessInst.move(m)
