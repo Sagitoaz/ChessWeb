@@ -893,41 +893,21 @@ const RankedGamePage = () => {
   }, [])
 
   /**
-   * Called by react-chessboard to decide if the built-in promotion dialog should show.
-   * Return true → show dialog, false → normal move.
+   * Called when the user picks a piece from our custom promotion dialog.
+   * `promoType` is 'q', 'r', 'b', or 'n'.
    */
-  const onPromotionCheck = useCallback(
-    (sourceSquare, targetSquare, _piece) => {
-      return isPromotionMove(sourceSquare, targetSquare)
-    },
-    [isPromotionMove],
-  )
+  const handlePromotionSelect = useCallback(
+    (promoType) => {
+      const from = pendingPromoFrom
+      const to = promotionToSquare
 
-  /**
-   * Called when the user picks a piece from the built-in promotion dialog.
-   * `piece` is e.g. "wQ", "wR", "bN", "bB" or undefined if cancelled.
-   */
-  const onPromotionPieceSelect = useCallback(
-    (piece, promoteFromSquare, promoteToSquare) => {
-      // User cancelled
-      if (!piece) {
-        setPromotionToSquare(null)
-        setPendingPromoFrom(null)
-        setMoveFrom(null)
-        setOptionSquares({})
-        return false
-      }
+      // Clear promotion state first
+      setPromotionToSquare(null)
+      setPendingPromoFrom(null)
+      setMoveFrom(null)
+      setOptionSquares({})
 
-      // Extract promotion type: "wQ" → "q", "bN" → "n"
-      const promoType = piece[1].toLowerCase()
-      const from = promoteFromSquare || pendingPromoFrom
-      const to = promoteToSquare || promotionToSquare
-
-      if (!from || !to) {
-        setPromotionToSquare(null)
-        setPendingPromoFrom(null)
-        return false
-      }
+      if (!from || !to) return
 
       const move = gameRef.current.move({
         from,
@@ -935,19 +915,20 @@ const RankedGamePage = () => {
         promotion: promoType,
       })
 
-      setPromotionToSquare(null)
-      setPendingPromoFrom(null)
-      setMoveFrom(null)
-      setOptionSquares({})
-
       if (move) {
         commitMove(move)
-        return true
       }
-      return false
     },
     [commitMove, pendingPromoFrom, promotionToSquare],
   )
+
+  /** Cancel a pending promotion */
+  const handlePromotionCancel = useCallback(() => {
+    setPromotionToSquare(null)
+    setPendingPromoFrom(null)
+    setMoveFrom(null)
+    setOptionSquares({})
+  }, [])
 
   // ═══════════════════════════════════════════
   // PIECE DROP (drag & drop)
@@ -957,11 +938,11 @@ const RankedGamePage = () => {
       if (gamePhase !== GAME_PHASE.PLAYING || endedRef.current || !isMyTurn)
         return false
 
-      // If promotion → let the built-in dialog handle it
+      // If promotion → show custom dialog, don't commit yet
       if (isPromotionMove(src, dst)) {
         setPendingPromoFrom(src)
         setPromotionToSquare(dst)
-        return false // don't commit yet — wait for dialog
+        return false
       }
 
       const move = gameRef.current.move({
@@ -1338,7 +1319,7 @@ const RankedGamePage = () => {
 
             {/* Chess board — sized to fill available height */}
             <div
-              className="my-1 w-full"
+              className="my-1 w-full relative"
               style={{ maxWidth: 'calc(100vh - 180px)', margin: '4px auto' }}
             >
               <Chessboard
@@ -1356,11 +1337,49 @@ const RankedGamePage = () => {
                 customLightSquareStyle={{ backgroundColor: '#edeed1' }}
                 animationDuration={200}
                 showBoardNotation
-                promotionToSquare={promotionToSquare}
-                onPromotionCheck={onPromotionCheck}
-                onPromotionPieceSelect={onPromotionPieceSelect}
-                promotionDialogVariant="default"
+                onPromotionCheck={() => false}
               />
+              {/* Custom Promotion Dialog */}
+              {promotionToSquare && (
+                <div
+                  className="absolute inset-0 z-50 flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                  onClick={handlePromotionCancel}
+                >
+                  <div
+                    className="bg-[#312e2b] rounded-lg p-4 shadow-2xl border border-gray-600"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className="text-white text-sm mb-3 text-center font-medium">
+                      Chọn quân để phong cấp
+                    </p>
+                    <div className="flex gap-2">
+                      {['q', 'r', 'b', 'n'].map((piece) => {
+                        const color = gameRef.current.turn() === 'w' ? 'w' : 'b'
+                        const pieceSymbols = {
+                          wq: '♕', wr: '♖', wb: '♗', wn: '♘',
+                          bq: '♛', br: '♜', bb: '♝', bn: '♞',
+                        }
+                        const symbol = pieceSymbols[`${color}${piece}`]
+                        const labels = { q: 'Hậu', r: 'Xe', b: 'Tượng', n: 'Mã' }
+                        return (
+                          <button
+                            key={piece}
+                            onClick={() => handlePromotionSelect(piece)}
+                            className="flex flex-col items-center justify-center w-16 h-20 bg-[#454240] hover:bg-[#5a5654] rounded-lg transition-colors border border-gray-500 hover:border-yellow-400"
+                            title={labels[piece]}
+                          >
+                            <span className="text-4xl leading-none" style={{ color: color === 'w' ? '#fff' : '#333' }}>
+                              {symbol}
+                            </span>
+                            <span className="text-xs text-gray-400 mt-1">{labels[piece]}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Player bar (bottom) */}
