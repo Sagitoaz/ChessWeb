@@ -16,9 +16,9 @@ const ChessBoard = ({
   const [optionSquares, setOptionSquares] = useState({})
   const [rightClickedSquares, setRightClickedSquares] = useState({})
 
-  const position = useMemo(() => {
-    return gameState?.fen() || 'start'
-  }, [gameState])
+  // Note: chess.js instances mutate in place, so we read fen() directly (no useMemo)
+  // to always get the latest position on each render.
+  const position = gameState?.fen() || 'start'
 
   const playSound = useCallback(
     (_type) => {
@@ -31,7 +31,7 @@ const ChessBoard = ({
     (square) => {
       if (!gameState) return []
 
-      const moves = gameState.getMovesForSquare(square)
+      const moves = gameState.moves({ square, verbose: true })
       if (moves.length === 0) {
         setOptionSquares({})
         return []
@@ -72,7 +72,7 @@ const ChessBoard = ({
         return
       }
 
-      const moves = gameState.getMovesForSquare(moveFrom)
+      const moves = gameState.moves({ square: moveFrom, verbose: true })
       const foundMove = moves.find((m) => m.from === moveFrom && m.to === square)
 
       if (!foundMove) {

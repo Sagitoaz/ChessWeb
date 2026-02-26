@@ -351,6 +351,102 @@ const mockGameAPI = {
       createdAt: new Date().toISOString(),
     }
   },
+  // =============================================
+  // BOT GAME APIs (mock) — theo S1_StartBotGame.puml
+  // =============================================
+
+  // POST /games/bot { level }
+  // level: 1=Easy, 2=Medium, 3=Hard, 4=Expert (BotConfig.fromDifficulty)
+  async startBotGame(level) {
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    const botNames = { 1: 'Bot (Easy)', 2: 'Bot (Medium)', 3: 'Bot (Hard)', 4: 'Bot (Expert)' }
+    const botRatings = { 1: 600, 2: 900, 3: 1600, 4: 2200 }
+    const playerColor = Math.random() > 0.5 ? 'White' : 'Black'
+    return {
+      gameId: `game-${Date.now()}`,
+      sessionId: `session-${Date.now()}`, // BotSession.sessionId
+      initialFEN: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      playerColor, // 'White' | 'Black'
+      config: {
+        // BotConfig.fromDifficulty(level)
+        difficulty: level,
+        depth: [1, 3, 10, 20][level - 1],
+        skillLevel: [2, 5, 15, 20][level - 1],
+        timeLimitMs: [100, 1000, 3000, 5000][level - 1],
+        engine: 'stockfish',
+      },
+      botPlayer: {
+        id: `bot-level-${level}`,
+        username: botNames[level],
+        color: playerColor === 'White' ? 'Black' : 'White',
+        isBot: true,
+        rating: botRatings[level],
+      },
+      humanPlayer: { id: 'user-local', username: 'You', color: playerColor, isBot: false },
+      status: 'Waiting', // GameState.Waiting
+    }
+  },
+
+  // POST /games/{gameId}/moves { move }
+  async submitPlayerMove(gameId, move) {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    return { success: true, fen: null }
+  },
+
+  async pauseBotGame(gameId) {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    return { success: true, state: 'Paused' }
+  },
+
+  async resumeBotGame(gameId) {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    return { success: true, state: 'InGame' }
+  },
+
+  // UC6: Save Game — SM: Finished → Saved
+  async saveBotGame(gameId, gameData) {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return {
+      success: true,
+      savedGame: { id: gameId, state: 'Saved', finishedAt: new Date().toISOString() },
+    }
+  },
+  // =============================================
+  // REPLAY / HISTORY APIs (mock) — theo S2_LoadReplay.puml
+  // =============================================
+
+  // GET /games?mode=&result= — lấy danh sách lịch sử
+  async getGameHistory(filters = {}) {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    const data = await import('../mocks/botGames.json')
+    let games = [...(data.default ?? data).games]
+    // filter theo GameMode enum: HumanVsBot | HumanVsHuman
+    if (filters.mode) games = games.filter((g) => g.mode === filters.mode)
+    // filter theo GameResult enum: WhiteWin | BlackWin | Draw
+    if (filters.result) games = games.filter((g) => g.result === filters.result)
+    games.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    return { games, total: games.length }
+  },
+
+  // GET /games/{gameId} — S2_LoadReplay.puml
+  // Chỉ cho replay nếu state === 'Saved'
+  async getGame(gameId) {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    const data = await import('../mocks/botGames.json')
+    const game = (data.default ?? data).games.find((g) => g.id === gameId)
+    if (!game) {
+      const e = new Error('Game not found')
+      e.status = 404
+      throw e
+    }
+    // S2: validate state === 'Saved'
+    if (game.state !== 'Saved') {
+      const e = new Error('Replay not available')
+      e.status = 422
+      throw e
+    }
+    return game
+  },
 }
 
 /**
@@ -457,3 +553,62 @@ const gameService = {
 }
 
 export default gameService
+
+// =============================================
+// BOT GAME APIs — theo S1_StartBotGame.puml
+// =============================================
+export const botGameAPI = {
+  /**
+   * POST /games/bot { level }
+   * level: 1=Easy, 2=Medium, 3=Hard, 4=Expert
+   * 201: { gameId, sessionId, initialFEN, playerColor, config, botPlayer, humanPlayer, status:'Waiting' }
+   * Errors: 401, 422 (invalid level), 429, 503 (bot unavailable), 504
+   */
+  startBotGame: (level) =>
+    USE_MOCK ? mockGameAPI.startBotGame(level) : gameAPI.post('/games/bot', { level }),
+
+  /**
+   * POST /games/{gameId}/moves { move: { from, to, promotion? } }
+   * Backend tự gọi POST /bot/move { sessionId, FEN } → Stockfish — frontend KHÔNG gọi trực tiếp
+   * 200: { gameFinished, fen, lastMove } | { gameFinished: true, result, finalFEN }
+   * Errors: 400, 401, 403, 404, 409 (not your turn), 422 (illegal move), 503, 504
+   */
+  submitPlayerMove: (gameId, move) =>
+    USE_MOCK
+      ? mockGameAPI.submitPlayerMove(gameId, move)
+      : gameAPI.post(`/games/${gameId}/moves`, { move }),
+
+  pauseBotGame: (gameId) =>
+    USE_MOCK
+      ? mockGameAPI.pauseBotGame(gameId)
+      : gameAPI.patch(`/games/${gameId}/state`, { action: 'pause' }),
+
+  resumeBotGame: (gameId) =>
+    USE_MOCK
+      ? mockGameAPI.resumeBotGame(gameId)
+      : gameAPI.patch(`/games/${gameId}/state`, { action: 'resume' }),
+
+  /**
+   * UC6: Save Game to History — SM: Finished → Saved
+   */
+  saveBotGame: (gameId, data) =>
+    USE_MOCK ? mockGameAPI.saveBotGame(gameId, data) : gameAPI.post(`/games/${gameId}/save`, data),
+}
+
+// =============================================
+// REPLAY / HISTORY APIs — theo S2_LoadReplay.puml
+// =============================================
+export const replayAPI = {
+  /**
+   * GET /games/{gameId}
+   * Kiểm tra state === 'Saved' trước khi cho replay
+   * Errors: 400, 401, 403, 404, 429, 503, 504
+   */
+  getGame: (gameId) => (USE_MOCK ? mockGameAPI.getGame(gameId) : gameAPI.get(`/games/${gameId}`)),
+
+  /**
+   * GET /games?mode=HumanVsBot|HumanVsHuman&result=WhiteWin|BlackWin|Draw
+   */
+  getGameHistory: (filters = {}) =>
+    USE_MOCK ? mockGameAPI.getGameHistory(filters) : gameAPI.get('/games', { params: filters }),
+}

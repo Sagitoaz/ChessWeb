@@ -14,11 +14,8 @@ export { default as useAuth } from './useAuth'
 export { useTimer } from './useTimer'
 export { useNotification } from './useNotification'
 export { useModal, useConfirmModal } from './useModal'
-
-export {
-  useChessGame,
-  useOnlineChessGame,
-} from './useChessGame'
+export { useReplayControls } from './useReplayControls'
+export { useChessGame, useOnlineChessGame } from './useChessGame'
 
 /**
  * Custom hook for localStorage
