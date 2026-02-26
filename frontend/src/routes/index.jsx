@@ -23,10 +23,10 @@ const CommonComponentsDemo = lazy(() => import('@pages/demo/CommonComponentsDemo
 // const LeaderboardPage = lazy(() => import('@pages/profile/LeaderboardPage'))
 
 // Ranked Pages (Team Member 2)
-// const RankedLobbyPage = lazy(() => import('@pages/ranked/RankedLobbyPage'))
-// const RankedGamePage = lazy(() => import('@pages/ranked/RankedGamePage'))
-// const RankedHistoryPage = lazy(() => import('@pages/ranked/RankedHistoryPage'))
-// const RankedStatsPage = lazy(() => import('@pages/ranked/RankedStatsPage'))
+const RankedLobbyPage = lazy(() => import('@pages/ranked/RankedLobbyPage'))
+const RankedGamePage = lazy(() => import('@pages/ranked/RankedGamePage'))
+const RankedHistoryPage = lazy(() => import('@pages/ranked/RankedHistoryPage'))
+const RankedStatsPage = lazy(() => import('@pages/ranked/RankedStatsPage'))
 
 // Room Pages (Team Member 3)
 // const RoomListPage = lazy(() => import('@pages/rooms/RoomListPage'))
@@ -168,22 +168,22 @@ function AppRoutes() {
         {/* ==================== RANKED ROUTES ==================== */}
         <Route path="/ranked" element={
           <PrivateRoute>
-            <PlaceholderPage title="Ranked Lobby" module="Ranked Match" assignedTo="Team Member 2" />
+            <RankedLobbyPage />
           </PrivateRoute>
         } />
         <Route path="/ranked/game/:matchId" element={
           <PrivateRoute>
-            <PlaceholderPage title="Ranked Game" module="Ranked Match" assignedTo="Team Member 2" />
+            <RankedGamePage />
           </PrivateRoute>
         } />
         <Route path="/ranked/history" element={
           <PrivateRoute>
-            <PlaceholderPage title="Ranked History" module="Ranked Match" assignedTo="Team Member 2" />
+            <RankedHistoryPage />
           </PrivateRoute>
         } />
         <Route path="/ranked/stats" element={
           <PrivateRoute>
-            <PlaceholderPage title="Ranked Stats" module="Ranked Match" assignedTo="Team Member 2" />
+            <RankedStatsPage />
           </PrivateRoute>
         } />
 
@@ -259,6 +259,11 @@ function AppRoutes() {
         <Route path="/demo" element={<GameComponentsDemo />} />
         <Route path="/demo/game" element={<GameComponentsDemo />} />
         <Route path="/demo/components" element={<CommonComponentsDemo />} />
+        <Route path="/demo/ranked" element={<RankedLobbyPage />} />
+        <Route path="/demo/ranked/game" element={<RankedGamePage />} />
+        <Route path="/demo/ranked/game/:matchId" element={<RankedGamePage />} />
+        <Route path="/demo/ranked/history" element={<RankedHistoryPage />} />
+        <Route path="/demo/ranked/stats" element={<RankedStatsPage />} />
 
         {/* ==================== 404 ==================== */}
         <Route path="*" element={
