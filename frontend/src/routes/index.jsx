@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { Loader } from '@components/common'
 import { AppLayout } from '@components/layout'
@@ -15,7 +15,6 @@ const RegisterPage       = lazy(() => import('@pages/auth/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@pages/auth/ForgotPasswordPage'))
 
 // Home
-const HomePage     = lazy(() => import('@pages/home/HomePage'))
 const DashboardPage = lazy(() => import('@pages/home/DashboardPage'))
 
 // Profile
@@ -48,11 +47,6 @@ const BotGamePage   = lazy(() => import('@pages/bot/BotGamePage'))
 // Replay (xem lại ván đấu)
 const ReplayListPage   = lazy(() => import('@pages/replay/ReplayListPage'))
 const ReplayViewerPage = lazy(() => import('@pages/replay/ReplayViewerPage'))
-
-// Demo (dùng để test component — không cần auth)
-const DemoHubPage          = lazy(() => import('@pages/demo/DemoHubPage'))
-const GameComponentsDemo   = lazy(() => import('@pages/demo/GameComponentsDemo'))
-const CommonComponentsDemo = lazy(() => import('@pages/demo/CommonComponentsDemo'))
 
 // =============================================================================
 // LOADING SPINNER — Hiển thị khi đang tải trang
@@ -99,9 +93,9 @@ function AppRoutes() {
       <Routes>
 
         {/* =========================================================
-            TRANG CHỦ (không cần auth)
+            ROOT — Redirect thẳng vào dashboard
         ========================================================= */}
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
         {/* =========================================================
             AUTH — Trang đăng nhập / đăng ký (không có sidebar)
@@ -156,60 +150,6 @@ function AppRoutes() {
           <Route path="/replays/:gameId"   element={<ReplayViewerPage />} />
 
         </Route>
-
-        {/* =========================================================
-            TEST ROUTES — Truy cập không cần login (chỉ để test UI)
-            Các trang auth test không cần sidebar nên đứng riêng.
-            Các trang khác đặt dưới AppLayout để test đúng giao diện.
-        ========================================================= */}
-
-        {/* Test auth — standalone (không sidebar) */}
-        <Route path="/test/auth/login"    element={<LoginPage />} />
-        <Route path="/test/auth/register" element={<RegisterPage />} />
-
-        {/* Test các trang có sidebar — dùng AppLayout */}
-        <Route element={<AppLayout />}>
-          <Route path="/test/auth/profile"      element={<ProfilePage />} />
-          <Route path="/test/auth/profile/edit" element={<EditProfilePage />} />
-          <Route path="/test/auth/leaderboard"  element={<LeaderboardPage />} />
-
-          <Route path="/test/rooms"             element={<RoomListPage />} />
-          <Route path="/test/rooms/create"      element={<CreateRoomPage />} />
-          <Route path="/test/rooms/join"        element={<JoinRoomPage />} />
-          <Route path="/test/rooms/game"        element={<RoomGamePage />} />
-
-          <Route path="/test/tournaments"         element={<TournamentListPage />} />
-          <Route path="/test/tournaments/create"  element={<CreateTournamentPage />} />
-          <Route path="/test/tournaments/detail"  element={<TournamentDetailPage />} />
-          <Route path="/test/tournaments/bracket" element={<TournamentBracketPage />} />
-
-          <Route path="/test/bot"                element={<BotSelectPage />} />
-          <Route path="/test/bot/game"           element={<BotGamePage />} />
-          <Route path="/test/bot/game/:gameId"   element={<BotGamePage />} />
-
-          <Route path="/test/replays"            element={<ReplayListPage />} />
-          <Route path="/test/replays/viewer"     element={<ReplayViewerPage />} />
-          <Route path="/test/replays/:gameId"    element={<ReplayViewerPage />} />
-        </Route>
-
-        {/* Test ranked — standalone (có layout riêng bên trong) */}
-        <Route path="/test/ranked"                   element={<RankedLobbyPage />} />
-        <Route path="/test/ranked/game"              element={<RankedGamePage />} />
-        <Route path="/test/ranked/game/:matchId"     element={<RankedGamePage />} />
-        <Route path="/test/ranked/history"           element={<RankedHistoryPage />} />
-        <Route path="/test/ranked/stats"             element={<RankedStatsPage />} />
-
-        {/* =========================================================
-            DEMO — Component showcase (không cần auth)
-        ========================================================= */}
-        <Route path="/demo"                    element={<DemoHubPage />} />
-        <Route path="/demo/game"               element={<GameComponentsDemo />} />
-        <Route path="/demo/components"         element={<CommonComponentsDemo />} />
-        <Route path="/demo/ranked"             element={<RankedLobbyPage />} />
-        <Route path="/demo/ranked/game"        element={<RankedGamePage />} />
-        <Route path="/demo/ranked/game/:matchId" element={<RankedGamePage />} />
-        <Route path="/demo/ranked/history"     element={<RankedHistoryPage />} />
-        <Route path="/demo/ranked/stats"       element={<RankedStatsPage />} />
 
         {/* =========================================================
             404 — Không tìm thấy trang

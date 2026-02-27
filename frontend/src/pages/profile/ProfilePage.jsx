@@ -2,13 +2,6 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import MOCK_USERS from '@/mocks/users.json'
 
-// ─── WIP Banner ───────────────────────────────────────────────────────────
-const WIPBanner = () => (
-  <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-400 text-yellow-900 text-xs font-bold text-center py-1.5 tracking-wide">
-    🚧 [WIP - Member 1] ProfilePage — đang dùng mock data, chưa kết nối API
-  </div>
-)
-
 const StatCard = ({ label, value, color = 'blue' }) => {
   const colors = {
     blue: 'bg-blue-50 text-blue-700',
@@ -87,9 +80,7 @@ const ProfilePage = () => {
   const winRate = user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0
 
   return (
-    <>
-      <WIPBanner />
-      <div className="min-h-screen bg-gray-100 pt-10 pb-12">
+    <div className="pb-12">
         <div className="max-w-3xl mx-auto px-4 pt-6">
           {/* Avatar + Info */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
@@ -110,12 +101,20 @@ const ProfilePage = () => {
                   <p className="text-sm text-gray-500">@{user.username}</p>
                   {user.bio && <p className="text-sm text-gray-600 mt-1">{user.bio}</p>}
                 </div>
-                <Link
-                  to="/test/auth/profile/edit"
-                  className="shrink-0 self-start sm:self-auto px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition"
-                >
-                  Chỉnh sửa
-                </Link>
+                <div className="flex gap-2 shrink-0 self-start sm:self-auto">
+                  <Link
+                    to="/profile/edit"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition"
+                  >
+                    Chỉnh sửa
+                  </Link>
+                  <button
+                    onClick={() => { useAuthStore.getState().logout(); window.location.href = '/login' }}
+                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-lg border border-red-200 transition"
+                  >
+                    Logout
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -152,7 +151,6 @@ const ProfilePage = () => {
           </div>
         </div>
       </div>
-    </>
   )
 }
 

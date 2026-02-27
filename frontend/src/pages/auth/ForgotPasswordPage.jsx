@@ -9,13 +9,6 @@ const schema = z.object({
   email: z.string().email('Email không hợp lệ'),
 })
 
-// ─── WIP Banner ───────────────────────────────────────────────────────────
-const WIPBanner = () => (
-  <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-400 text-yellow-900 text-xs font-bold text-center py-1.5 tracking-wide">
-    🚧 [WIP - Member 1] ForgotPasswordPage — chưa kết nối API thật
-  </div>
-)
-
 const ForgotPasswordPage = () => {
   const [sent, setSent] = useState(false)
   const [countdown, setCountdown] = useState(0)
@@ -64,9 +57,7 @@ const ForgotPasswordPage = () => {
   }
 
   return (
-    <>
-      <WIPBanner />
-      <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4 pt-10">
+    <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <span className="text-5xl text-blue-600 leading-none select-none">♟</span>
@@ -132,7 +123,7 @@ const ForgotPasswordPage = () => {
           </Card>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

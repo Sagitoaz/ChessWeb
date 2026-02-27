@@ -24,14 +24,11 @@ import MainLayout from './MainLayout'
  * -----------------------------------------------------------------------
  */
 
-// Trong môi trường dev (npm run dev), bỏ qua kiểm tra login để test dễ hơn
-const IS_DEV = import.meta.env.DEV || import.meta.env.VITE_USE_MOCK === 'true'
-
 const AppLayout = () => {
   const { isAuthenticated } = useAuthStore()
 
-  // Nếu KHÔNG phải dev mode VÀ người dùng chưa đăng nhập → đưa về trang login
-  if (!IS_DEV && !isAuthenticated) {
+  // Chưa đăng nhập → đưa về trang login
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 

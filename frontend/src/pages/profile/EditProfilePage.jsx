@@ -6,13 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '@/store'
 import { Button, Input, useNotification } from '@/components/common'
 
-// ─── WIP Banner ───────────────────────────────────────────────────────────
-const WIPBanner = () => (
-  <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-400 text-yellow-900 text-xs font-bold text-center py-1.5 tracking-wide">
-    🚧 [WIP - Member 1] EditProfilePage — avatar upload chưa làm, form chưa lưu vào API
-  </div>
-)
-
 const profileSchema = z.object({
   displayName: z.string().min(2, 'Tên hiển thị tối thiểu 2 ký tự').max(50),
   bio: z.string().max(200, 'Bio tối đa 200 ký tự').optional(),
@@ -70,7 +63,7 @@ const EditProfilePage = () => {
     // TODO: gọi authService.updateProfile(data)
     await new Promise((r) => setTimeout(r, 800))
     showNotification({ type: 'success', title: 'Đã lưu', message: 'Hồ sơ cập nhật thành công.' })
-    navigate('/test/auth/profile')
+    navigate('/profile')
   }
 
   const onChangePassword = async (data) => {
@@ -98,9 +91,7 @@ const EditProfilePage = () => {
   }
 
   return (
-    <>
-      <WIPBanner />
-      <div className="min-h-screen bg-gray-100 pt-10 pb-12">
+    <div className="pb-12">
         <div className="max-w-2xl mx-auto px-4 pt-6">
           {/* Avatar */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-4">
@@ -172,7 +163,7 @@ const EditProfilePage = () => {
                 <Button type="submit" variant="primary" loading={isSubmitting}>
                   Lưu thay đổi
                 </Button>
-                <Link to="/test/auth/profile">
+                <Link to="/profile">
                   <Button type="button" variant="outline">
                     Hủy
                   </Button>
@@ -217,12 +208,11 @@ const EditProfilePage = () => {
               </Button>
             </form>
           </div>
-          <Link to="/test/auth/profile" className="text-sm text-blue-500 hover:underline">
+          <Link to="/profile" className="text-sm text-blue-500 hover:underline">
             ← Quay lại hồ sơ
           </Link>
         </div>
       </div>
-    </>
   )
 }
 

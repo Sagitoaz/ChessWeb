@@ -1,4 +1,6 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuthStore } from '@/store'
+import { useUIStore } from '@/store'
 
 /**
  * Sidebar - Navigation menu dọc bên trái
@@ -43,8 +45,16 @@ const NAV_ITEMS = [
  */
 const Sidebar = ({ collapsed = false }) => {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { logout, user } = useAuthStore()
+  const closeSidebar = useUIStore((s) => s.toggleSidebar)
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen)
 
-  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/')
+  // Dùng exact match để tránh /ranked highlight khi vào /ranked/history
+  const isActive = (path) => location.pathname === path
+
+  // Đóng sidebar trên mobile khi click link
+  const handleNavClick = () => { if (sidebarOpen) closeSidebar() }
 
   return (
     <aside
@@ -53,6 +63,37 @@ const Sidebar = ({ collapsed = false }) => {
         ${collapsed ? 'w-16' : 'w-60'}
       `}
     >
+      {/* User profile card */}
+      <div className={`border-b border-gray-200 ${collapsed ? 'py-3 px-2' : 'p-4'}`}>
+        <Link
+          to="/profile"
+          onClick={handleNavClick}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+        >
+          {user?.avatarUrl ? (
+            <img
+              src={user.avatarUrl}
+              alt={user?.username}
+              className="w-9 h-9 rounded-full object-cover border-2 border-green-500 flex-shrink-0"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+              {user?.username?.[0]?.toUpperCase() || 'U'}
+            </div>
+          )}
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-800 truncate">
+                {user?.displayName || user?.username || 'User'}
+              </p>
+              {user?.rating && (
+                <p className="text-xs text-yellow-600 font-medium">⭐ {user.rating} ELO</p>
+              )}
+            </div>
+          )}
+        </Link>
+      </div>
+
       {/* Nav groups */}
       <nav className="flex-1 overflow-y-auto py-4 px-2">
         {NAV_ITEMS.map((group) => (
@@ -69,6 +110,7 @@ const Sidebar = ({ collapsed = false }) => {
                 key={path}
                 to={path}
                 title={collapsed ? label : undefined}
+                onClick={handleNavClick}
                 className={`
                   flex items-center gap-3 px-3 py-2 rounded-lg mb-1 text-sm font-medium
                   transition-colors duration-150
@@ -88,20 +130,20 @@ const Sidebar = ({ collapsed = false }) => {
         ))}
       </nav>
 
-      {/* Bottom: Settings */}
+      {/* Bottom: Logout */}
       <div className="border-t border-gray-200 py-3 px-2">
-        <Link
-          to="/profile/edit"
-          title={collapsed ? 'Settings' : undefined}
+        <button
+          onClick={() => { logout(); navigate('/login') }}
+          title={collapsed ? 'Logout' : undefined}
           className={`
-            flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
-            hover:bg-gray-100 hover:text-gray-900 transition-colors
+            w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
+            text-red-600 hover:bg-red-50 transition-colors
             ${collapsed ? 'justify-center' : ''}
           `}
         >
-          <span className="text-base">⚙️</span>
-          {!collapsed && <span>Settings</span>}
-        </Link>
+          <span className="text-base">🚪</span>
+          {!collapsed && <span>Logout</span>}
+        </button>
       </div>
     </aside>
   )

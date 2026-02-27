@@ -15,19 +15,19 @@ const queryClient = new QueryClient({
   },
 })
 
-// Seed mock user in dev mode so PrivateRoutes and pages get a valid user object
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.DEV
-if (USE_MOCK && !localStorage.getItem('token')) {
-  localStorage.setItem('token', 'mock-token-dev')
+// Tài khoản mặc định — tự động đăng nhập khi chưa có session
+// (Thay bằng luồng login thật khi backend sẵn sàng)
+if (!localStorage.getItem('token')) {
+  localStorage.setItem('token', 'mock-token')
   localStorage.setItem(
     'user',
     JSON.stringify({
       id: 1,
-      username: 'testuser',
-      email: 'test@chessweb.local',
-      displayName: 'Test User',
-      avatarUrl: 'https://i.pravatar.cc/150?img=1',
-      bio: 'Tài khoản test — dùng để kiểm tra giao diện',
+      username: 'chesslover',
+      email: 'chesslover@chessweb.vn',
+      displayName: 'Nguyễn Văn An',
+      avatarUrl: 'https://i.pravatar.cc/150?img=12',
+      bio: 'Yêu cờ vua từ năm 10 tuổi 🤍',
       rating: 1520,
       gamesPlayed: 87,
       wins: 45,

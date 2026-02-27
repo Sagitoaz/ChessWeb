@@ -2,13 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import MOCK_DATA from '@/mocks/users.json'
 
-// ─── WIP Banner ───────────────────────────────────────────────────────────
-const WIPBanner = () => (
-  <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-400 text-yellow-900 text-xs font-bold text-center py-1.5 tracking-wide">
-    🚧 [WIP - Member 1] LeaderboardPage — đang dùng mock data, pagination chưa làm
-  </div>
-)
-
 // ── Expand mock leaderboard ───────────────────────────────────────────────
 const MOCK_LEADERBOARD = [
   ...MOCK_DATA.leaderboard,
@@ -17,7 +10,7 @@ const MOCK_LEADERBOARD = [
   { rank: 6, username: 'KnightSlayer', rating: 2100, gamesPlayed: 280, winRate: 64 },
   { rank: 7, username: 'PawnStorm', rating: 2050, gamesPlayed: 260, winRate: 62 },
   { rank: 8, username: 'EndgamePro', rating: 2000, gamesPlayed: 240, winRate: 60 },
-  { rank: 9, username: 'testuser', rating: 1500, gamesPlayed: 120, winRate: 50, isMe: true },
+  { rank: 9, username: 'chesslover', rating: 1520, gamesPlayed: 87, winRate: 52, isMe: true },
   { rank: 10, username: 'NewPlayer', rating: 1200, gamesPlayed: 30, winRate: 40 },
 ]
 
@@ -54,9 +47,7 @@ const LeaderboardPage = () => {
   const rest = filtered.slice(3)
 
   return (
-    <>
-      <WIPBanner />
-      <div className="min-h-screen bg-gray-100 pt-10 pb-12">
+    <div className="pb-12">
         <div className="max-w-3xl mx-auto px-4 pt-6">
           {/* Header */}
           <div className="text-center mb-6">
@@ -135,9 +126,6 @@ const LeaderboardPage = () => {
                 ))}
               </tbody>
             </table>
-            <div className="p-4 text-center text-xs text-yellow-600 bg-yellow-50 border-t border-yellow-100">
-              ⚠️ Pagination chưa implement — đang hiển thị mock data
-            </div>
           </div>
 
           <div className="mt-6 text-center">
@@ -147,7 +135,6 @@ const LeaderboardPage = () => {
           </div>
         </div>
       </div>
-    </>
   )
 }
 

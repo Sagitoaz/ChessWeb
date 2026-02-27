@@ -3,6 +3,7 @@ import PropTypes from 'prop-types'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import Footer from './Footer'
+import { useUIStore } from '@/store'
 
 /**
  * MainLayout - Wrapper layout chính cho các trang cần auth
@@ -23,6 +24,7 @@ import Footer from './Footer'
  */
 const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const { sidebarOpen, toggleSidebar } = useUIStore()
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -31,13 +33,11 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
 
       {/* Body: Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - ẩn trên mobile, hiện trên desktop */}
         {!hideSidebar && (
           <>
-            {/* Desktop Sidebar */}
-            <div className="hidden md:flex flex-col relative">
+            {/* Desktop Sidebar — ẩn trên mobile */}
+            <div className="hidden md:flex flex-col relative h-full">
               <Sidebar collapsed={sidebarCollapsed} />
-
               {/* Toggle collapse button */}
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -47,6 +47,21 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
                 {sidebarCollapsed ? '›' : '‹'}
               </button>
             </div>
+
+            {/* Mobile Sidebar — drawer từ trái */}
+            {sidebarOpen && (
+              <>
+                {/* Overlay */}
+                <div
+                  className="fixed inset-0 bg-black/40 z-40 md:hidden"
+                  onClick={toggleSidebar}
+                />
+                {/* Drawer */}
+                <div className="fixed top-0 left-0 h-full z-50 md:hidden flex flex-col">
+                  <Sidebar collapsed={false} />
+                </div>
+              </>
+            )}
           </>
         )}
 
