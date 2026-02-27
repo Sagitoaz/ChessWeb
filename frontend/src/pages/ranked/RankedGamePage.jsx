@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Chessboard } from 'react-chessboard'
+import { ChessBoard } from '@components/game'
 import {
   Flag,
   Handshake,
@@ -115,12 +115,12 @@ const CapturedPieces = ({ pieces, color, advantage }) => {
   return (
     <div className="flex items-center gap-0.5 h-5">
       {pieces.map((p, i) => (
-        <span key={i} className="text-sm leading-none opacity-80">
+        <span key={i} className="text-sm leading-none opacity-70">
           {PIECE_UNICODE[color][p]}
         </span>
       ))}
       {advantage > 0 && (
-        <span className="text-xs font-bold text-white/60 ml-1">+{advantage}</span>
+        <span className="text-xs font-bold text-gray-500 ml-1">+{advantage}</span>
       )}
     </div>
   )
@@ -147,8 +147,8 @@ const PlayerBar = ({
     <div
       className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-300 ${
         isActive
-          ? 'bg-[#3d3a37] border border-[#81b64c]/50'
-          : 'bg-[#262421] border border-transparent'
+          ? 'bg-green-50 border border-green-400'
+          : 'bg-white border border-gray-200'
       }`}
     >
       {/* Left ─ player info */}
@@ -156,12 +156,12 @@ const PlayerBar = ({
         <div className="relative flex-shrink-0">
           <Avatar src={player.avatarUrl} alt={player.username} size="sm" />
           {isActive && (
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border border-[#262421]" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-white" />
           )}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-white text-sm truncate">
+            <span className="font-semibold text-gray-900 text-sm truncate">
               {player.username}
             </span>
             <span
@@ -194,12 +194,12 @@ const PlayerBar = ({
       <div
         className={`font-mono text-2xl font-bold px-3 py-1 rounded min-w-[90px] text-right tabular-nums transition-colors ${
           critical && isActive
-            ? 'bg-red-600/30 text-red-400 animate-pulse'
+            ? 'bg-red-100 text-red-600 animate-pulse'
             : low && isActive
-            ? 'bg-yellow-600/20 text-yellow-400'
+            ? 'bg-yellow-100 text-yellow-700'
             : isActive
-            ? 'bg-[#81b64c]/20 text-white'
-            : 'bg-gray-800/50 text-gray-400'
+            ? 'bg-green-100 text-green-800'
+            : 'bg-gray-100 text-gray-500'
         }`}
       >
         {fmtClock(timeMs)}
@@ -225,78 +225,79 @@ const EndGameModal = ({
 }) => {
   if (!isOpen) return null
 
+  // Local 2P: "win" = player (white) thắng, "lose" = opponent (black) thắng
+  const winnerName = result === 'win' ? player.username : result === 'lose' ? opponent.username : null
+
   const cfg = {
     win: {
-      title: 'Victory!',
+      title: `🏆 ${winnerName} thắng!`,
       icon: <Crown className="w-12 h-12 text-yellow-400" />,
       bg: 'from-yellow-900/40 to-green-900/30',
       border: 'border-yellow-600/50',
     },
     lose: {
-      title: 'Defeat',
-      icon: <Flag className="w-12 h-12 text-red-400" />,
-      bg: 'from-red-900/30 to-gray-900/30',
-      border: 'border-red-600/50',
+      title: `🏆 ${winnerName} thắng!`,
+      icon: <Crown className="w-12 h-12 text-yellow-400" />,
+      bg: 'from-yellow-900/40 to-green-900/30',
+      border: 'border-yellow-600/50',
     },
     draw: {
-      title: 'Draw',
+      title: 'Hòa cờ',
       icon: <Handshake className="w-12 h-12 text-blue-400" />,
       bg: 'from-blue-900/30 to-gray-900/30',
       border: 'border-blue-600/50',
     },
   }[result] || {
-    title: 'Game Over',
+    title: 'Kết thúc',
     icon: <Swords className="w-12 h-12 text-gray-400" />,
     bg: 'from-gray-900 to-gray-900',
     border: 'border-gray-600',
   }
 
   const reasonLabel = {
-    checkmate: 'by checkmate',
-    resignation: 'by resignation',
-    timeout: 'on time',
-    stalemate: 'by stalemate',
-    draw_agreement: 'by mutual agreement',
-    insufficient_material: 'insufficient material',
-    threefold_repetition: 'threefold repetition',
-    fifty_move: '50-move rule',
+    checkmate: 'bằng chiếu hết',
+    resignation: 'đối thủ đầu hàng',
+    timeout: 'hết giờ',
+    stalemate: 'pat (hòa)',
+    draw_agreement: 'đồng ý hòa',
+    insufficient_material: 'thiếu quân (hòa)',
+    threefold_repetition: 'lặp thế (hòa)',
+    fifty_move: 'luật 50 nước (hòa)',
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div
-        className={`bg-gradient-to-b ${cfg.bg} border ${cfg.border} rounded-2xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl animate-slideUp`}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl border border-gray-200">
         {/* Icon */}
         <div className="flex justify-center mb-4">{cfg.icon}</div>
 
         {/* Title */}
-        <h2 className="text-3xl font-bold text-white mb-1">{cfg.title}</h2>
-        <p className="text-gray-400 text-sm mb-6">{reasonLabel[reason] || reason}</p>
+        <h2 className="text-3xl font-bold text-gray-900 mb-1">{cfg.title}</h2>
+        <p className="text-gray-500 text-sm mb-6">{reasonLabel[reason] || reason}</p>
 
         {/* Players */}
         <div className="flex items-center justify-center gap-6 mb-6">
           <div className="text-center">
             <Avatar src={player.avatarUrl} alt={player.username} size="sm" />
-            <p className="text-xs text-gray-300 mt-1 truncate max-w-[80px]">
+            <p className="text-xs text-gray-600 mt-1 truncate max-w-[80px]">
               {player.username}
             </p>
           </div>
-          <span className="text-gray-600 font-bold text-lg">vs</span>
+          <span className="text-gray-400 font-bold text-lg">vs</span>
           <div className="text-center">
             <Avatar src={opponent.avatarUrl} alt={opponent.username} size="sm" />
-            <p className="text-xs text-gray-300 mt-1 truncate max-w-[80px]">
+            <p className="text-xs text-gray-600 mt-1 truncate max-w-[80px]">
               {opponent.username}
             </p>
           </div>
         </div>
 
         {/* Rating change */}
-        <div className="bg-black/30 rounded-xl p-4 mb-6">
-          <p className="text-xs text-gray-400 mb-1">Rating Change</p>
+        <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100">
+          <p className="text-xs text-gray-500 mb-1">Thay đổi ELO (Trắng)</p>
           <div className="flex items-center justify-center gap-3">
-            <span className="text-gray-400 text-lg">{player.rating}</span>
-            <span className="text-gray-500">→</span>
+            <span className="text-gray-500 text-lg">{player.rating}</span>
+            <span className="text-gray-400">→</span>
             <span className={`text-2xl font-bold ${eloDeltaColor(ratingChange)}`}>
               {newRating}
             </span>
@@ -311,18 +312,18 @@ const EndGameModal = ({
           <Button
             variant="ghost"
             onClick={onBackToLobby}
-            className="w-full gap-2 bg-[#81b64c] hover:bg-[#6a9a3f] text-white"
+            className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white"
           >
             <Swords className="w-4 h-4" />
-            Back to Lobby
+            Về Lobby
           </Button>
           <Button
             variant="ghost"
             onClick={onViewHistory}
-            className="w-full gap-2 border border-gray-600 text-gray-300 hover:bg-gray-700/50"
+            className="w-full gap-2 border border-gray-200 text-gray-700 hover:bg-gray-50"
           >
             <Eye className="w-4 h-4" />
-            View History
+            Lịch sử trận
           </Button>
         </div>
       </div>
@@ -334,11 +335,11 @@ const EndGameModal = ({
 // SUB-CMP: DrawOfferBanner
 // ═════════════════════════════════════════════════════
 const DrawOfferBanner = ({ from, onAccept, onDecline }) => (
-  <div className="mx-3 my-2 bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3 animate-slideUp">
+  <div className="mx-3 my-2 bg-yellow-50 border border-yellow-300 rounded-lg p-3">
     <div className="flex items-center gap-3">
-      <Handshake className="w-5 h-5 text-yellow-400 flex-shrink-0" />
-      <p className="flex-1 text-sm text-yellow-200 font-medium">
-        {from} offers a draw
+      <Handshake className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+      <p className="flex-1 text-sm text-yellow-800 font-medium">
+        {from} đề nghị hòa
       </p>
       <div className="flex gap-2">
         <button
@@ -398,8 +399,8 @@ const MoveListPanel = ({ moves }) => {
             <span
               className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
                 p.wi === moves.length - 1
-                  ? 'bg-yellow-800/30 text-yellow-200'
-                  : 'text-gray-300 hover:bg-gray-700/50'
+                  ? 'bg-yellow-100 text-yellow-800 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
               {p.w?.san || ''}
@@ -408,8 +409,8 @@ const MoveListPanel = ({ moves }) => {
               <span
                 className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
                   p.bi === moves.length - 1
-                    ? 'bg-yellow-800/30 text-yellow-200'
-                    : 'text-gray-300 hover:bg-gray-700/50'
+                    ? 'bg-yellow-100 text-yellow-800 font-semibold'
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 {p.b.san}
@@ -443,21 +444,21 @@ const InlineChat = ({ messages, onSend, disabled }) => {
   }
 
   return (
-    <div className="flex flex-col border-t border-gray-700">
+    <div className="flex flex-col border-t border-gray-200">
       {/* Messages */}
       <div className="h-28 overflow-y-auto p-2 space-y-1">
         {messages.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center mt-6">No messages</p>
+          <p className="text-xs text-gray-400 text-center mt-6">Chưa có tin nhắn</p>
         ) : (
           messages.map((m, i) => (
             <div
               key={i}
               className={`text-xs ${
                 m.isSystem
-                  ? 'text-yellow-400/70 text-center italic'
+                  ? 'text-blue-600 text-center italic'
                   : m.isMine
-                  ? 'text-blue-300'
-                  : 'text-gray-300'
+                  ? 'text-green-700'
+                  : 'text-gray-700'
               }`}
             >
               {!m.isSystem && (
@@ -473,21 +474,21 @@ const InlineChat = ({ messages, onSend, disabled }) => {
       {/* Input */}
       <form
         onSubmit={handleSubmit}
-        className="flex gap-1 p-2 border-t border-gray-700/50"
+        className="flex gap-1 p-2 border-t border-gray-100"
       >
         <input
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={disabled}
-          placeholder={disabled ? 'Game ended' : 'Type a message...'}
+          placeholder={disabled ? 'Trận đấu kết thúc' : 'Nhắn tin...'}
           maxLength={150}
-          className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#81b64c]/50"
+          className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-1 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-green-400"
         />
         <button
           type="submit"
           disabled={disabled || !text.trim()}
-          className="px-2 py-1 bg-[#81b64c] hover:bg-[#6a9a3f] disabled:bg-gray-700 disabled:text-gray-500 text-white rounded text-xs transition-colors"
+          className="px-2 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded text-xs transition-colors"
         >
           <Send className="w-3 h-3" />
         </button>
@@ -503,8 +504,10 @@ const RankedGamePage = () => {
   const { matchId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const isDemo = location.pathname.startsWith('/demo')
   const storeUser = useAuthStore((s) => s.user)
+
+  // ─── Nhận dữ liệu trận đấu từ Lobby (qua navigate state) ───
+  const locationMatchData = location.state?.matchData
 
   // ─── Players ───
   const player = useMemo(
@@ -519,22 +522,24 @@ const RankedGamePage = () => {
         : MOCK_PLAYER,
     [storeUser],
   )
-  const [opponent] = useState(MOCK_OPPONENT)
-  const [playerColor] = useState('white') // player is always white in mock
+  const [opponent] = useState(
+    locationMatchData?.opponent
+      ? {
+          id: locationMatchData.opponent.id || 'opp-1',
+          username: locationMatchData.opponent.username,
+          rating: locationMatchData.opponent.rating,
+          avatarUrl: locationMatchData.opponent.avatarUrl,
+        }
+      : MOCK_OPPONENT
+  )
+  // Chế độ local 2 người: bỏ qua màu được gán, cả 2 cùng đi trên 1 máy
+  const playerColor = locationMatchData?.color || 'white'
 
   // ─── Chess Logic ───
   const gameRef = useRef(new ChessGame())
   const [fen, setFen] = useState(gameRef.current.fen())
   const [moveHistory, setMoveHistory] = useState([])
   const [lastMove, setLastMove] = useState(null)
-
-  // ─── Click-to-move state ───
-  const [moveFrom, setMoveFrom] = useState(null)
-  const [optionSquares, setOptionSquares] = useState({})
-
-  // ─── Promotion state ───
-  const [promotionToSquare, setPromotionToSquare] = useState(null)
-  const [pendingPromoFrom, setPendingPromoFrom] = useState(null)
 
   // ─── Game phase ───
   const [gamePhase, setGamePhase] = useState(GAME_PHASE.LOADING)
@@ -611,9 +616,8 @@ const RankedGamePage = () => {
 
   // ─── Derived state (recalculated each render) ───
   const currentTurn = gameRef.current.turn() // 'w' | 'b'
-  const isMyTurn =
-    (currentTurn === 'w' && playerColor === 'white') ||
-    (currentTurn === 'b' && playerColor === 'black')
+  // Local 2P: luôn cho phép di chuyển — cả 2 người cùng ngồi 1 máy
+  const isMyTurn = gamePhase === GAME_PHASE.PLAYING && !endedRef.current
   const isCheck = gameRef.current.inCheck()
   const isWhite = playerColor === 'white'
 
@@ -661,10 +665,9 @@ const RankedGamePage = () => {
         }
       }
     }
-    // Click-to-move option dots
-    return { ...s, ...optionSquares }
+    return s
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastMove, isCheck, currentTurn, gamePhase, fen, optionSquares])
+  }, [lastMove, isCheck, currentTurn, gamePhase, fen])
 
   // ═══════════════════════════════════════════
   // GAME LIFECYCLE — simulate match load
@@ -674,10 +677,11 @@ const RankedGamePage = () => {
       setGamePhase(GAME_PHASE.PLAYING)
       setChatMessages((prev) => [
         ...prev,
-        { text: 'You are playing as White. Your move!', isSystem: true },
+        { text: `Trận đấu bắt đầu! ${player.username} (Trắng) đi trước.`, isSystem: true },
       ])
     }, 800)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ═══════════════════════════════════════════
@@ -766,49 +770,7 @@ const RankedGamePage = () => {
     return false
   }, [playerColor, endGame])
 
-  // ═══════════════════════════════════════════
-  // INACTIVITY TIMER — warn at 90s, auto-resign at 120s
-  // ═══════════════════════════════════════════
-  useEffect(() => {
-    if (gamePhase !== GAME_PHASE.PLAYING || endedRef.current) {
-      if (inactivityRef.current) clearInterval(inactivityRef.current)
-      return
-    }
-
-    // Reset inactivity when turn changes
-    setInactivityTime(0)
-    setShowAFKWarning(false)
-
-    if (!isMyTurn) {
-      if (inactivityRef.current) clearInterval(inactivityRef.current)
-      return
-    }
-
-    inactivityRef.current = setInterval(() => {
-      setInactivityTime((prev) => {
-        const next = prev + 1
-        if (next === INACTIVITY_WARNING_SEC) {
-          setShowAFKWarning(true)
-          setChatMessages((p) => [
-            ...p,
-            { text: '⚠️ Make a move or you will lose! (30s remaining)', isSystem: true },
-          ])
-        }
-        if (next >= INACTIVITY_TIMEOUT_SEC) {
-          endGame('afk', 'lose')
-          if (gameSocket?.isConnected) {
-            gameSocket.emit?.('game:afkTimeout', { matchId })
-          }
-        }
-        return next
-      })
-    }, 1000)
-
-    return () => {
-      if (inactivityRef.current) clearInterval(inactivityRef.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMyTurn, gamePhase, endGame, matchId])
+  // Inactivity timer disabled for local 2P mode
 
   // ═══════════════════════════════════════════
   // DISCONNECT HANDLING — listen for opponent events
@@ -839,313 +801,59 @@ const RankedGamePage = () => {
   // ═══════════════════════════════════════════
   // COMMIT MOVE  — shared by drag-drop & click
   // ═══════════════════════════════════════════
-  const commitMove = useCallback(
+  // handleChessBoardMove — callback from ChessBoard component after each move
+  const handleChessBoardMove = useCallback(
     (move) => {
       setFen(gameRef.current.fen())
       setMoveHistory(gameRef.current.history({ verbose: true }))
       setLastMove({ from: move.from, to: move.to })
-      setMoveFrom(null)
-      setOptionSquares({})
       setDrawOffer(null)
 
-      // Reset inactivity on own move
-      setInactivityTime(0)
-      setShowAFKWarning(false)
-
-      // Sound effects
-      if (move.captured) {
-        playSound('capture')
-      } else {
-        playSound('move')
-      }
+      if (move.captured) playSound('capture')
+      else playSound('move')
 
       const ended = checkGameEnd()
-
-      // Play check sound if in check and game didn't end
-      if (!ended && gameRef.current.inCheck()) {
-        playSound('check')
-      }
+      if (!ended && gameRef.current.inCheck()) playSound('check')
 
       if (gameSocket?.isConnected) {
-        gameSocket.sendMove({
-          from: move.from,
-          to: move.to,
-          promotion: move.promotion,
-          san: move.san,
-        })
+        gameSocket.sendMove({ from: move.from, to: move.to, promotion: move.promotion, san: move.san })
       }
     },
     [checkGameEnd, gameSocket, playSound],
   )
 
-  // ═══════════════════════════════════════════
-  // PROMOTION HELPERS
-  // ═══════════════════════════════════════════
 
-  /** Check whether a move from src→dst is a pawn promotion */
-  const isPromotionMove = useCallback((src, dst) => {
-    const piece = gameRef.current.get(src)
-    if (!piece || piece.type !== 'p') return false
-    const targetRank = dst[1]
-    return (
-      (piece.color === 'w' && targetRank === '8') ||
-      (piece.color === 'b' && targetRank === '1')
-    )
-  }, [])
 
-  /**
-   * Called when the user picks a piece from our custom promotion dialog.
-   * `promoType` is 'q', 'r', 'b', or 'n'.
-   */
-  const handlePromotionSelect = useCallback(
-    (promoType) => {
-      const from = pendingPromoFrom
-      const to = promotionToSquare
 
-      // Clear promotion state first
-      setPromotionToSquare(null)
-      setPendingPromoFrom(null)
-      setMoveFrom(null)
-      setOptionSquares({})
 
-      if (!from || !to) return
-
-      const move = gameRef.current.move({
-        from,
-        to,
-        promotion: promoType,
-      })
-
-      if (move) {
-        commitMove(move)
-      }
-    },
-    [commitMove, pendingPromoFrom, promotionToSquare],
-  )
-
-  /** Cancel a pending promotion */
-  const handlePromotionCancel = useCallback(() => {
-    setPromotionToSquare(null)
-    setPendingPromoFrom(null)
-    setMoveFrom(null)
-    setOptionSquares({})
-  }, [])
-
-  // ═══════════════════════════════════════════
-  // PIECE DROP (drag & drop)
-  // ═══════════════════════════════════════════
-  const handlePieceDrop = useCallback(
-    (src, dst) => {
-      if (gamePhase !== GAME_PHASE.PLAYING || endedRef.current || !isMyTurn)
-        return false
-
-      // If promotion → show custom dialog, don't commit yet
-      if (isPromotionMove(src, dst)) {
-        setPendingPromoFrom(src)
-        setPromotionToSquare(dst)
-        return false
-      }
-
-      const move = gameRef.current.move({
-        from: src,
-        to: dst,
-      })
-      if (!move) return false
-      commitMove(move)
-      return true
-    },
-    [gamePhase, isMyTurn, commitMove, isPromotionMove],
-  )
-
-  // ═══════════════════════════════════════════
-  // CLICK-TO-MOVE
-  // ═══════════════════════════════════════════
-  const showMoveOptions = useCallback((square) => {
-    const moves = gameRef.current.getMovesForSquare(square)
-    const opts = {}
-    moves.forEach((m) => {
-      const isCapture = gameRef.current.get(m.to)
-      opts[m.to] = {
-        background: isCapture
-          ? 'radial-gradient(circle, rgba(0,0,0,.15) 85%, transparent 85%)'
-          : 'radial-gradient(circle, rgba(0,0,0,.15) 25%, transparent 25%)',
-      }
-    })
-    opts[square] = { background: 'rgba(255, 255, 0, 0.4)' }
-    setOptionSquares(opts)
-  }, [])
-
-  const handleSquareClick = useCallback(
-    (square) => {
-      if (gamePhase !== GAME_PHASE.PLAYING || endedRef.current || !isMyTurn) {
-        setMoveFrom(null)
-        setOptionSquares({})
-        return
-      }
-
-      // Already selected a piece → try to move
-      if (moveFrom) {
-        // If this is a promotion move, show the dialog instead
-        if (isPromotionMove(moveFrom, square)) {
-          setPendingPromoFrom(moveFrom)
-          setPromotionToSquare(square)
-          return
-        }
-
-        const move = gameRef.current.move({
-          from: moveFrom,
-          to: square,
-        })
-        if (move) {
-          commitMove(move)
-          return
-        }
-        // Clicked another own piece → re-select
-        const piece = gameRef.current.get(square)
-        if (piece && piece.color === gameRef.current.turn()) {
-          setMoveFrom(square)
-          showMoveOptions(square)
-          return
-        }
-        // Clear selection
-        setMoveFrom(null)
-        setOptionSquares({})
-        return
-      }
-
-      // Select a piece
-      const piece = gameRef.current.get(square)
-      if (piece && piece.color === gameRef.current.turn()) {
-        setMoveFrom(square)
-        showMoveOptions(square)
-      }
-    },
-    [gamePhase, isMyTurn, moveFrom, commitMove, showMoveOptions],
-  )
-
-  // Only allow dragging own pieces
-  const isDraggable = useCallback(
-    ({ piece }) => {
-      if (gamePhase !== GAME_PHASE.PLAYING || endedRef.current || !isMyTurn)
-        return false
-      const color = piece[0] // 'w' | 'b'
-      return (
-        (playerColor === 'white' && color === 'w') ||
-        (playerColor === 'black' && color === 'b')
-      )
-    },
-    [gamePhase, isMyTurn, playerColor],
-  )
-
-  // ═══════════════════════════════════════════
-  // MOCK AI — opponent makes random moves
-  // ═══════════════════════════════════════════
-  useEffect(() => {
-    if (gamePhase !== GAME_PHASE.PLAYING || endedRef.current) return
-    const oppTurn = playerColor === 'white' ? 'b' : 'w'
-    if (gameRef.current.turn() !== oppTurn) return
-
-    const delay = AI_DELAY_MIN + Math.random() * (AI_DELAY_MAX - AI_DELAY_MIN)
-    const timer = setTimeout(() => {
-      if (endedRef.current) return
-      const ai = pickAIMove(gameRef.current)
-      if (!ai) return
-
-      const move = gameRef.current.move({
-        from: ai.from,
-        to: ai.to,
-        promotion: ai.promotion || 'q',
-      })
-      if (!move) return
-
-      setFen(gameRef.current.fen())
-      setMoveHistory(gameRef.current.history({ verbose: true }))
-      setLastMove({ from: move.from, to: move.to })
-
-      // Sound for opponent moves
-      if (move.captured) {
-        playSound('capture')
-      } else {
-        playSound('move')
-      }
-
-      const aiEnded = checkGameEnd()
-      if (!aiEnded && gameRef.current.inCheck()) {
-        playSound('check')
-      }
-
-      // Occasional bot chat
-      if (Math.random() < 0.12) {
-        const msgs = [
-          'Good move!',
-          'Interesting...',
-          'Hmm 🤔',
-          'Nice!',
-          '😏',
-          'Let me think...',
-        ]
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            sender: opponent.username,
-            text: msgs[Math.floor(Math.random() * msgs.length)],
-            isMine: false,
-          },
-        ])
-      }
-
-      // Rare draw offer from bot
-      if (Math.random() < 0.04 && moveHistory.length > 20) {
-        setDrawOffer('received')
-        setChatMessages((prev) => [
-          ...prev,
-          { text: `${opponent.username} offers a draw`, isSystem: true },
-        ])
-      }
-    }, delay)
-
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, gamePhase, playerColor, checkGameEnd, opponent.username])
+  // AI đã bị tắt — chế độ local 2 người chơi luân phiên trên 1 máy
 
   // ═══════════════════════════════════════════
   // CONTROLS: Resign / Draw / Chat
   // ═══════════════════════════════════════════
   const handleResign = useCallback(() => {
     if (showResignConfirm) {
-      endGame('resignation', 'lose')
+      // Bên đang đến lượt đầu hàng → bên kia thắng
+      const resigningColor = gameRef.current.turn()
+      const result = resigningColor === 'w' ? 'lose' : 'win' // relative to player (white)
+      endGame('resignation', playerColor === 'white' ? result : result === 'win' ? 'lose' : 'win')
       setShowResignConfirm(false)
     } else {
       setShowResignConfirm(true)
       setTimeout(() => setShowResignConfirm(false), 4000)
     }
-  }, [showResignConfirm, endGame])
+  }, [showResignConfirm, endGame, playerColor])
 
   const handleOfferDraw = useCallback(() => {
     if (drawOffer) return
-    setDrawOffer('sent')
+    // Local 2P: đề nghị hòa → phía kia bấm Accept/Decline
+    const side = gameRef.current.turn() === 'w' ? player.username : opponent.username
+    setDrawOffer('received') // luôn hiển thị banner để bên kia xác nhận
     setChatMessages((prev) => [
       ...prev,
-      { text: 'You offered a draw', isSystem: true },
+      { text: `${side} đề nghị hòa. Chấp nhận hay từ chối?`, isSystem: true },
     ])
-    // Opponent responds after delay
-    setTimeout(() => {
-      if (endedRef.current) return
-      const accepted = Math.random() < 0.3
-      if (accepted) {
-        endGame('draw_agreement', 'draw')
-      } else {
-        setDrawOffer(null)
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            text: `${opponent.username} declined the draw`,
-            isSystem: true,
-          },
-        ])
-      }
-    }, 2000 + Math.random() * 2000)
-  }, [drawOffer, endGame, opponent.username])
+  }, [drawOffer, player.username, opponent.username])
 
   const handleAcceptDraw = useCallback(() => {
     endGame('draw_agreement', 'draw')
@@ -1162,24 +870,11 @@ const RankedGamePage = () => {
 
   const handleSendChat = useCallback(
     (text) => {
+      const side = gameRef.current.turn() === 'w' ? player.username : opponent.username
       setChatMessages((prev) => [
         ...prev,
-        { sender: player.username, text, isMine: true },
+        { sender: side, text, isMine: true },
       ])
-      // Bot occasionally replies
-      if (Math.random() < 0.3) {
-        setTimeout(() => {
-          const replies = ['Thanks!', 'gg', '👍', 'Good one!', '🙂']
-          setChatMessages((prev) => [
-            ...prev,
-            {
-              sender: opponent.username,
-              text: replies[Math.floor(Math.random() * replies.length)],
-              isMine: false,
-            },
-          ])
-        }, 1000 + Math.random() * 2000)
-      }
     },
     [player.username, opponent.username],
   )
@@ -1188,12 +883,12 @@ const RankedGamePage = () => {
   // NAVIGATION
   // ═══════════════════════════════════════════
   const goToLobby = useCallback(
-    () => navigate(isDemo ? '/demo/ranked' : '/ranked'),
-    [navigate, isDemo]
+    () => navigate('/ranked'),
+    [navigate]
   )
   const goToHistory = useCallback(
-    () => navigate(isDemo ? '/demo/ranked/history' : '/ranked/history'),
-    [navigate, isDemo]
+    () => navigate('/ranked/history'),
+    [navigate]
   )
 
   // ═══════════════════════════════════════════
@@ -1206,6 +901,32 @@ const RankedGamePage = () => {
   }, [])
 
   // ═══════════════════════════════════════════
+  // NAVIGATE-AWAY FORFEIT
+  // block browser tab close/refresh; in-app back button shows confirm
+  // ═══════════════════════════════════════════
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  useEffect(() => {
+    if (gamePhase !== GAME_PHASE.PLAYING) return
+    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [gamePhase])
+
+  const handleBackClick = useCallback(() => {
+    if (gamePhase === GAME_PHASE.PLAYING) {
+      setShowLeaveConfirm(true)
+    } else {
+      goToLobby()
+    }
+  }, [gamePhase, goToLobby])
+
+  const handleForfeitAndLeave = useCallback(() => {
+    endGame('forfeit', 'lose')
+    setShowLeaveConfirm(false)
+    navigate('/ranked')
+  }, [endGame, navigate])
+
+  // ═══════════════════════════════════════════
   // LOADING SCREEN
   // ═══════════════════════════════════════════
   if (gamePhase === GAME_PHASE.LOADING) {
@@ -1213,9 +934,9 @@ const RankedGamePage = () => {
       <MainLayout>
         <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4">
           <div className="w-16 h-16 border-4 border-[#81b64c] border-t-transparent rounded-full animate-spin" />
-          <h2 className="text-xl font-bold text-white">Loading Game...</h2>
-          <p className="text-gray-400 text-sm">
-            Connecting to match {matchId || 'demo'}
+          <h2 className="text-xl font-bold text-gray-900">Đang tải trận đấu...</h2>
+          <p className="text-gray-500 text-sm">
+            Chuẩn bị bàn cờ · {matchId || 'local'}
           </p>
         </div>
       </MainLayout>
@@ -1251,49 +972,76 @@ const RankedGamePage = () => {
   const botCapColor = isWhite ? 'b' : 'w'
 
   // Status text
+  // Local 2P: hiển thị lượt hiện tại
+  const currentPlayerName =
+    currentTurn === 'w' ? `${player.username} (Trắng)` : `${opponent.username} (Đen)`
   const statusText =
     gamePhase === GAME_PHASE.ENDED
       ? endResult?.result === 'win'
-        ? '🎉 You Won!'
+        ? '🎉 Chiến thắng!'
         : endResult?.result === 'lose'
-        ? '😔 You Lost'
-        : '🤝 Draw'
+        ? '😔 Thua trận'
+        : '🤝 Hòa'
       : isCheck
-      ? '⚡ Check!'
-      : isMyTurn
-      ? '🟢 Your Turn'
-      : '⏳ Opponent thinking...'
+      ? `⚡ Chiếu! — ${currentPlayerName}`
+      : `🟢 Lượt: ${currentPlayerName}`
 
   // ═══════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════
   return (
     <MainLayout>
+      {/* Leave-game confirm dialog */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Bỏ trận?</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              Rời trang trong khi đang đấu sẽ bị tính là thua.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm"
+              >
+                Ở lại
+              </button>
+              <button
+                onClick={handleForfeitAndLeave}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
+              >
+                Rời và thua
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto px-2 sm:px-4 py-2">
         {/* ─── Header bar ─── */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <button
-              onClick={goToLobby}
-              className="p-2 rounded-lg hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
-              title="Back to Lobby"
+              onClick={handleBackClick}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+              title="Về Lobby"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#81b64c]" />
-                Ranked Game
+              <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-green-600" />
+                Ranked Match
               </h1>
               <p className="text-xs text-gray-500 font-mono">
-                {matchId || 'demo-game'} · 10+0 · Rated
+                {matchId || 'local'} · 10+0 · Có xếp hạng · Local 2P
               </p>
             </div>
           </div>
           <button
             onClick={() => setSoundEnabled((v) => !v)}
-            className="p-2 rounded-lg hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
-            title={soundEnabled ? 'Mute' : 'Unmute'}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+            title={soundEnabled ? 'Tắt âm' : 'Mở âm'}
           >
             {soundEnabled ? (
               <Volume2 className="w-4 h-4" />
@@ -1318,69 +1066,21 @@ const RankedGamePage = () => {
               isTop
             />
 
-            {/* Chess board — sized to fill available height */}
+            {/* Chess board — dùng component ChessBoard có sẵn */}
             <div
-              className="my-1 w-full relative"
+              className="my-1 w-full"
               style={{ maxWidth: 'calc(100vh - 180px)', margin: '4px auto' }}
             >
-              <Chessboard
-                position={fen}
-                onPieceDrop={handlePieceDrop}
-                onSquareClick={handleSquareClick}
-                isDraggablePiece={isDraggable}
-                boardOrientation={playerColor}
+              <ChessBoard
+                gameState={gameRef.current}
+                onMove={handleChessBoardMove}
+                playerColor={playerColor}
+                disabled={gamePhase !== GAME_PHASE.PLAYING || endedRef.current}
                 customSquareStyles={squareStyles}
-                customBoardStyle={{
-                  borderRadius: '4px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-                }}
-                customDarkSquareStyle={{ backgroundColor: '#779952' }}
-                customLightSquareStyle={{ backgroundColor: '#edeed1' }}
-                animationDuration={200}
-                showBoardNotation
-                onPromotionCheck={() => false}
+                showCoordinates={true}
+                highlightCheck={true}
+                soundEnabled={false}
               />
-              {/* Custom Promotion Dialog */}
-              {promotionToSquare && (
-                <div
-                  className="absolute inset-0 z-50 flex items-center justify-center"
-                  style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-                  onClick={handlePromotionCancel}
-                >
-                  <div
-                    className="bg-[#312e2b] rounded-lg p-4 shadow-2xl border border-gray-600"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <p className="text-white text-sm mb-3 text-center font-medium">
-                      Chọn quân để phong cấp
-                    </p>
-                    <div className="flex gap-2">
-                      {['q', 'r', 'b', 'n'].map((piece) => {
-                        const color = gameRef.current.turn() === 'w' ? 'w' : 'b'
-                        const pieceSymbols = {
-                          wq: '♕', wr: '♖', wb: '♗', wn: '♘',
-                          bq: '♛', br: '♜', bb: '♝', bn: '♞',
-                        }
-                        const symbol = pieceSymbols[`${color}${piece}`]
-                        const labels = { q: 'Hậu', r: 'Xe', b: 'Tượng', n: 'Mã' }
-                        return (
-                          <button
-                            key={piece}
-                            onClick={() => handlePromotionSelect(piece)}
-                            className="flex flex-col items-center justify-center w-16 h-20 bg-[#454240] hover:bg-[#5a5654] rounded-lg transition-colors border border-gray-500 hover:border-yellow-400"
-                            title={labels[piece]}
-                          >
-                            <span className="text-4xl leading-none" style={{ color: color === 'w' ? '#fff' : '#333' }}>
-                              {symbol}
-                            </span>
-                            <span className="text-xs text-gray-400 mt-1">{labels[piece]}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Player bar (bottom) */}
@@ -1397,43 +1097,31 @@ const RankedGamePage = () => {
 
           {/* ═════ RIGHT: Side panel ═════ */}
           <div
-            className="w-full lg:flex-1 lg:min-w-[280px] flex flex-col bg-[#262421] rounded-lg border border-gray-700 overflow-hidden"
+            className="w-full lg:flex-1 lg:min-w-[280px] flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
             style={{ maxHeight: 'calc(100vh - 120px)' }}
           >
-            {/* AFK Warning Banner */}
-            {showAFKWarning && gamePhase === GAME_PHASE.PLAYING && (
-              <div className="px-3 py-2 bg-red-900/40 border-b border-red-600/50 animate-pulse">
-                <div className="flex items-center justify-center gap-2 text-sm text-red-300 font-medium">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Make a move! Auto-resign in {INACTIVITY_TIMEOUT_SEC - inactivityTime}s</span>
-                </div>
-              </div>
-            )}
-
             {/* Opponent Disconnected Banner */}
             {opponentDisconnected && gamePhase === GAME_PHASE.PLAYING && (
-              <div className="px-3 py-2 bg-yellow-900/30 border-b border-yellow-600/50">
-                <div className="flex items-center justify-center gap-2 text-sm text-yellow-300 font-medium">
+              <div className="px-3 py-2 bg-yellow-50 border-b border-yellow-200">
+                <div className="flex items-center justify-center gap-2 text-sm text-yellow-700 font-medium">
                   <AlertTriangle className="w-4 h-4" />
-                  <span>Opponent disconnected. Waiting for reconnect...</span>
+                  <span>Đối thủ ngắt kết nối. Chờ kết nối lại...</span>
                 </div>
               </div>
             )}
 
             {/* Status strip */}
             <div
-              className={`px-4 py-2 text-sm font-semibold text-center border-b border-gray-700 ${
+              className={`px-4 py-2 text-sm font-semibold text-center border-b border-gray-200 ${
                 gamePhase === GAME_PHASE.ENDED
                   ? endResult?.result === 'win'
-                    ? 'bg-green-900/30 text-green-300'
+                    ? 'bg-green-50 text-green-700'
                     : endResult?.result === 'lose'
-                    ? 'bg-red-900/30 text-red-300'
-                    : 'bg-blue-900/30 text-blue-300'
+                    ? 'bg-red-50 text-red-700'
+                    : 'bg-blue-50 text-blue-700'
                   : isCheck
-                  ? 'bg-red-900/20 text-red-300'
-                  : isMyTurn
-                  ? 'bg-[#81b64c]/10 text-[#81b64c]'
-                  : 'bg-gray-800 text-gray-400'
+                  ? 'bg-red-50 text-red-600'
+                  : 'bg-green-50 text-green-700'
               }`}
             >
               {statusText}
@@ -1449,13 +1137,13 @@ const RankedGamePage = () => {
             )}
 
             {/* Moves header */}
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-700/50">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50">
               <List className="w-4 h-4 text-gray-500" />
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Moves
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Nước đi
               </span>
-              <span className="text-xs text-gray-600 ml-auto">
-                {moveHistory.length} moves
+              <span className="text-xs text-gray-400 ml-auto">
+                {moveHistory.length} nước
               </span>
             </div>
 
@@ -1463,16 +1151,16 @@ const RankedGamePage = () => {
             <MoveListPanel moves={moveHistory} />
 
             {/* Game controls */}
-            <div className="px-3 py-2 border-t border-gray-700 flex gap-2">
+            <div className="px-3 py-2 border-t border-gray-200 flex gap-2">
               <button
                 onClick={handleResign}
                 disabled={!playing}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all ${
                   !playing
-                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : showResignConfirm
                     ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
-                    : 'bg-gray-700 hover:bg-red-600/80 text-gray-300 hover:text-white'
+                    : 'bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700'
                 }`}
               >
                 {showResignConfirm ? (
@@ -1480,7 +1168,7 @@ const RankedGamePage = () => {
                 ) : (
                   <Flag className="w-4 h-4" />
                 )}
-                {showResignConfirm ? 'Confirm?' : 'Resign'}
+                {showResignConfirm ? 'Xác nhận?' : 'Đầu hàng'}
               </button>
 
               <button
@@ -1488,12 +1176,12 @@ const RankedGamePage = () => {
                 disabled={!playing || drawOffer !== null}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all ${
                   !playing || drawOffer !== null
-                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                    : 'bg-gray-700 hover:bg-blue-600/80 text-gray-300 hover:text-white'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-700'
                 }`}
               >
                 <Handshake className="w-4 h-4" />
-                {drawOffer === 'sent' ? 'Offer Sent' : 'Draw'}
+                {drawOffer === 'received' ? 'Đề nghị hòa' : 'Đề nghị hòa'}
               </button>
             </div>
 

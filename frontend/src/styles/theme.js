@@ -9,7 +9,7 @@
 export const THEME = {
   // Màu nền chính
   background: {
-    page: 'bg-gray-50',           // Nền trang
+    page: 'bg-[#e1edff]',          // Nền trang
     card: 'bg-white',              // Nền card
     hover: 'bg-gray-100',          // Hover state
     active: 'bg-gray-200',         // Active state

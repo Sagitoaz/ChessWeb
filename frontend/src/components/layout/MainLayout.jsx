@@ -27,16 +27,16 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
   const { sidebarOpen, toggleSidebar } = useUIStore()
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col h-screen overflow-hidden bg-[#e1edff]">
       {/* Header cố định trên cùng */}
       <Header />
 
-      {/* Body: Sidebar + Content */}
+      {/* Body: Sidebar + Content — chiếm phần còn lại sau header */}
       <div className="flex flex-1 overflow-hidden">
         {!hideSidebar && (
           <>
-            {/* Desktop Sidebar — ẩn trên mobile */}
-            <div className="hidden md:flex flex-col relative h-full">
+            {/* Desktop Sidebar — chiều cao 100% vùng body, tự cuộn nội dung nếu cần */}
+            <div className="hidden md:flex flex-col relative h-full flex-shrink-0">
               <Sidebar collapsed={sidebarCollapsed} />
               {/* Toggle collapse button */}
               <button
@@ -65,14 +65,14 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
           </>
         )}
 
-        {/* Main content area */}
+        {/* Main content area — cuộn độc lập, sidebar không bị ảnh hưởng */}
         <main className="flex-1 overflow-y-auto">
-          <div className="min-h-full p-4 md:p-6 lg:p-8">{children}</div>
+          <div className="min-h-full p-4 md:p-6 lg:p-8">
+            {children}
+            {!hideFooter && <Footer />}
+          </div>
         </main>
       </div>
-
-      {/* Footer */}
-      {!hideFooter && <Footer />}
     </div>
   )
 }

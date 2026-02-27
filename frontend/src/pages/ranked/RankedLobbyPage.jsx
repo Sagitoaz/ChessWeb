@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   Swords,
@@ -51,8 +51,12 @@ const formatSearchTime = (seconds) => {
 const MOCK_USER = {
   id: 1,
   username: 'ChessPlayer',
-  rating: 3636,
+  rating: 1200,
   avatarUrl: 'https://i.pravatar.cc/150?img=1',
+  gamesPlayed: 0,
+  wins: 0,
+  losses: 0,
+  draws: 0,
 }
 
 const MOCK_RECENT_GAMES = [
@@ -263,8 +267,24 @@ const RankedLobbyPage = () => {
   const isDemo = location.pathname.startsWith('/demo')
 
   // ──── Auth/User State ────
-  const { user: authUser, isAuthenticated } = useAuthStore()
-  const user = authUser || MOCK_USER
+  const { isAuthenticated } = useAuthStore()
+  const storeUser = useAuthStore((s) => s.user)
+  const user = useMemo(
+    () =>
+      storeUser
+        ? {
+            id: storeUser.id,
+            username: storeUser.username || MOCK_USER.username,
+            rating: storeUser.rating || MOCK_USER.rating,
+            avatarUrl: storeUser.avatarUrl || MOCK_USER.avatarUrl,
+            gamesPlayed: storeUser.gamesPlayed ?? MOCK_USER.gamesPlayed,
+            wins: storeUser.wins ?? MOCK_USER.wins,
+            losses: storeUser.losses ?? MOCK_USER.losses,
+            draws: storeUser.draws ?? MOCK_USER.draws,
+          }
+        : MOCK_USER,
+    [storeUser],
+  )
 
   // ──── Queue & Match State ────
   const [queueStatus, setQueueStatus] = useState(QUEUE_STATUS.IDLE)
@@ -384,7 +404,7 @@ const RankedLobbyPage = () => {
       setMatchData(mockMatch)
 
       setTimeout(() => setQueueStatus(QUEUE_STATUS.CONNECTING), 1500)
-      setTimeout(() => navigate(`/demo/ranked/game/${mockMatch.matchId}`), 3000)
+      setTimeout(() => navigate(`/ranked/game/${mockMatch.matchId}`, { state: { matchData: mockMatch } }), 3000)
     }, Math.random() * 10000 + 5000)
 
     return () => {
@@ -603,13 +623,39 @@ const RankedLobbyPage = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-100 rounded-lg p-3 text-center">
                   <p className={`text-2xl font-bold ${THEME.text.primary}`}>{user.rating}</p>
-                  <p className={`text-xs ${THEME.text.muted} mt-1`}>Current Rating</p>
+                  <p className={`text-xs ${THEME.text.muted} mt-1`}>ELO Rating</p>
                 </div>
                 <div className="bg-gray-100 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-yellow-400" style={{ color: rankInfo.color }}>
+                  <p className="text-2xl font-bold" style={{ color: rankInfo.color }}>
                     {rankInfo.name.split(' ')[0]}
                   </p>
                   <p className={`text-xs ${THEME.text.muted} mt-1`}>Rank</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-green-600">{user.wins ?? 0}</p>
+                  <p className={`text-xs ${THEME.text.muted} mt-1`}>Thắng</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-red-500">{user.losses ?? 0}</p>
+                  <p className={`text-xs ${THEME.text.muted} mt-1`}>Thua</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 text-center col-span-2">
+                  <div className="flex justify-around">
+                    <div>
+                      <p className={`text-xl font-bold ${THEME.text.primary}`}>{user.gamesPlayed ?? 0}</p>
+                      <p className={`text-xs ${THEME.text.muted}`}>Tổng ván</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-blue-500">{user.draws ?? 0}</p>
+                      <p className={`text-xs ${THEME.text.muted}`}>Hòa</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-yellow-600">
+                        {user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0}%
+                      </p>
+                      <p className={`text-xs ${THEME.text.muted}`}>Tỉ lệ thắng</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -115,6 +115,12 @@ function AppRoutes() {
         <Route path="/ranked/stats"          element={<RankedStatsPage />} />
 
         {/* =========================================================
+            BOT GAME — Tự có MainLayout bên trong
+            (Không bọc AppLayout để tránh double-wrap)
+        ========================================================= */}
+        <Route path="/bot/game/:gameId"  element={<BotGamePage />} />
+
+        {/* =========================================================
             APP LAYOUT — Tất cả trang có Sidebar + Header
             AppLayout tự động wrap Header + Sidebar + Footer.
             Muốn thêm trang mới? Thêm <Route> vào trong đây!
@@ -143,7 +149,6 @@ function AppRoutes() {
 
           {/* Chơi với Bot */}
           <Route path="/bot"               element={<BotSelectPage />} />
-          <Route path="/bot/game/:gameId"  element={<BotGamePage />} />
 
           {/* Replay */}
           <Route path="/replays"           element={<ReplayListPage />} />
