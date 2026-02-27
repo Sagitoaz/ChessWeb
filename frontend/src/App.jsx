@@ -24,10 +24,15 @@ if (USE_MOCK && !localStorage.getItem('token')) {
     JSON.stringify({
       id: 1,
       username: 'testuser',
-      email: 'test@example.com',
+      email: 'test@chessweb.local',
       displayName: 'Test User',
       avatarUrl: 'https://i.pravatar.cc/150?img=1',
-      rating: 1500,
+      bio: 'Tài khoản test — dùng để kiểm tra giao diện',
+      rating: 1520,
+      gamesPlayed: 87,
+      wins: 45,
+      losses: 32,
+      draws: 10,
     })
   )
 }
