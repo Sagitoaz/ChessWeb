@@ -42,3 +42,8 @@ build/
 # ==================== Project Specific ====================
 # Xóa dòng này nếu muốn commit README cho components
 # frontend/src/components/common/README.md
+
+.github/
+.aidlc-rule-details/
+aidlc-docs/
+AGENTS.md

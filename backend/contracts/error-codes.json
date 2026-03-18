@@ -1,0 +1,16 @@
+{
+  "AUTH_INVALID_CREDENTIALS": "Sai tài khoản hoặc mật khẩu",
+  "AUTH_TOKEN_EXPIRED": "Token đã hết hạn",
+  "AUTH_FORBIDDEN": "Không có quyền truy cập",
+  "VALIDATION_FAILED": "Dữ liệu đầu vào không hợp lệ",
+  "ROOM_NOT_FOUND": "Không tìm thấy phòng",
+  "ROOM_FULL": "Phòng đã đủ người",
+  "RANKED_QUEUE_STATE_INVALID": "Trạng thái hàng chờ không hợp lệ",
+  "RANKED_MATCH_NOT_FOUND": "Không tìm thấy trận đấu hạng",
+  "TOURNAMENT_NOT_FOUND": "Không tìm thấy giải đấu",
+  "TOURNAMENT_JOIN_BLOCKED": "Không thể tham gia giải đấu ở trạng thái hiện tại",
+  "BOT_PROVIDER_TIMEOUT": "Hết thời gian chờ Stockfish API",
+  "BOT_PROVIDER_ERROR": "Lỗi từ Stockfish API",
+  "DB_CONSTRAINT_VIOLATION": "Vi phạm ràng buộc dữ liệu",
+  "INTERNAL_SERVER_ERROR": "Lỗi hệ thống nội bộ"
+}
