@@ -1,4 +1,4 @@
-{
+﻿{
   "AUTH_INVALID_CREDENTIALS": "Sai tài khoản hoặc mật khẩu",
   "AUTH_TOKEN_EXPIRED": "Token đã hết hạn",
   "AUTH_FORBIDDEN": "Không có quyền truy cập",
@@ -12,5 +12,7 @@
   "BOT_PROVIDER_TIMEOUT": "Hết thời gian chờ Stockfish API",
   "BOT_PROVIDER_ERROR": "Lỗi từ Stockfish API",
   "DB_CONSTRAINT_VIOLATION": "Vi phạm ràng buộc dữ liệu",
+  "NOT_FOUND": "Không tìm thấy tài nguyên",
+  "NOT_IMPLEMENTED": "Chức năng chưa được triển khai",
   "INTERNAL_SERVER_ERROR": "Lỗi hệ thống nội bộ"
 }
