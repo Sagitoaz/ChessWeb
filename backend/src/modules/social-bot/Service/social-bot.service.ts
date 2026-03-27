@@ -61,6 +61,14 @@ export class SocialBotService {
     });
     return room;
   }
+  async getRoom(code: string) {
+    const room = await this.repo.findRoomByCode(code);
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+    const members = await this.repo.findRoomMembers(room._id);
+    return { ...room, members };
+  }
   async leaveRoom(userId: string, code: string) {
     const room = await this.repo.findRoomByCode(code);
     if (!room) {

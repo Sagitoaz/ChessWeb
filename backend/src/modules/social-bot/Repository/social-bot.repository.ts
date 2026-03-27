@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ObjectId } from "mongodb";
-import { MongoService } from "src/shared/db/mongo.service";
+import { MongoService } from "../../../shared/db/mongo.service";
 
 @Injectable()
 export class SocialBotRepository {
@@ -27,7 +27,10 @@ export class SocialBotRepository {
     return this.db.collection("room_members").deleteOne({ roomId, userId });
   }
   async findTournamentById(id: string) {
-    const _id = ObjectId.isValid(id) ? new ObjectId(id) : id;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
+    const _id = new ObjectId(id);
     return this.db.collection("tournaments").findOne({ _id });
   }
   async addTournamentParticipant(doc: Record<string, unknown>) {
@@ -68,7 +71,10 @@ export class SocialBotRepository {
   }
 
   async findGameById(id: string) {
-    const _id = ObjectId.isValid(id) ? new ObjectId(id) : id;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
+    const _id = new ObjectId(id);
     return this.db.collection("games").findOne({ _id });
   }
 }
