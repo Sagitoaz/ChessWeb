@@ -13,5 +13,62 @@ export class SocialBotRepository {
     // trong mongod db không dùng table dùng collection
     return { ...doc, _id: result.insertedId };
   }
-  async addRoomMember(doc: Record<string, unknown>) {}
+  async addRoomMember(doc: Record<string, unknown>) {
+    await this.db.collection("room_members").insertOne(doc);
+    return doc;
+  }
+  async findRoomByCode(RoomCode: string) {
+    return await this.db.collection("rooms").findOne({ code: RoomCode });
+  }
+  async findRoomMembers(roomId: ObjectId | string) {
+    return await this.db.collection("room_members").find({ roomId }).toArray();
+  }
+  async removeRoomMember(roomId: ObjectId | string, userId: string) {
+    return this.db.collection("room_members").deleteOne({ roomId, userId });
+  }
+  async findTournamentById(id: string) {
+    const _id = ObjectId.isValid(id) ? new ObjectId(id) : id;
+    return this.db.collection("tournaments").findOne({ _id });
+  }
+  async addTournamentParticipant(doc: Record<string, unknown>) {
+    await this.db.collection("tournament_participants").insertOne(doc);
+    return doc;
+  }
+  async removeTournamentParticipant(
+    tournamentId: ObjectId | string,
+    userId: string,
+  ) {
+    return this.db
+      .collection("tournament_participants")
+      .deleteOne({ tournamentId, userId });
+  }
+  async createBotSession(doc: Record<string, unknown>) {
+    const result = await this.db.collection("bot_sessions").insertOne(doc);
+    return { ...doc, _id: result.insertedId };
+  }
+  async createBotMoveRequest(doc: Record<string, unknown>) {
+    const result = await this.db.collection("bot_move_requests").insertOne(doc);
+    return { ...doc, _id: result.insertedId };
+  }
+  async updateBotMoveRequestResponse(
+    id: ObjectId,
+    responsePayload: unknown,
+    status: string,
+  ) {
+    await this.db
+      .collection("bot_move_requests")
+      .updateOne(
+        { _id: id },
+        { $set: { responsePayload, status, updateAt: new Date() } },
+      );
+  }
+  async createGame(doc: Record<string, unknown>) {
+    const result = await this.db.collection("games").insertOne(doc);
+    return { ...doc, _id: result.insertedId };
+  }
+
+  async findGameById(id: string) {
+    const _id = ObjectId.isValid(id) ? new ObjectId(id) : id;
+    return this.db.collection("games").findOne({ _id });
+  }
 }
