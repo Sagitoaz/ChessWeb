@@ -1,5 +1,15 @@
 import * as assert from 'assert'
-import { ProfileRepositoryPort, UserProfileDoc, EmailVerificationTokenDoc, VerifyTokenResult } from '../profile.repository.port'
+import { ProfileController } from '../profile.controller'
+import {
+  EmailVerificationTokenDoc,
+  LeaderboardQuery,
+  LeaderboardQueryResult,
+  ProfileRepositoryPort,
+  UserGamesQuery,
+  UserGamesQueryResult,
+  UserProfileDoc,
+  VerifyTokenResult,
+} from '../profile.repository.port'
 import { ProfileService } from '../profile.service'
 
 class InMemoryProfileRepository implements ProfileRepositoryPort {
@@ -14,6 +24,49 @@ class InMemoryProfileRepository implements ProfileRepositoryPort {
     return this.users.get(userId) || null
   }
 
+  async findPasswordHashByUserId(userId: string): Promise<string | null> {
+    const user = this.users.get(userId)
+    if (!user || !user.passwordHash) return null
+    return user.passwordHash
+  }
+
+  async updatePasswordHashByUserId(userId: string, passwordHash: string, now: Date): Promise<boolean> {
+    const user = this.users.get(userId)
+    if (!user) return false
+
+    this.users.set(userId, {
+      ...user,
+      passwordHash,
+      updatedAt: now,
+    })
+
+    return true
+  }
+
+  async updateUserAvatarById(userId: string, avatar: { avatarUrl: string; avatarPublicId: string | null; now: Date }): Promise<UserProfileDoc | null> {
+    const user = this.users.get(userId)
+    if (!user) return null
+
+    const updated: UserProfileDoc = {
+      ...user,
+      avatarUrl: avatar.avatarUrl,
+      avatarPublicId: avatar.avatarPublicId,
+      avatarUpdatedAt: avatar.now,
+      updatedAt: avatar.now,
+    }
+
+    this.users.set(userId, updated)
+    return updated
+  }
+
+  async findUserStatsByUserId(_userId: string): Promise<null> {
+    return null
+  }
+
+  async findUserRatingByUserId(_userId: string): Promise<null> {
+    return null
+  }
+
   async updateUserProfileDisplayName(userId: string, displayName: string | null): Promise<UserProfileDoc | null> {
     const user = this.users.get(userId)
     if (!user) return null
@@ -25,6 +78,21 @@ class InMemoryProfileRepository implements ProfileRepositoryPort {
     }
     this.users.set(userId, updated)
     return updated
+  }
+
+  async findLeaderboard(_query: LeaderboardQuery): Promise<LeaderboardQueryResult> {
+    return {
+      items: [],
+      total: 0,
+      modeApplied: false,
+    }
+  }
+
+  async findUserGames(_userId: string, _query: UserGamesQuery): Promise<UserGamesQueryResult> {
+    return {
+      items: [],
+      total: 0,
+    }
   }
 
   async createEmailVerificationToken(token: EmailVerificationTokenDoc): Promise<void> {
@@ -75,6 +143,16 @@ async function run(): Promise<void> {
     updatedAt: new Date('2026-03-20T00:00:00.000Z'),
   })
 
+  repo.seedUser({
+    _id: 'u-verified',
+    username: 'member2-verified',
+    displayName: 'TV2 Verified',
+    isActive: true,
+    isVerified: true,
+    createdAt: new Date('2026-03-20T00:00:00.000Z'),
+    updatedAt: new Date('2026-03-20T00:00:00.000Z'),
+  })
+
   const profileResult = await service.getProfile({ sub: 'u-001' })
   assert.equal(profileResult.ok, true)
   if (profileResult.ok) {
@@ -91,6 +169,30 @@ async function run(): Promise<void> {
   const resendResult = await service.resendVerification({ userId: 'u-001' })
   assert.equal(resendResult.ok, true)
   assert.equal(repo.getTokenCount(), 1)
+
+  const resendMissingUser = await service.resendVerification({ userId: 'u-missing' })
+  assert.equal(resendMissingUser.ok, true)
+  if (resendMissingUser.ok) {
+    assert.equal(resendMissingUser.data.userId, 'u-missing')
+    assert.equal(typeof resendMissingUser.data.expiresAt, 'string')
+  }
+  assert.equal(repo.getTokenCount(), 1)
+
+  const resendVerifiedUser = await service.resendVerification({ userId: 'u-verified' })
+  assert.equal(resendVerifiedUser.ok, true)
+  if (resendVerifiedUser.ok) {
+    assert.equal(resendVerifiedUser.data.userId, 'u-verified')
+    assert.equal(typeof resendVerifiedUser.data.expiresAt, 'string')
+  }
+  assert.equal(repo.getTokenCount(), 1)
+
+  const controller = new ProfileController(service)
+  const fallbackRequestIdResponse = await controller.getProfile({ user: { sub: 'u-001' } })
+  assert.equal(typeof fallbackRequestIdResponse.meta.requestId, 'string')
+  assert.equal((fallbackRequestIdResponse.meta.requestId || '').length > 0, true)
+
+  const passthroughRequestIdResponse = await controller.getProfile({ user: { sub: 'u-001' } }, 'req-day1-001')
+  assert.equal(passthroughRequestIdResponse.meta.requestId, 'req-day1-001')
 
   const missingUserResult = await service.getProfile({ sub: 'u-missing' })
   assert.equal(missingUserResult.ok, false)

@@ -8,7 +8,17 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "db:check": "ts-node --transpile-only src/scripts/check-db-connection.ts",
-    "test:tv2:day1": "ts-node --transpile-only src/modules/profile/tests/day1-profile.service.unit-test.ts"
+    "test:tv2:day1": "ts-node --transpile-only src/modules/profile/tests/day1-profile.service.unit-test.ts",
+    "test:tv2:day2": "ts-node --transpile-only src/modules/profile/tests/day2-profile-password.unit-test.ts",
+    "test:tv2:day2:avatar-stats": "ts-node --transpile-only src/modules/profile/tests/day2-profile-avatar-stats.unit-test.ts",
+    "test:tv2:day2:repository": "ts-node --transpile-only src/modules/profile/tests/day2-profile-repository-verify-email.unit-test.ts",
+    "test:tv2:day2:controller-requestid": "ts-node --transpile-only src/modules/profile/tests/day2-profile-controller-request-id.unit-test.ts",
+    "test:tv2:day2:repository:integration": "ts-node --transpile-only src/modules/profile/tests/day2-profile-repository-verify-email.integration-test.ts",
+    "test:tv2:day2:all": "npm run test:tv2:day2 && npm run test:tv2:day2:avatar-stats && npm run test:tv2:day2:repository",
+    "test:tv2:day3": "ts-node --transpile-only src/modules/profile/tests/day3-profile-leaderboard-games.unit-test.ts",
+    "test:tv2:day3:controller-dto": "ts-node --transpile-only src/modules/profile/tests/day3-profile-controller-dto.unit-test.ts",
+    "test:tv2:day3:repository:integration": "ts-node --transpile-only src/modules/profile/tests/day3-profile-repository-leaderboard-games.integration-test.ts",
+    "test:tv2:day3:all": "npm run test:tv2:day3 && npm run test:tv2:day3:controller-dto && npm run test:tv2:day3:repository:integration"
   },
   "engines": {
     "node": ">=20.0.0 <25.0.0"
