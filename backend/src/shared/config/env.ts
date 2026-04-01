@@ -14,5 +14,9 @@ export const env = {
   mongodbDbName: process.env.MONGODB_DB_NAME as string,
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET || 'change-me-access-secret',
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'change-me-refresh-secret',
+  stockfishEnabled: (process.env.STOCKFISH_ENABLED || 'false').toLowerCase() === 'true',
+  stockfishApiUrl: process.env.STOCKFISH_API_URL || '',
+  stockfishApiKey: process.env.STOCKFISH_API_KEY || '',
+  stockfishTimeoutMs: Number(process.env.STOCKFISH_TIMEOUT_MS || 5000),
   port: Number(process.env.PORT || 8080),
 }

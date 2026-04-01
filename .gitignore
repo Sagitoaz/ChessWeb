@@ -4,9 +4,6 @@
 
 # ==================== Dependencies ====================
 node_modules/
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
 
 # ==================== IDE & Editors ====================
 .vscode/
@@ -25,6 +22,11 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+!.env.example
+!**/.env.example
 
 # ==================== Logs ====================
 *.log
@@ -38,6 +40,11 @@ dist/
 build/
 .cache/
 .temp/
+
+# ==================== Container Runtime ====================
+*.pid
+*.seed
+mongo_data/
 
 # ==================== Project Specific ====================
 # Xóa dòng này nếu muốn commit README cho components

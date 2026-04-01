@@ -17,7 +17,7 @@ export class CreateRoomDto {
   @IsString()
   @IsOptional()
   @MaxLength(50)
-  name?: String;
+  name?: string;
 
   @IsOptional()
   @IsEnum(RoomTimeControl)

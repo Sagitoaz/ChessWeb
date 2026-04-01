@@ -5,7 +5,6 @@ import {
   IsOptional,
   IsString,
   Max,
-  MaxLength,
   Min,
 } from "class-validator";
 
@@ -24,6 +23,7 @@ export class CreateBotGameDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(["white", "black", "random"])
   preferredColor?: "white" | "black" | "random";
 
   @IsOptional()

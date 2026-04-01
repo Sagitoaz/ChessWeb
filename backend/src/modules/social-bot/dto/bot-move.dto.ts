@@ -2,10 +2,10 @@ import { IsString, MaxLength } from "class-validator";
 
 export class BotMoveDto {
   @IsString()
-  @MaxLength(10)
+  @MaxLength(64)
   sessionId!: string;
 
   @IsString()
-  @MaxLength(10)
+  @MaxLength(120)
   fen!: string;
 }

@@ -1,0 +1,49 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: chessweb-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  stockfish-gateway:
+    build:
+      context: ./stockfish-gateway
+      dockerfile: Dockerfile
+    container_name: chessweb-stockfish-gateway
+    restart: unless-stopped
+    environment:
+      PORT: 9000
+      STOCKFISH_DEFAULT_MOVETIME_MS: 300
+      STOCKFISH_REQUEST_TIMEOUT_MS: 8000
+      # STOCKFISH_GATEWAY_API_KEY: your-secure-key
+    ports:
+      - "9000:9000"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chessweb-backend
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+      - stockfish-gateway
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: chessweb
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      STOCKFISH_ENABLED: "true"
+      STOCKFISH_API_URL: http://stockfish-gateway:9000/api/stockfish/best-move
+      STOCKFISH_API_KEY: ""
+      STOCKFISH_TIMEOUT_MS: 5000
+    ports:
+      - "8080:8080"
+
+volumes:
+  mongo_data:
