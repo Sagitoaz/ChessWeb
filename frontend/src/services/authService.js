@@ -8,6 +8,13 @@ import { API_ENDPOINTS } from '../utils/constants'
  */
 
 const authService = {
+  unwrapApiData(response) {
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data ?? response
+    }
+    return response
+  },
+
   /**
    * Đăng nhập
    * @param {Object} credentials - Username/email và password
@@ -18,16 +25,17 @@ const authService = {
   async login(credentials) {
     try {
       const response = await apiCall('POST', API_ENDPOINTS.LOGIN, credentials)
+      const data = this.unwrapApiData(response)
       
       // Lưu tokens vào localStorage
-      if (response.token) {
-        localStorage.setItem('token', response.token)
+      if (data?.token) {
+        localStorage.setItem('token', data.token)
       }
-      if (response.refreshToken) {
-        localStorage.setItem('refreshToken', response.refreshToken)
+      if (data?.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken)
       }
       
-      return response
+      return data
     } catch (error) {
       throw this.handleError(error)
     }
@@ -45,16 +53,17 @@ const authService = {
   async register(userData) {
     try {
       const response = await apiCall('POST', API_ENDPOINTS.REGISTER, userData)
+      const data = this.unwrapApiData(response)
       
       // Lưu tokens vào localStorage (auto login sau khi đăng ký)
-      if (response.token) {
-        localStorage.setItem('token', response.token)
+      if (data?.token) {
+        localStorage.setItem('token', data.token)
       }
-      if (response.refreshToken) {
-        localStorage.setItem('refreshToken', response.refreshToken)
+      if (data?.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken)
       }
       
-      return response
+      return data
     } catch (error) {
       throw this.handleError(error)
     }
@@ -89,16 +98,17 @@ const authService = {
       const response = await apiCall('POST', API_ENDPOINTS.REFRESH_TOKEN, {
         refreshToken,
       })
+      const data = this.unwrapApiData(response)
       
       // Cập nhật token mới
-      if (response.token) {
-        localStorage.setItem('token', response.token)
+      if (data?.token) {
+        localStorage.setItem('token', data.token)
       }
-      if (response.refreshToken) {
-        localStorage.setItem('refreshToken', response.refreshToken)
+      if (data?.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken)
       }
       
-      return response
+      return data
     } catch (error) {
       // Token refresh failed - force logout
       localStorage.removeItem('token')
@@ -163,7 +173,7 @@ const authService = {
   async getCurrentUser() {
     try {
       const response = await apiCall('GET', API_ENDPOINTS.GET_PROFILE)
-      return response
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -177,7 +187,7 @@ const authService = {
   async checkUsernameAvailability(username) {
     try {
       const response = await apiCall('POST', '/auth/check-username', { username })
-      return response
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -191,7 +201,7 @@ const authService = {
   async checkEmailAvailability(email) {
     try {
       const response = await apiCall('POST', '/auth/check-email', { email })
-      return response
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -205,7 +215,7 @@ const authService = {
   async verifyEmail(token) {
     try {
       const response = await apiCall('POST', '/auth/verify-email', { token })
-      return response
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -218,7 +228,7 @@ const authService = {
   async resendVerificationEmail() {
     try {
       const response = await apiCall('POST', '/auth/resend-verification')
-      return response
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }

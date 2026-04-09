@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react'
+import PropTypes from 'prop-types'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -16,10 +17,6 @@ const loginSchema = z.object({
   remember: z.boolean().optional(),
 })
 
-const GOOGLE_MOCK_CREDENTIALS = {
-  username: 'google_user',
-  password: 'google_oauth',
-}
 
 const Divider = () => (
   <div className="relative py-2">
@@ -62,8 +59,8 @@ const GoogleButton = ({ onClick, disabled }) => (
 )
 
 GoogleButton.propTypes = {
-  onClick: Function,
-  disabled: Boolean,
+  onClick: PropTypes.func,
+  disabled: PropTypes.bool,
 }
 
 const LoginPage = () => {
@@ -136,12 +133,7 @@ const LoginPage = () => {
   }
 
   const onGoogleLogin = async () => {
-    try {
-      await handleLogin(GOOGLE_MOCK_CREDENTIALS)
-      notifySuccess('Đăng nhập Google thành công', 'Chào mừng bạn quay lại!')
-    } catch (err) {
-      notifyError('Đăng nhập Google thất bại', err?.message || 'Vui lòng thử lại.')
-    }
+    notifyError('Google login chưa hỗ trợ', 'Hệ thống hiện chỉ hỗ trợ đăng nhập bằng username/email và mật khẩu.')
   }
 
   return (

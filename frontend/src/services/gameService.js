@@ -370,7 +370,7 @@ const mockGameAPI = {
       config: {
         // BotConfig.fromDifficulty(level)
         difficulty: level,
-        depth: [1, 3, 10, 20][level - 1],
+        depth: [8, 15, 20, 25][level - 1],
         skillLevel: [2, 5, 15, 20][level - 1],
         timeLimitMs: [100, 1000, 3000, 5000][level - 1],
         engine: 'stockfish',
@@ -391,6 +391,18 @@ const mockGameAPI = {
   async submitPlayerMove(gameId, move) {
     await new Promise((resolve) => setTimeout(resolve, 200))
     return { success: true, fen: null }
+  },
+
+  async getBotMove(sessionId, fen) {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    return {
+      sessionId,
+      move: {
+        bestMoveUci: 'e2e4',
+        evaluation: 0,
+      },
+      fen,
+    }
   },
 
   async pauseBotGame(gameId) {
@@ -564,8 +576,32 @@ export const botGameAPI = {
    * 201: { gameId, sessionId, initialFEN, playerColor, config, botPlayer, humanPlayer, status:'Waiting' }
    * Errors: 401, 422 (invalid level), 429, 503 (bot unavailable), 504
    */
-  startBotGame: (level) =>
-    USE_MOCK ? mockGameAPI.startBotGame(level) : gameAPI.post('/games/bot', { level }),
+  startBotGame: async (level) => {
+    if (USE_MOCK) return mockGameAPI.startBotGame(level)
+
+    const difficultyMap = {
+      1: 'beginner',
+      2: 'intermediate',
+      3: 'advanced',
+      4: 'expert',
+    }
+
+    const response = await gameAPI.post('/bot/games', {
+      difficulty: difficultyMap[level] || 'intermediate',
+      preferredColor: 'white',
+    })
+
+    const data = response?.data ?? response
+    return {
+      ...data,
+      initialFEN: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      playerColor: 'White',
+      config: {
+        timeLimitMs: 500,
+      },
+      status: 'InGame',
+    }
+  },
 
   /**
    * POST /games/{gameId}/moves { move: { from, to, promotion? } }
@@ -577,6 +613,14 @@ export const botGameAPI = {
     USE_MOCK
       ? mockGameAPI.submitPlayerMove(gameId, move)
       : gameAPI.post(`/games/${gameId}/moves`, { move }),
+
+  getBotMove: async (sessionId, fen) => {
+    if (USE_MOCK) {
+      return mockGameAPI.getBotMove(sessionId, fen)
+    }
+    const response = await gameAPI.post('/bot/move', { sessionId, fen })
+    return response?.data ?? response
+  },
 
   pauseBotGame: (gameId) =>
     USE_MOCK

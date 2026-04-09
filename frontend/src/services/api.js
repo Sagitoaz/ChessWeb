@@ -1,5 +1,21 @@
 import axios from 'axios'
 import { API_URL, USE_MOCK } from '../utils/constants'
+import { useAuthStore } from '../store'
+
+const isValidToken = (token) => token && token !== 'undefined' && token !== 'null' && !token.startsWith('mock-jwt-token')
+
+const clearAuthSession = () => {
+  try {
+    localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('user')
+    useAuthStore.getState().logout()
+  } catch (_error) {
+    localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('user')
+  }
+}
 
 // Create axios instance
 const api = axios.create({
@@ -14,8 +30,11 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
-    if (token) {
+    if (isValidToken(token)) {
       config.headers.Authorization = `Bearer ${token}`
+    } else {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
     }
     return config
   },
@@ -36,19 +55,28 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refreshToken')
+        if (!refreshToken || refreshToken === 'undefined' || refreshToken === 'null' || refreshToken.startsWith('mock-refresh-token')) {
+          throw new Error('Missing or invalid refresh token')
+        }
         const response = await axios.post(`${API_URL}/auth/refresh`, {
           refreshToken,
         })
 
-        const { token } = response.data
+        const payload = response.data?.data ?? response.data
+        const token = payload?.token
+        if (!isValidToken(token)) {
+          throw new Error('Refresh response did not contain a valid token')
+        }
         localStorage.setItem('token', token)
+        if (payload?.refreshToken && payload.refreshToken !== refreshToken) {
+          localStorage.setItem('refreshToken', payload.refreshToken)
+        }
 
         originalRequest.headers.Authorization = `Bearer ${token}`
         return api(originalRequest)
       } catch (refreshError) {
         // Refresh token failed, logout user
-        localStorage.removeItem('token')
-        localStorage.removeItem('refreshToken')
+        clearAuthSession()
         window.location.href = '/login'
         return Promise.reject(refreshError)
       }

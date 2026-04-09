@@ -58,7 +58,8 @@ export default function BotGamePage() {
   const { error: showError, success: showSuccess } = useNotification()
 
   // Nhận gameData từ BotSelectPage qua navigation state
-  const { gameData } = location.state ?? {}
+  const { gameData, sessionId: sessionIdFromState } = location.state ?? {}
+  const botSessionId = gameData?.sessionId ?? sessionIdFromState ?? null
   const [gameState, setGameState] = useState('Waiting')
   // chess instance là "live" — truyền trực tiếp vào ChessBoard làm gameState prop
   const [chess] = useState(() => new Chess(gameData?.initialFEN ?? undefined))
@@ -141,14 +142,25 @@ export default function BotGamePage() {
     async (chessInst) => {
       setIsBotThinking(true)
       try {
-        const legalMoves = chessInst.moves({ verbose: true })
-        if (legalMoves.length === 0) return
-        // Simulate BotConfig.timeLimitMs — cap at 500ms so Easy (100ms) feels instant
-        await new Promise((r) =>
-          setTimeout(r, Math.min(gameData?.config?.timeLimitMs ?? 300, 500))
-        )
-        const m = legalMoves[Math.floor(Math.random() * legalMoves.length)]
-        const result = chessInst.move(m)
+        if (!botSessionId) {
+          throw new Error('Missing bot session id')
+        }
+        const botResponse = await botGameAPI.getBotMove(botSessionId, chessInst.fen())
+        const uci = botResponse?.move?.bestMoveUci || botResponse?.bestMoveUci
+        if (!uci || uci.length < 4) {
+          throw new Error('Invalid bot move from server')
+        }
+
+        const result = chessInst.move({
+          from: uci.slice(0, 2),
+          to: uci.slice(2, 4),
+          promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
+        })
+
+        if (!result) {
+          throw new Error(`Illegal move from bot: ${uci}`)
+        }
+
         if (result) {
           forceUpdate()
           setMoveHistory((prev) => [
@@ -162,7 +174,7 @@ export default function BotGamePage() {
               promotion: result.promotion,
               san: result.san,
               uci: `${result.from}${result.to}`,
-              color: 'Black',
+              color: result.color === 'w' ? 'White' : 'Black',
               isCheck: chessInst.inCheck(),
               isCheckmate: chessInst.isCheckmate(),
               timestamp: new Date().toISOString(),
@@ -170,13 +182,13 @@ export default function BotGamePage() {
           ])
           checkEndCondition(chessInst)
         }
-      } catch {
-        showError('Bot gặp lỗi') // S1: 503/504
+      } catch (error) {
+        showError((error && error.message) || 'Bot gặp lỗi') // S1: 503/504
       } finally {
         setIsBotThinking(false)
       }
     },
-    [gameData?.config?.timeLimitMs, checkEndCondition, showError, forceUpdate]
+    [botSessionId, checkEndCondition, showError, forceUpdate]
   )
 
   // =============================================

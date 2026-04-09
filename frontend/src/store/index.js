@@ -28,9 +28,13 @@ export const useAuthStore = create((set) => ({
     const token = localStorage.getItem('token')
     const userStr = localStorage.getItem('user')
     
-    if (token && userStr) {
+    if (token && token !== 'undefined' && token !== 'null' && !token.startsWith('mock-jwt-token') && userStr) {
       const user = JSON.parse(userStr)
       set({ user, token, isAuthenticated: true })
+    } else {
+      localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
     }
   },
 }))

@@ -121,12 +121,8 @@ const RegisterPage = () => {
   )
 
   const onGoogleRegister = useCallback(async () => {
-    try {
-      notifySuccess('Tính năng sắp ra mắt', 'Đăng ký Google sẽ sớm được hỗ trợ.')
-    } catch {
-      notifyError('Lỗi', 'Không thể đăng ký với Google.')
-    }
-  }, [notifySuccess, notifyError])
+    notifyError('Google register chưa hỗ trợ', 'Hiện tại bạn hãy đăng ký bằng email và mật khẩu.')
+  }, [notifyError])
 
   return (
     <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">

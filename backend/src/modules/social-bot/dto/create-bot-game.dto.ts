@@ -13,8 +13,6 @@ export enum BotDifficulty {
   INTERMEDIATE = "intermediate",
   ADVANCED = "advanced",
   EXPERT = "expert",
-  MASTER = "master",
-  GRANDMASTER = "grandmaster",
 }
 
 export class CreateBotGameDto {

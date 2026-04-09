@@ -54,6 +54,19 @@ export class SocialBotRepository {
     return { ...doc, _id: result.insertedId }
   }
 
+  async findBotSessionById(id: string | ObjectId) {
+    let sessionId: ObjectId | null = null
+    if (typeof id === 'string') {
+      if (!ObjectId.isValid(id)) {
+        return null
+      }
+      sessionId = new ObjectId(id)
+    } else {
+      sessionId = id
+    }
+    return this.db.collection('bot_sessions').findOne({ _id: sessionId })
+  }
+
   async createBotMoveRequest(doc: Record<string, unknown>) {
     const result = await this.db.collection('bot_move_requests').insertOne(doc)
     return { ...doc, _id: result.insertedId }

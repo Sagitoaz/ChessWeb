@@ -8,7 +8,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
 
 // Mock API cho development (set false khi có backend thật)
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.DEV
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export const API_ENDPOINTS = {
   // Auth
@@ -117,10 +117,10 @@ export const GAME_RESULTS = {
 }
 
 export const BOT_DIFFICULTIES = {
-  EASY: { value: 'easy', name: 'Easy', elo: '500-800', depth: 1 },
-  MEDIUM: { value: 'medium', name: 'Medium', elo: '800-1200', depth: 5 },
-  HARD: { value: 'hard', name: 'Hard', elo: '1200-1800', depth: 10 },
-  EXPERT: { value: 'expert', name: 'Expert', elo: '1800-2500', depth: 15 },
+  EASY: { value: 'beginner', name: 'Easy', elo: '500-800', depth: 8 },
+  MEDIUM: { value: 'intermediate', name: 'Medium', elo: '900-1200', depth: 15 },
+  HARD: { value: 'advanced', name: 'Hard', elo: '1600-1900', depth: 20 },
+  EXPERT: { value: 'expert', name: 'Expert', elo: '2200+', depth: 25 },
 }
 
 export const TOURNAMENT_FORMATS = {

@@ -140,7 +140,7 @@ export class SocialBotService {
     return {
       gameId: String(game._id),
       sessionId: String(botSession._id),
-      difficulty: dto,
+      difficulty: dto.difficulty,
     }
   }
 
@@ -158,7 +158,11 @@ export class SocialBotService {
       updatedAt: now,
     })
 
-    const stockfishMove = await this.stockfishService.getBestMove(dto.fen)
+    // Fetch bot session to get difficulty level
+    const session = await this.repo.findBotSessionById(dto.sessionId)
+    const difficulty = session?.difficulty || 'intermediate'
+
+    const stockfishMove = await this.stockfishService.getBestMove(dto.fen, difficulty)
     const move = stockfishMove ?? {
       bestMoveUci: 'e2e4',
       evaluation: 0.24,

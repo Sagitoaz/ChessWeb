@@ -148,7 +148,8 @@ export const useAuth = () => {
       setLoading(true)
       setError(null)
       
-      const userData = await authService.getCurrentUser()
+      const responseData = await authService.getCurrentUser()
+      const userData = responseData?.user ?? responseData
       const token = localStorage.getItem('token')
       setLogin(userData, token)
       

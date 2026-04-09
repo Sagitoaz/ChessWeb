@@ -1,31 +1,62 @@
 /**
  * DashboardPage - Trang dashboard sau khi login
- * 
+ *
  * Hiển thị:
  * - User stats overview
  * - Recent games
  * - Quick access to game modes
  * - Upcoming tournaments
- * 
+ *
  * Protected route - Requires authentication
  */
 
-import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { THEME, STATUS_COLORS } from '@/styles/theme'
 import { Button, Avatar } from '@/components/common'
-import { 
-  Trophy, Users, Swords, Bot, TrendingUp, 
-  Clock, Target, Medal, PlayCircle, Calendar,
-  ArrowRight, Star, Zap
+import {
+  Trophy,
+  Users,
+  Swords,
+  Bot,
+  TrendingUp,
+  Clock,
+  Target,
+  Medal,
+  PlayCircle,
+  Calendar,
+  ArrowRight,
+  Star,
+  Zap,
 } from 'lucide-react'
 
 // ==================== MOCK DATA ====================
 const MOCK_RECENT_GAMES = [
-  { id: 1, opponent: 'GrandMaster', result: 'win', eloChange: +24, mode: 'Ranked', time: '2 giờ trước' },
-  { id: 2, opponent: 'ChessKing', result: 'lose', eloChange: -18, mode: 'Ranked', time: '5 giờ trước' },
-  { id: 3, opponent: 'Bot Level 3', result: 'win', eloChange: 0, mode: 'Bot', time: '1 ngày trước' },
+  {
+    id: 1,
+    opponent: 'GrandMaster',
+    result: 'win',
+    eloChange: +24,
+    mode: 'Ranked',
+    time: '2 giờ trước',
+  },
+  {
+    id: 2,
+    opponent: 'ChessKing',
+    result: 'lose',
+    eloChange: -18,
+    mode: 'Ranked',
+    time: '5 giờ trước',
+  },
+  {
+    id: 3,
+    opponent: 'Bot Level 3',
+    result: 'win',
+    eloChange: 0,
+    mode: 'Bot',
+    time: '1 ngày trước',
+  },
 ]
 
 const MOCK_TOURNAMENTS = [
@@ -39,14 +70,21 @@ const MOCK_TOURNAMENTS = [
  * StatCard - Card hiển thị thống kê
  */
 const StatCard = ({ icon: Icon, label, value, change, trend }) => (
-  <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-5`}>
+  <div
+    className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-5`}
+  >
     <div className="flex items-start justify-between mb-3">
-      <div className={`w-12 h-12 ${THEME.primary.light} ${THEME.rounded.DEFAULT} flex items-center justify-center`}>
+      <div
+        className={`w-12 h-12 ${THEME.primary.light} ${THEME.rounded.DEFAULT} flex items-center justify-center`}
+      >
         <Icon className={`w-6 h-6 ${THEME.primary.text}`} />
       </div>
       {change && (
-        <div className={`flex items-center text-sm font-semibold ${trend === 'up' ? STATUS_COLORS.win.icon : STATUS_COLORS.lose.icon}`}>
-          {trend === 'up' ? '+' : ''}{change}
+        <div
+          className={`flex items-center text-sm font-semibold ${trend === 'up' ? STATUS_COLORS.win.icon : STATUS_COLORS.lose.icon}`}
+        >
+          {trend === 'up' ? '+' : ''}
+          {change}
         </div>
       )}
     </div>
@@ -92,21 +130,30 @@ const RecentGameRow = ({ game }) => {
   const { label, color } = resultConfig[game.result]
 
   return (
-    <div className={`flex items-center justify-between py-3 border-b ${THEME.border.DEFAULT} last:border-0`}>
+    <div
+      className={`flex items-center justify-between py-3 border-b ${THEME.border.DEFAULT} last:border-0`}
+    >
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${THEME.rounded.full} ${THEME.background.active} flex items-center justify-center font-bold ${THEME.text.secondary}`}>
+        <div
+          className={`w-10 h-10 ${THEME.rounded.full} ${THEME.background.active} flex items-center justify-center font-bold ${THEME.text.secondary}`}
+        >
           {game.opponent[0]}
         </div>
         <div>
           <div className={`font-medium ${THEME.text.primary}`}>{game.opponent}</div>
-          <div className={`text-xs ${THEME.text.muted}`}>{game.mode} • {game.time}</div>
+          <div className={`text-xs ${THEME.text.muted}`}>
+            {game.mode} • {game.time}
+          </div>
         </div>
       </div>
       <div className="text-right">
         <div className={`font-bold ${color}`}>{label}</div>
         {game.eloChange !== 0 && (
-          <div className={`text-xs font-semibold ${game.eloChange > 0 ? STATUS_COLORS.win.icon : STATUS_COLORS.lose.icon}`}>
-            {game.eloChange > 0 ? '+' : ''}{game.eloChange} ELO
+          <div
+            className={`text-xs font-semibold ${game.eloChange > 0 ? STATUS_COLORS.win.icon : STATUS_COLORS.lose.icon}`}
+          >
+            {game.eloChange > 0 ? '+' : ''}
+            {game.eloChange} ELO
           </div>
         )}
       </div>
@@ -145,114 +192,67 @@ export default function DashboardPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
 
-  // Redirect nếu chưa login
-  useEffect(() => {
-    if (!user) {
-      navigate('/login')
-    }
-  }, [user, navigate])
-
-  if (!user) return null
+  if (!user) return <Navigate to="/login" replace />
 
   const winRate = user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0
 
   return (
     <div className={`min-h-screen ${THEME.background.page} py-6`}>
       <div className="max-w-7xl mx-auto px-4">
-        
         {/* Welcome Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-2">
-            <Avatar 
-              src={user.avatarUrl} 
-              alt={user.username}
-              size="lg"
-            />
+            <Avatar src={user.avatarUrl} alt={user.username} size="lg" />
             <div>
               <h1 className={`text-3xl font-bold ${THEME.text.primary}`}>
                 Xin chào, {user.displayName || user.username}! 👋
               </h1>
-              <p className={THEME.text.secondary}>
-                Sẵn sàng cho trận đấu tiếp theo?
-              </p>
+              <p className={THEME.text.secondary}>Sẵn sàng cho trận đấu tiếp theo?</p>
             </div>
           </div>
         </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard 
-            icon={Star} 
-            label="ELO Rating" 
+          <StatCard
+            icon={Star}
+            label="ELO Rating"
             value={user.rating || 1200}
             change={24}
             trend="up"
           />
-          <StatCard 
-            icon={Trophy} 
-            label="Thắng" 
-            value={user.wins || 0}
-          />
-          <StatCard 
-            icon={Clock} 
-            label="Tổng Ván" 
-            value={user.gamesPlayed || 0}
-          />
-          <StatCard 
-            icon={Target} 
-            label="Tỷ Lệ Thắng" 
-            value={`${winRate}%`}
-          />
+          <StatCard icon={Trophy} label="Thắng" value={user.wins || 0} />
+          <StatCard icon={Clock} label="Tổng Ván" value={user.gamesPlayed || 0} />
+          <StatCard icon={Target} label="Tỷ Lệ Thắng" value={`${winRate}%`} />
         </div>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <QuickActionButton 
-            icon={Swords} 
-            label="Ranked Match" 
-            href="/ranked" 
-            color="blue"
-          />
-          <QuickActionButton 
-            icon={Users} 
-            label="Phòng Chơi" 
-            href="/rooms" 
-            color="green"
-          />
-          <QuickActionButton 
-            icon={Trophy} 
-            label="Giải Đấu" 
-            href="/tournaments" 
-            color="purple"
-          />
-          <QuickActionButton 
-            icon={Bot} 
-            label="Chơi Với Bot" 
-            href="/bot" 
-            color="orange"
-          />
+          <QuickActionButton icon={Swords} label="Ranked Match" href="/ranked" color="blue" />
+          <QuickActionButton icon={Users} label="Phòng Chơi" href="/rooms" color="green" />
+          <QuickActionButton icon={Trophy} label="Giải Đấu" href="/tournaments" color="purple" />
+          <QuickActionButton icon={Bot} label="Chơi Với Bot" href="/bot" color="orange" />
         </div>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
           {/* Recent Games - Takes 2 columns */}
           <div className="lg:col-span-2">
-            <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}>
+            <div
+              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}
+            >
               <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-bold ${THEME.text.primary}`}>
-                  Ván Đấu Gần Đây
-                </h2>
-                <Link 
-                  to="/ranked/history" 
+                <h2 className={`text-xl font-bold ${THEME.text.primary}`}>Ván Đấu Gần Đây</h2>
+                <Link
+                  to="/ranked/history"
                   className={`text-sm ${THEME.primary.text} ${THEME.primary.textHover} font-medium`}
                 >
                   Xem tất cả →
                 </Link>
               </div>
-              
+
               <div>
-                {MOCK_RECENT_GAMES.map(game => (
+                {MOCK_RECENT_GAMES.map((game) => (
                   <RecentGameRow key={game.id} game={game} />
                 ))}
               </div>
@@ -274,17 +274,16 @@ export default function DashboardPage() {
 
           {/* Sidebar - Takes 1 column */}
           <div className="space-y-6">
-            
             {/* Tournaments */}
-            <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}>
+            <div
+              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}
+            >
               <div className="flex items-center justify-between mb-4">
-                <h3 className={`text-lg font-bold ${THEME.text.primary}`}>
-                  Giải Đấu Sắp Diễn Ra
-                </h3>
+                <h3 className={`text-lg font-bold ${THEME.text.primary}`}>Giải Đấu Sắp Diễn Ra</h3>
               </div>
-              
+
               <div className="space-y-3">
-                {MOCK_TOURNAMENTS.map(tournament => (
+                {MOCK_TOURNAMENTS.map((tournament) => (
                   <TournamentCard key={tournament.id} tournament={tournament} />
                 ))}
               </div>
@@ -298,16 +297,16 @@ export default function DashboardPage() {
             </div>
 
             {/* Quick Tips */}
-            <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}>
+            <div
+              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}
+            >
               <div className="flex items-center gap-2 mb-3">
                 <Zap className={`w-5 h-5 ${THEME.warning.text}`} />
-                <h3 className={`text-lg font-bold ${THEME.text.primary}`}>
-                  Mẹo Hôm Nay
-                </h3>
+                <h3 className={`text-lg font-bold ${THEME.text.primary}`}>Mẹo Hôm Nay</h3>
               </div>
               <p className={`text-sm ${THEME.text.secondary}`}>
-                Kiểm soát trung tâm bàn cờ là chìa khóa để dẫn dắt trận đấu. 
-                Cố gắng đặt quân ở các ô d4, d5, e4, e5 ngay từ đầu game!
+                Kiểm soát trung tâm bàn cờ là chìa khóa để dẫn dắt trận đấu. Cố gắng đặt quân ở các
+                ô d4, d5, e4, e5 ngay từ đầu game!
               </p>
             </div>
           </div>
