@@ -1,53 +1,81 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Input, Modal } from '@/components/common'
-import { 
-  Users, Clock, MessageCircle, RotateCcw, Flag, 
-  Handshake, Copy, Share2, ArrowLeft, Trophy,
-  Send, X
+import gameService from '@/services/gameService'
+import { useAuthStore } from '@/store'
+import {
+  Users,
+  Clock,
+  MessageCircle,
+  RotateCcw,
+  Flag,
+  Handshake,
+  Copy,
+  Share2,
+  ArrowLeft,
+  Trophy,
+  Send,
+  X,
 } from 'lucide-react'
 
-// Mock game data
-const MOCK_ROOM_DATA = {
-  code: 'ABC123',
-  name: 'Phòng của bạn bè',
+const buildFallbackRoom = (roomId, user) => ({
+  code: roomId || 'ROOM',
+  name: `Phòng ${roomId || 'ROOM'}`,
   host: {
-    id: 'host123',
-    username: 'ChessMaster99',
-    avatar: null
+    id: user?.id || 'host',
+    username: user?.username || 'Bạn',
+    avatar: user?.avatarUrl || null,
   },
   guest: {
-    id: 'guest456',
-    username: 'Player1',
-    avatar: null
+    id: 'guest',
+    username: 'Đang chờ người chơi',
+    avatar: null,
   },
   settings: {
     timeControl: '10+0',
     increment: 0,
-    isPrivate: true
+    isPrivate: true,
+  },
+})
+
+const normalizeRoomData = (room, roomId, user) => {
+  const fallback = buildFallbackRoom(roomId, user)
+  const players = Array.isArray(room?.players) ? room.players : []
+  return {
+    code: room?.code || fallback.code,
+    name: room?.name || fallback.name,
+    host: room?.host || room?.owner || players[0] || fallback.host,
+    guest: room?.guest || players[1] || fallback.guest,
+    settings: {
+      timeControl:
+        room?.settings?.timeControl || room?.timeControl || fallback.settings.timeControl,
+      increment: room?.settings?.increment || room?.increment || 0,
+      isPrivate: room?.settings?.isPrivate ?? room?.isPrivate ?? true,
+    },
   }
 }
 
 export default function RoomGamePage() {
   const { roomId } = useParams()
   const navigate = useNavigate()
-  
+  const user = useAuthStore((s) => s.user)
+
   // Game state
-  const [roomData, setRoomData] = useState(MOCK_ROOM_DATA)
+  const [roomData, setRoomData] = useState(() => buildFallbackRoom(roomId, user))
   const [currentPlayer, setCurrentPlayer] = useState('white') // Mock: assume we're white
   const [isMyTurn, setIsMyTurn] = useState(true)
   const [timeWhite, setTimeWhite] = useState(600) // 10 phút = 600 giây
   const [timeBlack, setTimeBlack] = useState(600)
   const [moveHistory, setMoveHistory] = useState(['e4', 'e5', 'Nf3', 'Nc6'])
   const [gameStatus, setGameStatus] = useState('playing') // playing, ended
-  
+
   // Chat state
   const [chatMessage, setChatMessage] = useState('')
   const [chatMessages, setChatMessages] = useState([
     { user: 'ChessMaster99', message: 'Chúc bạn chơi vui vẻ!', timestamp: new Date() },
-    { user: 'Player1', message: 'Cảm ơn, chúc may mắn!', timestamp: new Date() }
+    { user: 'Player1', message: 'Cảm ơn, chúc may mắn!', timestamp: new Date() },
   ])
-  
+
   // Modal states
   const [showResignModal, setShowResignModal] = useState(false)
   const [showDrawModal, setShowDrawModal] = useState(false)
@@ -56,15 +84,30 @@ export default function RoomGamePage() {
   const [gameResult, setGameResult] = useState(null)
   const [copiedCode, setCopiedCode] = useState(false)
 
+  useEffect(() => {
+    const loadRoom = async () => {
+      if (!roomId) return
+      try {
+        const response = await gameService.getRoom(roomId)
+        const room = response?.data ?? response
+        setRoomData(normalizeRoomData(room, roomId, user))
+      } catch (_error) {
+        setRoomData(buildFallbackRoom(roomId, user))
+      }
+    }
+
+    loadRoom()
+  }, [roomId, user])
+
   // Timer countdown
   useEffect(() => {
     if (gameStatus !== 'playing') return
 
     const interval = setInterval(() => {
       if (isMyTurn) {
-        setTimeWhite(prev => Math.max(0, prev - 1))
+        setTimeWhite((prev) => Math.max(0, prev - 1))
       } else {
-        setTimeBlack(prev => Math.max(0, prev - 1))
+        setTimeBlack((prev) => Math.max(0, prev - 1))
       }
     }, 1000)
 
@@ -79,20 +122,23 @@ export default function RoomGamePage() {
 
   const handleSendMessage = () => {
     if (!chatMessage.trim()) return
-    
-    setChatMessages([...chatMessages, {
-      user: currentPlayer === 'white' ? roomData.host.username : roomData.guest.username,
-      message: chatMessage,
-      timestamp: new Date()
-    }])
+
+    setChatMessages([
+      ...chatMessages,
+      {
+        user: currentPlayer === 'white' ? roomData.host.username : roomData.guest.username,
+        message: chatMessage,
+        timestamp: new Date(),
+      },
+    ])
     setChatMessage('')
   }
 
   const handleResign = () => {
     setShowResignModal(false)
-    setGameResult({ 
+    setGameResult({
       winner: currentPlayer === 'white' ? 'black' : 'white',
-      reason: 'resignation'
+      reason: 'resignation',
     })
     setGameStatus('ended')
     setShowEndGameModal(true)
@@ -124,9 +170,11 @@ export default function RoomGamePage() {
   const UserAvatar = ({ username, color }) => {
     const initial = username?.charAt(0).toUpperCase() || '?'
     const bgColor = color === 'white' ? 'bg-blue-500' : 'bg-purple-500'
-    
+
     return (
-      <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white font-semibold`}>
+      <div
+        className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white font-semibold`}
+      >
         {initial}
       </div>
     )
@@ -137,25 +185,17 @@ export default function RoomGamePage() {
       <div className="max-w-7xl mx-auto">
         {/* Top Bar */}
         <div className="mb-4 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={handleLeaveRoom}
-            size="sm"
-          >
+          <Button variant="ghost" onClick={handleLeaveRoom} size="sm">
             <ArrowLeft size={18} />
             Rời phòng
           </Button>
-          
+
           <div className="flex items-center gap-3">
             <div className="bg-white px-4 py-2 rounded-lg border border-gray-200">
               <span className="text-sm text-gray-600">Mã phòng: </span>
               <span className="font-mono font-bold text-blue-600">{roomData.code}</span>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyCode}
-            >
+            <Button variant="outline" size="sm" onClick={handleCopyCode}>
               {copiedCode ? <Copy size={16} className="text-green-600" /> : <Copy size={16} />}
             </Button>
           </div>
@@ -178,9 +218,11 @@ export default function RoomGamePage() {
                     <p className="text-xs text-gray-600">Đối thủ</p>
                   </div>
                 </div>
-                <div className={`text-2xl font-bold font-mono px-4 py-2 rounded-lg ${
-                  !isMyTurn ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'
-                }`}>
+                <div
+                  className={`text-2xl font-bold font-mono px-4 py-2 rounded-lg ${
+                    !isMyTurn ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
                   {formatTime(timeBlack)}
                 </div>
               </div>
@@ -196,9 +238,7 @@ export default function RoomGamePage() {
                 <div className="text-center">
                   <div className="text-6xl mb-4">♟️</div>
                   <p className="text-gray-600 font-semibold mb-2">Bàn cờ sẽ hiển thị ở đây</p>
-                  <p className="text-sm text-gray-500">
-                    ChessBoard component sẽ được tích hợp sau
-                  </p>
+                  <p className="text-sm text-gray-500">ChessBoard component sẽ được tích hợp sau</p>
                   <div className="mt-4 text-xs text-gray-400">
                     (Sử dụng react-chessboard + chess.js)
                   </div>
@@ -220,9 +260,11 @@ export default function RoomGamePage() {
                     <p className="text-xs text-gray-600">Bạn (Chủ phòng)</p>
                   </div>
                 </div>
-                <div className={`text-2xl font-bold font-mono px-4 py-2 rounded-lg ${
-                  isMyTurn ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                }`}>
+                <div
+                  className={`text-2xl font-bold font-mono px-4 py-2 rounded-lg ${
+                    isMyTurn ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
                   {formatTime(timeWhite)}
                 </div>
               </div>
@@ -288,7 +330,9 @@ export default function RoomGamePage() {
                       {index % 2 === 0 && (
                         <span className="text-gray-500 w-8">{Math.floor(index / 2) + 1}.</span>
                       )}
-                      <span className={`font-mono ${index === moveHistory.length - 1 ? 'font-bold text-blue-600' : 'text-gray-700'}`}>
+                      <span
+                        className={`font-mono ${index === moveHistory.length - 1 ? 'font-bold text-blue-600' : 'text-gray-700'}`}
+                      >
                         {move}
                       </span>
                     </div>
@@ -309,7 +353,7 @@ export default function RoomGamePage() {
                   Trò chuyện
                 </h3>
               </div>
-              
+
               {/* Messages */}
               <div className="p-4 h-64 overflow-y-auto space-y-3">
                 {chatMessages.map((msg, index) => (
@@ -360,18 +404,10 @@ export default function RoomGamePage() {
             Bạn có chắc chắn muốn đầu hàng? Ván đấu sẽ kết thúc ngay lập tức.
           </p>
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowResignModal(false)}
-              fullWidth
-            >
+            <Button variant="outline" onClick={() => setShowResignModal(false)} fullWidth>
               Hủy
             </Button>
-            <Button
-              variant="danger"
-              onClick={handleResign}
-              fullWidth
-            >
+            <Button variant="danger" onClick={handleResign} fullWidth>
               Đầu hàng
             </Button>
           </div>
@@ -379,21 +415,13 @@ export default function RoomGamePage() {
       </Modal>
 
       {/* Draw Offer Modal */}
-      <Modal
-        isOpen={showDrawModal}
-        onClose={() => setShowDrawModal(false)}
-        title="Đề nghị hòa"
-      >
+      <Modal isOpen={showDrawModal} onClose={() => setShowDrawModal(false)} title="Đề nghị hòa">
         <div className="p-6">
           <p className="text-gray-700 mb-6">
             Gửi đề nghị hòa đến đối thủ? Đối thủ có thể chấp nhận hoặc từ chối.
           </p>
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowDrawModal(false)}
-              fullWidth
-            >
+            <Button variant="outline" onClick={() => setShowDrawModal(false)} fullWidth>
               Hủy
             </Button>
             <Button
@@ -409,21 +437,11 @@ export default function RoomGamePage() {
       </Modal>
 
       {/* Rematch Modal */}
-      <Modal
-        isOpen={showRematchModal}
-        onClose={() => setShowRematchModal(false)}
-        title="Chơi lại"
-      >
+      <Modal isOpen={showRematchModal} onClose={() => setShowRematchModal(false)} title="Chơi lại">
         <div className="p-6">
-          <p className="text-gray-700 mb-6">
-            Gửi lời mời chơi lại đến đối thủ?
-          </p>
+          <p className="text-gray-700 mb-6">Gửi lời mời chơi lại đến đối thủ?</p>
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowRematchModal(false)}
-              fullWidth
-            >
+            <Button variant="outline" onClick={() => setShowRematchModal(false)} fullWidth>
               Hủy
             </Button>
             <Button
@@ -455,11 +473,7 @@ export default function RoomGamePage() {
             Lý do: {gameResult?.reason === 'resignation' ? 'Đầu hàng' : 'Hết giờ'}
           </p>
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={handleLeaveRoom}
-              fullWidth
-            >
+            <Button variant="outline" onClick={handleLeaveRoom} fullWidth>
               Rời phòng
             </Button>
             <Button

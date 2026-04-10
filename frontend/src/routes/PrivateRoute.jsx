@@ -1,18 +1,23 @@
 import { Navigate } from 'react-router-dom'
+import { Loader } from '@/components/common'
 import { useAuthStore } from '@/store'
-
-// Bypass auth check when running in mock/dev mode (auth pages not implemented yet)
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.DEV
 
 /**
  * PrivateRoute - Bảo vệ các routes cần authentication
  * Redirect về /login nếu chưa đăng nhập.
- * Trong mock/dev mode: luôn cho phép truy cập (auth chưa implement).
  */
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, hasHydrated } = useAuthStore()
 
-  if (!USE_MOCK && !isAuthenticated) {
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader size="lg" text="Đang kiểm tra phiên đăng nhập..." />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 

@@ -1,24 +1,40 @@
-import { Body, Controller, Get, Headers, Post, Put, Query, Req, UseGuards } from '@nestjs/common'
-import { randomUUID } from 'crypto'
-import { JwtAuthGuard } from '../../shared/auth/jwt-auth.guard'
-import { RolesGuard } from '../../shared/auth/roles.guard'
-import { Roles } from '../../shared/auth/roles.decorator'
-import { Role } from '../../shared/auth/roles.enum'
-import { ApiResponse, successResponse } from '../../shared/http/response.util'
-import { GetGamesQueryDto } from './dto/get-games.query.dto'
-import { GetLeaderboardQueryDto } from './dto/get-leaderboard.query.dto'
-import { ResendVerificationDto } from './dto/resend-verification.dto'
-import { UpdatePasswordDto } from './dto/update-password.dto'
-import { UpdateProfileDto } from './dto/update-profile.dto'
-import { UploadAvatarDto } from './dto/upload-avatar.dto'
-import { VerifyEmailDto } from './dto/verify-email.dto'
-import { LeaderboardResponse, ProfileService, UserGamesResponse } from './profile.service'
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { randomUUID } from "crypto";
+import { JwtAuthGuard } from "../../shared/auth/jwt-auth.guard";
+import { RolesGuard } from "../../shared/auth/roles.guard";
+import { Roles } from "../../shared/auth/roles.decorator";
+import { Role } from "../../shared/auth/roles.enum";
+import { ApiResponse, successResponse } from "../../shared/http/response.util";
+import { GetGamesQueryDto } from "./dto/get-games.query.dto";
+import { GetLeaderboardQueryDto } from "./dto/get-leaderboard.query.dto";
+import { GetModeStatsQueryDto } from "./dto/get-mode-stats.query.dto";
+import { ResendVerificationDto } from "./dto/resend-verification.dto";
+import { UpdatePasswordDto } from "./dto/update-password.dto";
+import { UpdateProfileDto } from "./dto/update-profile.dto";
+import { UploadAvatarDto } from "./dto/upload-avatar.dto";
+import { VerifyEmailDto } from "./dto/verify-email.dto";
+import {
+  LeaderboardResponse,
+  ProfileService,
+  UserGamesResponse,
+  UserModeStatsResponse,
+} from "./profile.service";
 
 const errorResponse = (
   requestId: string,
   code: string,
   message: string,
-  details?: unknown
+  details?: unknown,
 ): ApiResponse<null> => ({
   success: false,
   data: null,
@@ -31,151 +47,259 @@ const errorResponse = (
     requestId,
     timestamp: new Date().toISOString(),
   },
-})
+});
 
 @Controller()
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
   private resolveRequestId(requestId?: string): string {
-    const normalized = requestId?.trim()
-    return normalized && normalized.length > 0 ? normalized : randomUUID()
+    const normalized = requestId?.trim();
+    return normalized && normalized.length > 0 ? normalized : randomUUID();
   }
 
-  @Post('auth/verify-email')
+  @Post("auth/verify-email")
   async verifyEmail(
     @Body() body: VerifyEmailDto,
-    @Headers('x-request-id') requestId?: string
+    @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<{ userId: string; verifiedAt: string } | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.verifyEmail(body)
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.verifyEmail(body);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
   }
 
-  @Post('auth/resend-verification')
+  @Post("auth/resend-verification")
   async resendVerification(
     @Body() body: ResendVerificationDto,
-    @Headers('x-request-id') requestId?: string
+    @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<{ userId: string; expiresAt: string } | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.resendVerification(body)
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.resendVerification(body);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
   }
 
-  @Get('users/profile')
+  @Get("users/profile")
   @UseGuards(JwtAuthGuard)
   async getProfile(
     @Req() req: { user?: unknown },
-    @Headers('x-request-id') requestId?: string
-  ): Promise<ApiResponse<{ userId: string; username: string; displayName: string | null; isVerified: boolean; isActive: boolean } | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.getProfile(req.user)
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<
+    ApiResponse<{
+      userId: string;
+      username: string;
+      email: string | null;
+      displayName: string | null;
+      avatarUrl: string | null;
+      isVerified: boolean;
+      isActive: boolean;
+      rating: number | null;
+      peakRating: number | null;
+      gamesPlayed: number;
+      wins: number;
+      losses: number;
+      draws: number;
+    } | null>
+  > {
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.getProfile(req.user);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
   }
 
-  @Put('users/profile')
+  @Put("users/profile")
   @UseGuards(JwtAuthGuard)
   async updateProfile(
     @Req() req: { user?: unknown },
     @Body() body: UpdateProfileDto,
-    @Headers('x-request-id') requestId?: string
-  ): Promise<ApiResponse<{ userId: string; username: string; displayName: string | null; updatedAt: string } | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.updateProfile(req.user, body)
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<
+    ApiResponse<{
+      userId: string;
+      username: string;
+      displayName: string | null;
+      updatedAt: string;
+    } | null>
+  > {
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.updateProfile(req.user, body);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
   }
 
-  @Put('users/password')
+  @Put("users/password")
   @UseGuards(JwtAuthGuard)
   async updatePassword(
     @Req() req: { user?: unknown },
     @Body() body: UpdatePasswordDto,
-    @Headers('x-request-id') requestId?: string
+    @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<{ userId: string; changedAt: string } | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.updatePassword(req.user, body)
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.updatePassword(req.user, body);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
   }
 
-  @Post('users/avatar')
+  @Post("users/avatar")
   @UseGuards(JwtAuthGuard)
   async uploadAvatar(
     @Req() req: { user?: unknown },
     @Body() body: UploadAvatarDto,
-    @Headers('x-request-id') requestId?: string
-  ): Promise<ApiResponse<{ userId: string; avatarUrl: string; avatarPublicId: string | null; updatedAt: string } | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.uploadAvatar(req.user, body)
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<
+    ApiResponse<{
+      userId: string;
+      avatarUrl: string;
+      avatarPublicId: string | null;
+      updatedAt: string;
+    } | null>
+  > {
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.uploadAvatar(req.user, body);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
   }
 
-  @Get('users/stats')
+  @Get("users/stats")
   @UseGuards(JwtAuthGuard)
   async getStats(
     @Req() req: { user?: unknown },
-    @Headers('x-request-id') requestId?: string
-  ): Promise<ApiResponse<{ userId: string; totalGames: number; wins: number; losses: number; draws: number; winRate: number; rating: number | null; peakRating: number | null; updatedAt: string | null } | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.getStats(req.user)
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<
+    ApiResponse<{
+      userId: string;
+      totalGames: number;
+      wins: number;
+      losses: number;
+      draws: number;
+      winRate: number;
+      rating: number | null;
+      peakRating: number | null;
+      updatedAt: string | null;
+    } | null>
+  > {
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.getStats(req.user);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
   }
 
-  @Get('users/leaderboard')
+  @Get("users/leaderboard")
   async getLeaderboard(
     @Query() query: GetLeaderboardQueryDto,
-    @Headers('x-request-id') requestId?: string
+    @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<LeaderboardResponse | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.getLeaderboard(query)
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.getLeaderboard(query);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
   }
 
-  @Get('games')
+  @Get("games")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.USER, Role.MOD, Role.ADMIN)
   async getGames(
     @Req() req: { user?: unknown },
     @Query() query: GetGamesQueryDto,
-    @Headers('x-request-id') requestId?: string
+    @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<UserGamesResponse | null>> {
-    const resolvedRequestId = this.resolveRequestId(requestId)
-    const result = await this.profileService.getGames(req.user, query)
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.getGames(req.user, query);
     if (!result.ok) {
-      return errorResponse(resolvedRequestId, result.error.code, result.error.message, result.error.details)
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
     }
 
-    return successResponse(result.data, resolvedRequestId)
+    return successResponse(result.data, resolvedRequestId);
+  }
+
+  @Get("users/stats/by-mode")
+  @UseGuards(JwtAuthGuard)
+  async getModeStats(
+    @Req() req: { user?: unknown },
+    @Query() query: GetModeStatsQueryDto,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<UserModeStatsResponse | null>> {
+    const resolvedRequestId = this.resolveRequestId(requestId);
+    const result = await this.profileService.getModeStats(req.user, query.mode);
+    if (!result.ok) {
+      return errorResponse(
+        resolvedRequestId,
+        result.error.code,
+        result.error.message,
+        result.error.details,
+      );
+    }
+
+    return successResponse(result.data, resolvedRequestId);
   }
 }

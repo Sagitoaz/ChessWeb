@@ -9,6 +9,18 @@ import { API_ENDPOINTS } from '../utils/constants'
 
 const authService = {
   unwrapApiData(response) {
+    if (response && typeof response === 'object' && 'success' in response) {
+      if (response.success === false) {
+        const err = new Error(response.error?.message || 'Yeu cau khong thanh cong')
+        err.statusCode = response.error?.code || 400
+        err.data = response
+        throw err
+      }
+      if ('data' in response) {
+        return response.data ?? response
+      }
+    }
+
     if (response && typeof response === 'object' && 'data' in response) {
       return response.data ?? response
     }

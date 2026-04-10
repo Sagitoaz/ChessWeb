@@ -55,8 +55,7 @@ const PIECE_ORDER = ['q', 'r', 'b', 'n', 'p']
 // ─────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────
-const getRankInfo = (rating) =>
-  RANKS.find((r) => rating >= r.min && rating < r.max) || RANKS[0]
+const getRankInfo = (rating) => RANKS.find((r) => rating >= r.min && rating < r.max) || RANKS[0]
 
 /** Format milliseconds → "M:SS" or "S.t" when < 10 s */
 const fmtClock = (ms) => {
@@ -90,20 +89,20 @@ const calcMockRatingDelta = (result, pRating, oRating) => {
 }
 
 // ─────────────────────────────────────────────────────
-// MOCK DATA
+// FALLBACK DATA
 // ─────────────────────────────────────────────────────
-const MOCK_PLAYER = {
+const DEFAULT_PLAYER = {
   id: 'player-1',
-  username: 'ChessPlayer',
+  username: 'Player',
   rating: 1523,
-  avatarUrl: 'https://i.pravatar.cc/150?img=1',
+  avatarUrl: null,
 }
 
-const MOCK_OPPONENT = {
+const DEFAULT_OPPONENT = {
   id: 'opp-1',
-  username: 'DarkKnight77',
+  username: 'Opponent',
   rating: 1498,
-  avatarUrl: 'https://i.pravatar.cc/150?img=12',
+  avatarUrl: null,
 }
 
 // ═════════════════════════════════════════════════════
@@ -119,9 +118,7 @@ const CapturedPieces = ({ pieces, color, advantage }) => {
           {PIECE_UNICODE[color][p]}
         </span>
       ))}
-      {advantage > 0 && (
-        <span className="text-xs font-bold text-gray-500 ml-1">+{advantage}</span>
-      )}
+      {advantage > 0 && <span className="text-xs font-bold text-gray-500 ml-1">+{advantage}</span>}
     </div>
   )
 }
@@ -146,9 +143,7 @@ const PlayerBar = ({
   return (
     <div
       className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-300 ${
-        isActive
-          ? 'bg-green-50 border border-green-400'
-          : 'bg-white border border-gray-200'
+        isActive ? 'bg-green-50 border border-green-400' : 'bg-white border border-gray-200'
       }`}
     >
       {/* Left ─ player info */}
@@ -161,9 +156,7 @@ const PlayerBar = ({
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-900 text-sm truncate">
-              {player.username}
-            </span>
+            <span className="font-semibold text-gray-900 text-sm truncate">{player.username}</span>
             <span
               className="text-xs px-1.5 py-0.5 rounded font-mono"
               style={{
@@ -183,8 +176,8 @@ const PlayerBar = ({
                   ? Math.abs(materialAdv)
                   : 0
                 : materialAdv > 0
-                ? materialAdv
-                : 0
+                  ? materialAdv
+                  : 0
             }
           />
         </div>
@@ -196,10 +189,10 @@ const PlayerBar = ({
           critical && isActive
             ? 'bg-red-100 text-red-600 animate-pulse'
             : low && isActive
-            ? 'bg-yellow-100 text-yellow-700'
-            : isActive
-            ? 'bg-green-100 text-green-800'
-            : 'bg-gray-100 text-gray-500'
+              ? 'bg-yellow-100 text-yellow-700'
+              : isActive
+                ? 'bg-green-100 text-green-800'
+                : 'bg-gray-100 text-gray-500'
         }`}
       >
         {fmtClock(timeMs)}
@@ -226,7 +219,8 @@ const EndGameModal = ({
   if (!isOpen) return null
 
   // Local 2P: "win" = player (white) thắng, "lose" = opponent (black) thắng
-  const winnerName = result === 'win' ? player.username : result === 'lose' ? opponent.username : null
+  const winnerName =
+    result === 'win' ? player.username : result === 'lose' ? opponent.username : null
 
   const cfg = {
     win: {
@@ -279,16 +273,12 @@ const EndGameModal = ({
         <div className="flex items-center justify-center gap-6 mb-6">
           <div className="text-center">
             <Avatar src={player.avatarUrl} alt={player.username} size="sm" />
-            <p className="text-xs text-gray-600 mt-1 truncate max-w-[80px]">
-              {player.username}
-            </p>
+            <p className="text-xs text-gray-600 mt-1 truncate max-w-[80px]">{player.username}</p>
           </div>
           <span className="text-gray-400 font-bold text-lg">vs</span>
           <div className="text-center">
             <Avatar src={opponent.avatarUrl} alt={opponent.username} size="sm" />
-            <p className="text-xs text-gray-600 mt-1 truncate max-w-[80px]">
-              {opponent.username}
-            </p>
+            <p className="text-xs text-gray-600 mt-1 truncate max-w-[80px]">{opponent.username}</p>
           </div>
         </div>
 
@@ -298,9 +288,7 @@ const EndGameModal = ({
           <div className="flex items-center justify-center gap-3">
             <span className="text-gray-500 text-lg">{player.rating}</span>
             <span className="text-gray-400">→</span>
-            <span className={`text-2xl font-bold ${eloDeltaColor(ratingChange)}`}>
-              {newRating}
-            </span>
+            <span className={`text-2xl font-bold ${eloDeltaColor(ratingChange)}`}>{newRating}</span>
             <span className={`text-sm font-semibold ${eloDeltaColor(ratingChange)}`}>
               ({formatEloDelta(ratingChange)})
             </span>
@@ -338,9 +326,7 @@ const DrawOfferBanner = ({ from, onAccept, onDecline }) => (
   <div className="mx-3 my-2 bg-yellow-50 border border-yellow-300 rounded-lg p-3">
     <div className="flex items-center gap-3">
       <Handshake className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-      <p className="flex-1 text-sm text-yellow-800 font-medium">
-        {from} đề nghị hòa
-      </p>
+      <p className="flex-1 text-sm text-yellow-800 font-medium">{from} đề nghị hòa</p>
       <div className="flex gap-2">
         <button
           onClick={onAccept}
@@ -393,9 +379,7 @@ const MoveListPanel = ({ moves }) => {
       <div className="p-2 space-y-0.5">
         {pairs.map((p) => (
           <div key={p.n} className="flex items-center gap-1 text-sm">
-            <span className="w-7 text-gray-500 text-xs font-mono text-right">
-              {p.n}.
-            </span>
+            <span className="w-7 text-gray-500 text-xs font-mono text-right">{p.n}.</span>
             <span
               className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
                 p.wi === moves.length - 1
@@ -457,13 +441,11 @@ const InlineChat = ({ messages, onSend, disabled }) => {
                 m.isSystem
                   ? 'text-blue-600 text-center italic'
                   : m.isMine
-                  ? 'text-green-700'
-                  : 'text-gray-700'
+                    ? 'text-green-700'
+                    : 'text-gray-700'
               }`}
             >
-              {!m.isSystem && (
-                <span className="font-semibold mr-1">{m.sender}:</span>
-              )}
+              {!m.isSystem && <span className="font-semibold mr-1">{m.sender}:</span>}
               {m.text}
             </div>
           ))
@@ -472,10 +454,7 @@ const InlineChat = ({ messages, onSend, disabled }) => {
       </div>
 
       {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="flex gap-1 p-2 border-t border-gray-100"
-      >
+      <form onSubmit={handleSubmit} className="flex gap-1 p-2 border-t border-gray-100">
         <input
           type="text"
           value={text}
@@ -516,11 +495,11 @@ const RankedGamePage = () => {
         ? {
             id: storeUser.id,
             username: storeUser.username,
-            rating: storeUser.rating || MOCK_PLAYER.rating,
-            avatarUrl: storeUser.avatarUrl || MOCK_PLAYER.avatarUrl,
+            rating: storeUser.rating || DEFAULT_PLAYER.rating,
+            avatarUrl: storeUser.avatarUrl || DEFAULT_PLAYER.avatarUrl,
           }
-        : MOCK_PLAYER,
-    [storeUser],
+        : DEFAULT_PLAYER,
+    [storeUser]
   )
   const [opponent] = useState(
     locationMatchData?.opponent
@@ -530,7 +509,7 @@ const RankedGamePage = () => {
           rating: locationMatchData.opponent.rating,
           avatarUrl: locationMatchData.opponent.avatarUrl,
         }
-      : MOCK_OPPONENT
+      : DEFAULT_OPPONENT
   )
   // Chế độ local 2 người: bỏ qua màu được gán, cả 2 cùng đi trên 1 máy
   const playerColor = locationMatchData?.color || 'white'
@@ -575,21 +554,25 @@ const RankedGamePage = () => {
 
   // Initialize sound effects (using Web Audio API fallback)
   useEffect(() => {
-    const createTone = (freq, duration, type = 'sine') => () => {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)()
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.type = type
-        osc.frequency.value = freq
-        gain.gain.setValueAtTime(0.15, ctx.currentTime)
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.start()
-        osc.stop(ctx.currentTime + duration)
-      } catch { /* silent fallback */ }
-    }
+    const createTone =
+      (freq, duration, type = 'sine') =>
+      () => {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)()
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.type = type
+          osc.frequency.value = freq
+          gain.gain.setValueAtTime(0.15, ctx.currentTime)
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+          osc.connect(gain)
+          gain.connect(ctx.destination)
+          osc.start()
+          osc.stop(ctx.currentTime + duration)
+        } catch {
+          /* silent fallback */
+        }
+      }
     soundRefs.current = {
       move: createTone(600, 0.08),
       capture: createTone(300, 0.15, 'square'),
@@ -598,10 +581,13 @@ const RankedGamePage = () => {
     }
   }, [])
 
-  const playSound = useCallback((name) => {
-    if (!soundEnabled) return
-    soundRefs.current[name]?.()
-  }, [soundEnabled])
+  const playSound = useCallback(
+    (name) => {
+      if (!soundEnabled) return
+      soundRefs.current[name]?.()
+    },
+    [soundEnabled]
+  )
 
   // ─── Inactivity Timer ───
   const [inactivityTime, setInactivityTime] = useState(0)
@@ -681,7 +667,7 @@ const RankedGamePage = () => {
       ])
     }, 800)
     return () => clearTimeout(t)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ═══════════════════════════════════════════
@@ -713,28 +699,26 @@ const RankedGamePage = () => {
   // ═══════════════════════════════════════════
   // END GAME HELPER
   // ═══════════════════════════════════════════
-  const endGame = useCallback((reason, result) => {
-    if (endedRef.current) return
-    endedRef.current = true
-    setGamePhase(GAME_PHASE.ENDED)
-    if (clockRef.current) clearInterval(clockRef.current)
-    if (inactivityRef.current) clearInterval(inactivityRef.current)
-    setEndResult({ result, reason })
-    setShowAFKWarning(false)
+  const endGame = useCallback(
+    (reason, result) => {
+      if (endedRef.current) return
+      endedRef.current = true
+      setGamePhase(GAME_PHASE.ENDED)
+      if (clockRef.current) clearInterval(clockRef.current)
+      if (inactivityRef.current) clearInterval(inactivityRef.current)
+      setEndResult({ result, reason })
+      setShowAFKWarning(false)
 
-    const txt =
-      result === 'win'
-        ? 'You won'
-        : result === 'lose'
-        ? 'You lost'
-        : 'Game drawn'
-    setChatMessages((prev) => [
-      ...prev,
-      { text: `Game Over — ${txt} (${reason})`, isSystem: true },
-    ])
-    playSound('gameEnd')
-    setTimeout(() => setShowEndModal(true), 600)
-  }, [playSound])
+      const txt = result === 'win' ? 'You won' : result === 'lose' ? 'You lost' : 'Game drawn'
+      setChatMessages((prev) => [
+        ...prev,
+        { text: `Game Over — ${txt} (${reason})`, isSystem: true },
+      ])
+      playSound('gameEnd')
+      setTimeout(() => setShowEndModal(true), 600)
+    },
+    [playSound]
+  )
 
   // ─── Timeout detection (runs each clock tick) ───
   useEffect(() => {
@@ -752,8 +736,7 @@ const RankedGamePage = () => {
     if (g.isCheckmate()) {
       const loser = g.turn()
       const res =
-        (loser === 'w' && playerColor === 'white') ||
-        (loser === 'b' && playerColor === 'black')
+        (loser === 'w' && playerColor === 'white') || (loser === 'b' && playerColor === 'black')
           ? 'lose'
           : 'win'
       endGame('checkmate', res)
@@ -788,10 +771,7 @@ const RankedGamePage = () => {
 
     const handleOpponentReconnect = () => {
       setOpponentDisconnected(false)
-      setChatMessages((prev) => [
-        ...prev,
-        { text: '✅ Opponent reconnected.', isSystem: true },
-      ])
+      setChatMessages((prev) => [...prev, { text: '✅ Opponent reconnected.', isSystem: true }])
     }
 
     gameSocket.onOpponentDisconnected(handleOpponentDisconnect)
@@ -816,15 +796,16 @@ const RankedGamePage = () => {
       if (!ended && gameRef.current.inCheck()) playSound('check')
 
       if (gameSocket?.isConnected) {
-        gameSocket.sendMove({ from: move.from, to: move.to, promotion: move.promotion, san: move.san })
+        gameSocket.sendMove({
+          from: move.from,
+          to: move.to,
+          promotion: move.promotion,
+          san: move.san,
+        })
       }
     },
-    [checkGameEnd, gameSocket, playSound],
+    [checkGameEnd, gameSocket, playSound]
   )
-
-
-
-
 
   // AI đã bị tắt — chế độ local 2 người chơi luân phiên trên 1 máy
 
@@ -862,34 +843,22 @@ const RankedGamePage = () => {
 
   const handleDeclineDraw = useCallback(() => {
     setDrawOffer(null)
-    setChatMessages((prev) => [
-      ...prev,
-      { text: 'You declined the draw', isSystem: true },
-    ])
+    setChatMessages((prev) => [...prev, { text: 'You declined the draw', isSystem: true }])
   }, [])
 
   const handleSendChat = useCallback(
     (text) => {
       const side = gameRef.current.turn() === 'w' ? player.username : opponent.username
-      setChatMessages((prev) => [
-        ...prev,
-        { sender: side, text, isMine: true },
-      ])
+      setChatMessages((prev) => [...prev, { sender: side, text, isMine: true }])
     },
-    [player.username, opponent.username],
+    [player.username, opponent.username]
   )
 
   // ═══════════════════════════════════════════
   // NAVIGATION
   // ═══════════════════════════════════════════
-  const goToLobby = useCallback(
-    () => navigate('/ranked'),
-    [navigate]
-  )
-  const goToHistory = useCallback(
-    () => navigate('/ranked/history'),
-    [navigate]
-  )
+  const goToLobby = useCallback(() => navigate('/ranked'), [navigate])
+  const goToHistory = useCallback(() => navigate('/ranked/history'), [navigate])
 
   // ═══════════════════════════════════════════
   // CLEANUP on unmount
@@ -907,7 +876,10 @@ const RankedGamePage = () => {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   useEffect(() => {
     if (gamePhase !== GAME_PHASE.PLAYING) return
-    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    const handler = (e) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [gamePhase])
@@ -935,9 +907,7 @@ const RankedGamePage = () => {
         <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4">
           <div className="w-16 h-16 border-4 border-[#81b64c] border-t-transparent rounded-full animate-spin" />
           <h2 className="text-xl font-bold text-gray-900">Đang tải trận đấu...</h2>
-          <p className="text-gray-500 text-sm">
-            Chuẩn bị bàn cờ · {matchId || 'local'}
-          </p>
+          <p className="text-gray-500 text-sm">Chuẩn bị bàn cờ · {matchId || 'local'}</p>
         </div>
       </MainLayout>
     )
@@ -959,11 +929,9 @@ const RankedGamePage = () => {
 
   const playing = gamePhase === GAME_PHASE.PLAYING
   const topActive =
-    playing &&
-    ((isWhite && currentTurn === 'b') || (!isWhite && currentTurn === 'w'))
+    playing && ((isWhite && currentTurn === 'b') || (!isWhite && currentTurn === 'w'))
   const bottomActive =
-    playing &&
-    ((isWhite && currentTurn === 'w') || (!isWhite && currentTurn === 'b'))
+    playing && ((isWhite && currentTurn === 'w') || (!isWhite && currentTurn === 'b'))
 
   // Captured pieces for each bar
   const topCaptured = isWhite ? capturedByBlack : capturedByWhite
@@ -980,11 +948,11 @@ const RankedGamePage = () => {
       ? endResult?.result === 'win'
         ? '🎉 Chiến thắng!'
         : endResult?.result === 'lose'
-        ? '😔 Thua trận'
-        : '🤝 Hòa'
+          ? '😔 Thua trận'
+          : '🤝 Hòa'
       : isCheck
-      ? `⚡ Chiếu! — ${currentPlayerName}`
-      : `🟢 Lượt: ${currentPlayerName}`
+        ? `⚡ Chiếu! — ${currentPlayerName}`
+        : `🟢 Lượt: ${currentPlayerName}`
 
   // ═══════════════════════════════════════════
   // RENDER
@@ -1043,11 +1011,7 @@ const RankedGamePage = () => {
             className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
             title={soundEnabled ? 'Tắt âm' : 'Mở âm'}
           >
-            {soundEnabled ? (
-              <Volume2 className="w-4 h-4" />
-            ) : (
-              <VolumeX className="w-4 h-4" />
-            )}
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
         </div>
 
@@ -1117,11 +1081,11 @@ const RankedGamePage = () => {
                   ? endResult?.result === 'win'
                     ? 'bg-green-50 text-green-700'
                     : endResult?.result === 'lose'
-                    ? 'bg-red-50 text-red-700'
-                    : 'bg-blue-50 text-blue-700'
+                      ? 'bg-red-50 text-red-700'
+                      : 'bg-blue-50 text-blue-700'
                   : isCheck
-                  ? 'bg-red-50 text-red-600'
-                  : 'bg-green-50 text-green-700'
+                    ? 'bg-red-50 text-red-600'
+                    : 'bg-green-50 text-green-700'
               }`}
             >
               {statusText}
@@ -1142,9 +1106,7 @@ const RankedGamePage = () => {
               <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Nước đi
               </span>
-              <span className="text-xs text-gray-400 ml-auto">
-                {moveHistory.length} nước
-              </span>
+              <span className="text-xs text-gray-400 ml-auto">{moveHistory.length} nước</span>
             </div>
 
             {/* Move list */}
@@ -1159,8 +1121,8 @@ const RankedGamePage = () => {
                   !playing
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : showResignConfirm
-                    ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
-                    : 'bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700'
+                      ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
+                      : 'bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700'
                 }`}
               >
                 {showResignConfirm ? (

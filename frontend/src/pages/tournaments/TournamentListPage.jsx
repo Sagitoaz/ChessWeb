@@ -1,83 +1,75 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Input, Loader } from '@/components/common'
-import { 
-  Trophy, Users, Calendar, Clock, Search, Plus,
-  ChevronRight, Award, Target
+import gameService from '@/services/gameService'
+import {
+  Trophy,
+  Users,
+  Calendar,
+  Clock,
+  Search,
+  Plus,
+  ChevronRight,
+  Award,
+  Target,
 } from 'lucide-react'
 
-// Mock tournament data
-const MOCK_TOURNAMENTS = {
-  upcoming: [
-    {
-      id: 'tour1',
-      name: 'Giải Cờ Vua Mùa Xuân 2026',
-      organizer: 'ChessClub',
-      startDate: '2026-03-15T10:00:00Z',
-      registrationDeadline: '2026-03-10T23:59:00Z',
-      participants: 12,
-      maxParticipants: 16,
-      format: 'Single Elimination',
-      timeControl: '10+0',
-      status: 'registration',
-      prize: '1,000,000 VND'
+const EMPTY_TOURNAMENTS = { upcoming: [], ongoing: [], completed: [] }
+
+const normalizeTournament = (tournament = {}) => ({
+  ...tournament,
+  id: tournament.id || tournament._id,
+  name: tournament.name || 'Giải đấu',
+  organizer:
+    typeof tournament.organizer === 'string'
+      ? tournament.organizer
+      : tournament.organizer?.username || 'Unknown',
+  startDate: tournament.startDate || tournament.start_date || new Date().toISOString(),
+  registrationDeadline: tournament.registrationDeadline || tournament.registration_deadline || null,
+  participants: Array.isArray(tournament.participants)
+    ? tournament.participants.length
+    : tournament.participants || 0,
+  maxParticipants: tournament.maxParticipants || tournament.max_players || 0,
+  format: tournament.format || 'Unknown',
+  timeControl: tournament.timeControl || tournament.time_control || '10+0',
+  status: tournament.status || 'registration',
+})
+
+const groupTournamentsByStatus = (items = []) =>
+  items.reduce(
+    (acc, item) => {
+      const t = normalizeTournament(item)
+      if (t.status === 'ongoing') acc.ongoing.push(t)
+      else if (t.status === 'completed') acc.completed.push(t)
+      else acc.upcoming.push(t)
+      return acc
     },
-    {
-      id: 'tour2',
-      name: 'Giải Blitz Hàng Tuần',
-      organizer: 'Admin',
-      startDate: '2026-02-28T19:00:00Z',
-      registrationDeadline: '2026-02-27T23:59:00Z',
-      participants: 8,
-      maxParticipants: 8,
-      format: 'Round Robin',
-      timeControl: '3+2',
-      status: 'full',
-      prize: null
-    }
-  ],
-  ongoing: [
-    {
-      id: 'tour3',
-      name: 'Giải Vô Địch Tháng 2',
-      organizer: 'ProChess',
-      startDate: '2026-02-20T14:00:00Z',
-      participants: 16,
-      maxParticipants: 16,
-      format: 'Single Elimination',
-      timeControl: '15+10',
-      status: 'ongoing',
-      currentRound: 'Quarter Finals'
-    }
-  ],
-  completed: [
-    {
-      id: 'tour4',
-      name: 'Giải Giao Hữu Tháng 1',
-      organizer: 'ChessMaster99',
-      startDate: '2026-01-15T10:00:00Z',
-      endDate: '2026-01-20T18:00:00Z',
-      participants: 8,
-      maxParticipants: 8,
-      format: 'Swiss',
-      timeControl: '10+5',
-      status: 'completed',
-      winner: 'GrandMaster2000'
-    }
-  ]
-}
+    { upcoming: [], ongoing: [], completed: [] }
+  )
 
 export default function TournamentListPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('upcoming')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
-  const [tournaments, setTournaments] = useState(MOCK_TOURNAMENTS)
+  const [tournaments, setTournaments] = useState(EMPTY_TOURNAMENTS)
 
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => setLoading(false), 500)
-    return () => clearTimeout(timer)
+    const loadTournaments = async () => {
+      setLoading(true)
+      try {
+        const response = await gameService.getTournaments()
+        const payload = response?.data ?? response
+        const items = payload?.items || payload?.tournaments || payload || []
+        setTournaments(groupTournamentsByStatus(Array.isArray(items) ? items : []))
+      } catch (_error) {
+        setTournaments(EMPTY_TOURNAMENTS)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadTournaments()
   }, [])
 
   const getStatusBadge = (status) => {
@@ -85,7 +77,7 @@ export default function TournamentListPage() {
       registration: { text: 'Đang mở', color: 'bg-green-100 text-green-800' },
       full: { text: 'Đã đủ', color: 'bg-blue-100 text-blue-800' },
       ongoing: { text: 'Đang diễn ra', color: 'bg-yellow-100 text-yellow-800' },
-      completed: { text: 'Đã kết thúc', color: 'bg-gray-100 text-gray-800' }
+      completed: { text: 'Đã kết thúc', color: 'bg-gray-100 text-gray-800' },
     }
     const badge = badges[status] || badges.registration
     return (
@@ -100,10 +92,12 @@ export default function TournamentListPage() {
       'Single Elimination': 'bg-purple-100 text-purple-800',
       'Double Elimination': 'bg-indigo-100 text-indigo-800',
       'Round Robin': 'bg-blue-100 text-blue-800',
-      'Swiss': 'bg-teal-100 text-teal-800'
+      Swiss: 'bg-teal-100 text-teal-800',
     }
     return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${colors[format] || 'bg-gray-100 text-gray-800'}`}>
+      <span
+        className={`px-2 py-1 rounded text-xs font-medium ${colors[format] || 'bg-gray-100 text-gray-800'}`}
+      >
         {format}
       </span>
     )
@@ -111,12 +105,12 @@ export default function TournamentListPage() {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('vi-VN', { 
-      day: '2-digit', 
-      month: '2-digit', 
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
   }
 
@@ -246,10 +240,12 @@ export default function TournamentListPage() {
     </Card>
   )
 
-  const filteredTournaments = tournaments[activeTab]?.filter(t => 
-    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.organizer.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || []
+  const filteredTournaments =
+    tournaments[activeTab]?.filter(
+      (t) =>
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.organizer.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || []
 
   return (
     <div className="min-h-screen bg-[#e1edff] p-4">
@@ -257,9 +253,7 @@ export default function TournamentListPage() {
         {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-5xl font-bold text-blue-600 mb-3">🏆 Giải đấu</h1>
-          <p className="text-xl text-gray-800">
-            Tham gia hoặc tổ chức giải đấu cờ vua
-          </p>
+          <p className="text-xl text-gray-800">Tham gia hoặc tổ chức giải đấu cờ vua</p>
         </div>
 
         {/* Main Card */}
@@ -273,7 +267,10 @@ export default function TournamentListPage() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
               <div className="flex-1 max-w-md">
                 <div className="relative">
-                  <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Search
+                    size={18}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
                   <Input
                     placeholder="Tìm kiếm giải đấu..."
                     value={searchQuery}
@@ -298,8 +295,8 @@ export default function TournamentListPage() {
               {[
                 { key: 'upcoming', label: 'Sắp diễn ra', count: tournaments.upcoming.length },
                 { key: 'ongoing', label: 'Đang diễn ra', count: tournaments.ongoing.length },
-                { key: 'completed', label: 'Đã kết thúc', count: tournaments.completed.length }
-              ].map(tab => (
+                { key: 'completed', label: 'Đã kết thúc', count: tournaments.completed.length },
+              ].map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
@@ -328,8 +325,8 @@ export default function TournamentListPage() {
                   {searchQuery ? 'Không tìm thấy giải đấu' : 'Chưa có giải đấu nào'}
                 </h3>
                 <p className="text-gray-600 mb-4">
-                  {searchQuery 
-                    ? 'Thử tìm kiếm với từ khóa khác' 
+                  {searchQuery
+                    ? 'Thử tìm kiếm với từ khóa khác'
                     : 'Hãy là người đầu tiên tạo giải đấu mới'}
                 </p>
                 {!searchQuery && (
@@ -345,7 +342,7 @@ export default function TournamentListPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredTournaments.map(tournament => (
+                {filteredTournaments.map((tournament) => (
                   <TournamentCard key={tournament.id} tournament={tournament} />
                 ))}
               </div>
@@ -363,9 +360,7 @@ export default function TournamentListPage() {
             <div className="p-4 text-center">
               <Trophy size={32} className="mx-auto mb-2 text-blue-600" />
               <h3 className="font-bold text-gray-900 mb-1">Tham gia giải đấu</h3>
-              <p className="text-sm text-gray-600">
-                Thử thách bản thân với các kỳ thủ khác
-              </p>
+              <p className="text-sm text-gray-600">Thử thách bản thân với các kỳ thủ khác</p>
             </div>
           </Card>
 
@@ -377,9 +372,7 @@ export default function TournamentListPage() {
             <div className="p-4 text-center">
               <Target size={32} className="mx-auto mb-2 text-purple-600" />
               <h3 className="font-bold text-gray-900 mb-1">Nhiều định dạng</h3>
-              <p className="text-sm text-gray-600">
-                Single/Double Elim, Round Robin, Swiss
-              </p>
+              <p className="text-sm text-gray-600">Single/Double Elim, Round Robin, Swiss</p>
             </div>
           </Card>
 
@@ -391,9 +384,7 @@ export default function TournamentListPage() {
             <div className="p-4 text-center">
               <Award size={32} className="mx-auto mb-2 text-yellow-600" />
               <h3 className="font-bold text-gray-900 mb-1">Giải thưởng</h3>
-              <p className="text-sm text-gray-600">
-                Tranh tài để giành giải thưởng hấp dẫn
-              </p>
+              <p className="text-sm text-gray-600">Tranh tài để giành giải thưởng hấp dẫn</p>
             </div>
           </Card>
         </div>

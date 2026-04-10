@@ -1,8 +1,9 @@
 import axios from 'axios'
-import { API_URL, USE_MOCK } from '../utils/constants'
+import { API_URL } from '../utils/constants'
 import { useAuthStore } from '../store'
 
-const isValidToken = (token) => token && token !== 'undefined' && token !== 'null' && !token.startsWith('mock-jwt-token')
+const isValidToken = (token) =>
+  token && token !== 'undefined' && token !== 'null' && !token.startsWith('mock')
 
 const clearAuthSession = () => {
   try {
@@ -55,7 +56,12 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refreshToken')
-        if (!refreshToken || refreshToken === 'undefined' || refreshToken === 'null' || refreshToken.startsWith('mock-refresh-token')) {
+        if (
+          !refreshToken ||
+          refreshToken === 'undefined' ||
+          refreshToken === 'null' ||
+          refreshToken.startsWith('mock')
+        ) {
           throw new Error('Missing or invalid refresh token')
         }
         const response = await axios.post(`${API_URL}/auth/refresh`, {
@@ -87,121 +93,13 @@ api.interceptors.response.use(
 )
 
 /**
- * Mock API responses for development
- * Enable/disable via VITE_USE_MOCK in .env file
- */
-const mockAPI = {
-  async login(credentials) {
-    await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate network delay
-    return {
-      user: {
-        id: 1,
-        username: credentials.username,
-        email: 'test@example.com',
-        displayName: 'Test User',
-        avatarUrl: 'https://i.pravatar.cc/150?img=1',
-      },
-      token: 'mock-jwt-token-' + Date.now(),
-      refreshToken: 'mock-refresh-token-' + Date.now(),
-    }
-  },
-
-  async register(userData) {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    return {
-      user: {
-        id: 2,
-        username: userData.username,
-        email: userData.email,
-        displayName: userData.username,
-        avatarUrl: 'https://i.pravatar.cc/150?img=2',
-      },
-      token: 'mock-jwt-token-' + Date.now(),
-      refreshToken: 'mock-refresh-token-' + Date.now(),
-    }
-  },
-
-  async getProfile() {
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    return {
-      id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      displayName: 'Test User',
-      avatarUrl: 'https://i.pravatar.cc/150?img=1',
-      bio: 'Chess enthusiast',
-      rating: 1500,
-      gamesPlayed: 120,
-      wins: 60,
-      losses: 40,
-      draws: 20,
-    }
-  },
-
-  async getLeaderboard(params) {
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    return {
-      data: Array.from({ length: 20 }, (_, i) => ({
-        rank: i + 1,
-        id: i + 1,
-        username: `Player${i + 1}`,
-        avatarUrl: `https://i.pravatar.cc/150?img=${i + 1}`,
-        rating: 2000 - i * 50,
-        gamesPlayed: 100 + i * 10,
-        winRate: 60 - i,
-      })),
-      total: 1000,
-      page: params.page || 1,
-      pageSize: params.pageSize || 20,
-    }
-  },
-
-  async getRankedHistory() {
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    return {
-      data: Array.from({ length: 10 }, (_, i) => ({
-        id: i + 1,
-        opponent: {
-          username: `Opponent${i + 1}`,
-          rating: 1500 + i * 10,
-        },
-        result: ['win', 'loss', 'draw'][i % 3],
-        eloChange: [24, -16, 0][i % 3],
-        date: new Date(Date.now() - i * 86400000).toISOString(),
-        duration: '15:30',
-        mode: 'ranked',
-      })),
-    }
-  },
-}
-
-/**
- * API wrapper that uses mock or real API based on config
+ * API wrapper for real backend API calls.
  * @param {string} method - HTTP method (GET, POST, PUT, DELETE, PATCH)
  * @param {string} endpoint - API endpoint path
  * @param {*} data - Request data
  * @returns {Promise} API response
  */
 export const apiCall = async (method, endpoint, data = null) => {
-  if (USE_MOCK) {
-    // Use mock data in development
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.log(`[MOCK API] ${method.toUpperCase()} ${endpoint}`, data)
-    }
-    
-    // Route to appropriate mock function
-    if (endpoint.includes('/auth/login')) return mockAPI.login(data)
-    if (endpoint.includes('/auth/register')) return mockAPI.register(data)
-    if (endpoint.includes('/users/profile')) return mockAPI.getProfile()
-    if (endpoint.includes('/users/leaderboard')) return mockAPI.getLeaderboard(data)
-    if (endpoint.includes('/ranked/history')) return mockAPI.getRankedHistory()
-    
-    // Default mock response
-    return { message: 'Mock API response', data }
-  }
-
-  // Use real API
   switch (method.toLowerCase()) {
     case 'get':
       return api.get(endpoint, { params: data })

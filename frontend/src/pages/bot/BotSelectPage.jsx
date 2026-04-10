@@ -78,6 +78,12 @@ export default function BotSelectPage() {
         state: { gameData, sessionId: gameData.sessionId },
       })
     } catch (err) {
+      const status = err?.statusCode ?? err?.status ?? err?.response?.status
+      const backendMessage =
+        (typeof err?.message === 'string' && err.message) ||
+        (typeof err?.error?.message === 'string' && err.error.message) ||
+        (Array.isArray(err?.message) ? err.message[0] : null)
+
       const msg =
         {
           401: 'Bạn cần đăng nhập để chơi với bot',
@@ -85,7 +91,7 @@ export default function BotSelectPage() {
           429: 'Quá nhiều yêu cầu, thử lại sau',
           503: 'Bot service tạm thời không khả dụng',
           504: 'Bot service timeout, thử lại',
-        }[err.status] ?? 'Không thể bắt đầu game'
+        }[status] ?? backendMessage ?? 'Không thể bắt đầu game'
       showError(msg)
       setIsStarting(false)
     }

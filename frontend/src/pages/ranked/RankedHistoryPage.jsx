@@ -25,12 +25,7 @@ import { MainLayout } from '@components/layout'
 import { useAuthStore } from '@store'
 import gameService from '@services/gameService'
 import { RANKS } from '@utils/constants'
-import {
-  formatEloDelta,
-  eloDeltaColor,
-  formatRelativeTime,
-  formatDate,
-} from '@utils/formatters'
+import { formatEloDelta, eloDeltaColor, formatRelativeTime, formatDate } from '@utils/formatters'
 import { THEME } from '@/styles/theme'
 
 // ─────────────────────────────────────────────────────
@@ -54,16 +49,25 @@ const END_REASON_ICONS = {
 }
 
 const RESULT_BADGE = {
-  win: { label: 'WIN', bg: 'bg-green-600/20', text: 'text-green-400', border: 'border-green-600/30' },
+  win: {
+    label: 'WIN',
+    bg: 'bg-green-600/20',
+    text: 'text-green-400',
+    border: 'border-green-600/30',
+  },
   loss: { label: 'LOSS', bg: 'bg-red-600/20', text: 'text-red-400', border: 'border-red-600/30' },
-  draw: { label: 'DRAW', bg: 'bg-blue-600/20', text: 'text-blue-400', border: 'border-blue-600/30' },
+  draw: {
+    label: 'DRAW',
+    bg: 'bg-blue-600/20',
+    text: 'text-blue-400',
+    border: 'border-blue-600/30',
+  },
 }
 
 // ─────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────
-const getRankInfo = (rating) =>
-  RANKS.find((r) => rating >= r.min && rating < r.max) || RANKS[0]
+const getRankInfo = (rating) => RANKS.find((r) => rating >= r.min && rating < r.max) || RANKS[0]
 
 /** Format seconds → "M:SS" */
 const fmtDuration = (secs) => {
@@ -73,12 +77,6 @@ const fmtDuration = (secs) => {
 }
 
 // Mock user
-const MOCK_USER = {
-  id: 'player-1',
-  username: 'ChessPlayer',
-  rating: 1523,
-  avatarUrl: 'https://i.pravatar.cc/150?img=1',
-}
 
 // ═════════════════════════════════════════════════════
 // SUB-CMP: HistoryRow — a single match result card
@@ -90,7 +88,9 @@ const HistoryRow = ({ match }) => {
   const oppRank = getRankInfo(match.opponent.rating)
 
   return (
-    <div className={`group flex items-center gap-4 px-4 py-3 rounded-lg ${THEME.background.card} border ${THEME.border.DEFAULT} hover:border-gray-300 transition-all duration-200 ${THEME.shadow.sm}`}>
+    <div
+      className={`group flex items-center gap-4 px-4 py-3 rounded-lg ${THEME.background.card} border ${THEME.border.DEFAULT} hover:border-gray-300 transition-all duration-200 ${THEME.shadow.sm}`}
+    >
       {/* Result badge */}
       <div
         className={`flex-shrink-0 w-16 py-1 rounded text-center text-xs font-bold uppercase tracking-wider border ${badge.bg} ${badge.text} ${badge.border}`}
@@ -171,19 +171,27 @@ const StatsStrip = ({ matches }) => {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-      <div className={`${THEME.background.card} rounded-lg p-3 text-center border border-green-200 ${THEME.shadow.sm}`}>
+      <div
+        className={`${THEME.background.card} rounded-lg p-3 text-center border border-green-200 ${THEME.shadow.sm}`}
+      >
         <p className={`text-xs ${THEME.text.secondary} mb-1`}>Wins</p>
         <p className="text-xl font-bold text-green-600">{stats.wins}</p>
       </div>
-      <div className={`${THEME.background.card} rounded-lg p-3 text-center border border-red-200 ${THEME.shadow.sm}`}>
+      <div
+        className={`${THEME.background.card} rounded-lg p-3 text-center border border-red-200 ${THEME.shadow.sm}`}
+      >
         <p className={`text-xs ${THEME.text.secondary} mb-1`}>Losses</p>
         <p className="text-xl font-bold text-red-600">{stats.losses}</p>
       </div>
-      <div className={`${THEME.background.card} rounded-lg p-3 text-center border border-blue-200 ${THEME.shadow.sm}`}>
+      <div
+        className={`${THEME.background.card} rounded-lg p-3 text-center border border-blue-200 ${THEME.shadow.sm}`}
+      >
         <p className={`text-xs ${THEME.text.secondary} mb-1`}>Draws</p>
         <p className="text-xl font-bold text-blue-600">{stats.draws}</p>
       </div>
-      <div className={`${THEME.background.card} rounded-lg p-3 text-center border ${THEME.border.DEFAULT} ${THEME.shadow.sm}`}>
+      <div
+        className={`${THEME.background.card} rounded-lg p-3 text-center border ${THEME.border.DEFAULT} ${THEME.shadow.sm}`}
+      >
         <p className={`text-xs ${THEME.text.secondary} mb-1`}>Net Rating</p>
         <p className={`text-xl font-bold ${eloDeltaColor(stats.totalRatingChange)}`}>
           {formatEloDelta(stats.totalRatingChange)}
@@ -246,9 +254,7 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
 
       {end < totalPages && (
         <>
-          {end < totalPages - 1 && (
-            <span className={`${THEME.text.muted} px-1`}>...</span>
-          )}
+          {end < totalPages - 1 && <span className={`${THEME.text.muted} px-1`}>...</span>}
           <button
             onClick={() => onPageChange(totalPages)}
             className={`w-8 h-8 rounded text-xs font-medium ${THEME.text.secondary} hover:bg-gray-100 hover:${THEME.text.primary} transition-colors`}
@@ -284,11 +290,16 @@ const RankedHistoryPage = () => {
         ? {
             id: storeUser.id,
             username: storeUser.username,
-            rating: storeUser.rating || MOCK_USER.rating,
-            avatarUrl: storeUser.avatarUrl || MOCK_USER.avatarUrl,
+            rating: storeUser.rating || 1200,
+            avatarUrl: storeUser.avatarUrl || null,
           }
-        : MOCK_USER,
-    [storeUser],
+        : {
+            id: '',
+            username: 'Người chơi',
+            rating: 1200,
+            avatarUrl: null,
+          },
+    [storeUser]
   )
 
   // ─── Data ───
@@ -310,9 +321,9 @@ const RankedHistoryPage = () => {
     setError(null)
     try {
       const data = await gameService.getRankedHistory(page, PAGE_SIZE)
-      setMatches(data.matches)
-      setTotalPages(data.pagination.totalPages)
-      setCurrentPage(data.pagination.page)
+      setMatches(data.matches || [])
+      setTotalPages(data.pagination?.totalPages || 1)
+      setCurrentPage(data.pagination?.page || page)
     } catch (err) {
       setError('Không thể tải lịch sử trận đấu.')
       console.error('Failed to load history:', err)
@@ -333,9 +344,7 @@ const RankedHistoryPage = () => {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
-      result = result.filter((m) =>
-        m.opponent.username.toLowerCase().includes(q),
-      )
+      result = result.filter((m) => m.opponent.username.toLowerCase().includes(q))
     }
     return result
   }, [matches, resultFilter, searchQuery])
@@ -370,7 +379,9 @@ const RankedHistoryPage = () => {
               View your ranked game results and replay past matches
             </p>
           </div>
-          <div className={`hidden sm:flex items-center gap-2 ${THEME.background.card} rounded-lg px-3 py-2 border ${THEME.border.DEFAULT}`}>
+          <div
+            className={`hidden sm:flex items-center gap-2 ${THEME.background.card} rounded-lg px-3 py-2 border ${THEME.border.DEFAULT}`}
+          >
             <Avatar src={user.avatarUrl} alt={user.username} size="sm" />
             <div>
               <p className={`text-sm font-semibold ${THEME.text.primary}`}>{user.username}</p>
@@ -387,7 +398,9 @@ const RankedHistoryPage = () => {
         {/* ─── Filters Bar ─── */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
           {/* Result filter tabs */}
-          <div className={`flex ${THEME.background.card} rounded-lg p-1 border ${THEME.border.DEFAULT}`}>
+          <div
+            className={`flex ${THEME.background.card} rounded-lg p-1 border ${THEME.border.DEFAULT}`}
+          >
             {RESULT_FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -405,7 +418,9 @@ const RankedHistoryPage = () => {
 
           {/* Search */}
           <div className="flex-1 relative">
-            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${THEME.text.muted}`} />
+            <Search
+              className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${THEME.text.muted}`}
+            />
             <input
               type="text"
               value={searchQuery}
@@ -426,7 +441,9 @@ const RankedHistoryPage = () => {
         </div>
 
         {/* ─── Table Header ─── */}
-        <div className={`hidden sm:flex items-center gap-4 px-4 py-2 text-xs ${THEME.text.secondary} uppercase tracking-wider font-semibold mb-1`}>
+        <div
+          className={`hidden sm:flex items-center gap-4 px-4 py-2 text-xs ${THEME.text.secondary} uppercase tracking-wider font-semibold mb-1`}
+        >
           <div className="w-16 text-center">Result</div>
           <div className="w-4" />
           <div className="flex-1">Opponent</div>
@@ -454,9 +471,7 @@ const RankedHistoryPage = () => {
           <div className="text-center py-20">
             <Swords className={`w-12 h-12 ${THEME.text.secondary} mx-auto mb-4`} />
             <h3 className={`text-lg font-semibold ${THEME.text.primary} mb-2`}>
-              {matches.length === 0
-                ? 'No games played yet'
-                : 'No matches found'}
+              {matches.length === 0 ? 'No games played yet' : 'No matches found'}
             </h3>
             <p className={`${THEME.text.secondary} text-sm mb-6`}>
               {matches.length === 0
@@ -483,11 +498,7 @@ const RankedHistoryPage = () => {
 
         {/* ─── Pagination ─── */}
         {!loading && (
-          <Pagination
-            page={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-          />
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
         )}
 
         {/* ─── Bottom info ─── */}

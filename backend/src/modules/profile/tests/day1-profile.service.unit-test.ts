@@ -95,6 +95,15 @@ class InMemoryProfileRepository implements ProfileRepositoryPort {
     }
   }
 
+  async findUserModeStats(): Promise<{ totalGames: number; wins: number; losses: number; draws: number }> {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+    }
+  }
+
   async createEmailVerificationToken(token: EmailVerificationTokenDoc): Promise<void> {
     this.tokens.set(token.tokenHash, token)
   }

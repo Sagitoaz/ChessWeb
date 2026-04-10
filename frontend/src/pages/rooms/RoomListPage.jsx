@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Input, Loader } from '@/components/common'
 import { Users, Clock, Lock, Globe } from 'lucide-react'
@@ -22,64 +22,15 @@ const getAvatarColor = (username) => {
 const UserAvatar = ({ username }) => {
   const initial = username?.charAt(0).toUpperCase() || '?'
   const colorClass = getAvatarColor(username || '')
-  
+
   return (
-    <div className={`w-8 h-8 rounded-full ${colorClass} flex items-center justify-center text-white font-semibold text-sm`}>
+    <div
+      className={`w-8 h-8 rounded-full ${colorClass} flex items-center justify-center text-white font-semibold text-sm`}
+    >
       {initial}
     </div>
   )
 }
-
-// Mock data - sau này sẽ lấy từ API
-const MOCK_RECENT_ROOMS = [
-  {
-    id: 'ABC123',
-    code: 'ABC123',
-    name: 'Quick Game',
-    host: { username: 'Player1', avatar: null },
-    timeControl: '10+0',
-    isPrivate: false,
-    playerCount: 2,
-    status: 'playing',
-    createdAt: '2026-02-24T10:30:00Z'
-  },
-  {
-    id: 'XYZ789',
-    code: 'XYZ789',
-    name: 'Casual Match',
-    host: { username: 'ChessMaster99', avatar: null },
-    timeControl: '15+5',
-    isPrivate: true,
-    playerCount: 1,
-    status: 'waiting',
-    createdAt: '2026-02-24T09:15:00Z'
-  },
-]
-
-const MOCK_PUBLIC_ROOMS = [
-  {
-    id: 'PUB001',
-    code: 'PUB001',
-    name: 'Beginner Friendly',
-    host: { username: 'ChessNoob', avatar: null },
-    timeControl: '10+0',
-    isPrivate: false,
-    playerCount: 1,
-    status: 'waiting',
-    createdAt: '2026-02-24T11:00:00Z'
-  },
-  {
-    id: 'PUB002',
-    code: 'PUB002',
-    name: 'Blitz Battle',
-    host: { username: 'SpeedPlayer', avatar: null },
-    timeControl: '5+0',
-    isPrivate: false,
-    playerCount: 1,
-    status: 'waiting',
-    createdAt: '2026-02-24T11:10:00Z'
-  },
-]
 
 export default function RoomListPage() {
   const navigate = useNavigate()
@@ -93,10 +44,8 @@ export default function RoomListPage() {
   useEffect(() => {
     const loadRooms = async () => {
       setLoading(true)
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setRecentRooms(MOCK_RECENT_ROOMS)
-      setPublicRooms(MOCK_PUBLIC_ROOMS)
+      setRecentRooms([])
+      setPublicRooms([])
       setLoading(false)
     }
     loadRooms()
@@ -110,11 +59,6 @@ export default function RoomListPage() {
     if (!roomCode.trim()) return
 
     setJoiningRoom(roomCode)
-    // Simulate validation
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // TODO: Validate room code with API
-    // For now, just navigate
     navigate(`/rooms/join?code=${roomCode.toUpperCase()}`)
     setJoiningRoom(null)
   }
@@ -147,9 +91,7 @@ export default function RoomListPage() {
         {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-5xl font-bold text-blue-600 mb-3">♟️ Phòng chơi</h1>
-          <p className="text-xl text-gray-800">
-            Tạo phòng riêng hoặc tham gia phòng của bạn bè
-          </p>
+          <p className="text-xl text-gray-800">Tạo phòng riêng hoặc tham gia phòng của bạn bè</p>
         </div>
 
         {/* Main Actions */}
@@ -190,9 +132,7 @@ export default function RoomListPage() {
             {/* Join by code inline */}
             <div className="pt-6 border-t border-gray-100">
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                  Tham gia nhanh
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Tham gia nhanh</h3>
                 <p className="text-sm text-gray-600">Nhập mã phòng để vào ngay</p>
               </div>
               <div className="flex gap-3">
@@ -234,9 +174,7 @@ export default function RoomListPage() {
                 className="bg-white shadow-md border-none rounded-xl overflow-hidden"
               >
                 <div className="p-8">
-                  <h2 className="text-xl font-bold text-blue-400 mb-6">
-                    Phòng gần đây
-                  </h2>
+                  <h2 className="text-xl font-bold text-blue-400 mb-6">Phòng gần đây</h2>
 
                   <div className="space-y-3">
                     {recentRooms.map((room) => (
@@ -297,9 +235,7 @@ export default function RoomListPage() {
               >
                 <div className="p-8">
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-blue-400">
-                      Phòng công khai
-                    </h2>
+                    <h2 className="text-xl font-bold text-blue-400">Phòng công khai</h2>
                     <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
                       {publicRooms.length} phòng
                     </span>

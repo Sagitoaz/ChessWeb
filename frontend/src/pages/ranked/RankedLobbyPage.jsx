@@ -23,15 +23,8 @@ import { MainLayout } from '@components/layout'
 import { useRankedSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
 import gameService from '@services/gameService'
-import {
-  RANKS,
-  INACTIVITY_TIMEOUT,
-} from '@utils/constants'
-import {
-  formatEloDelta,
-  eloDeltaColor,
-  formatRelativeTime,
-} from '@utils/formatters'
+import { RANKS, INACTIVITY_TIMEOUT } from '@utils/constants'
+import { formatEloDelta, eloDeltaColor, formatRelativeTime } from '@utils/formatters'
 import { THEME } from '@/styles/theme'
 
 // ─────────────── Helper: get rank info by rating ───────────────
@@ -46,66 +39,6 @@ const formatSearchTime = (seconds) => {
   const s = seconds % 60
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
-
-// ─────────────── Mock Data ───────────────
-const MOCK_USER = {
-  id: 1,
-  username: 'ChessPlayer',
-  rating: 1200,
-  avatarUrl: 'https://i.pravatar.cc/150?img=1',
-  gamesPlayed: 0,
-  wins: 0,
-  losses: 0,
-  draws: 0,
-}
-
-const MOCK_RECENT_GAMES = [
-  {
-    id: 'g1',
-    opponent: { username: 'GrandMaster42', rating: 1580, avatarUrl: 'https://i.pravatar.cc/150?img=3' },
-    result: 'win',
-    ratingChange: 24,
-    endReason: 'checkmate',
-    duration: 842,
-    playedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'g2',
-    opponent: { username: 'KnightRider', rating: 1495, avatarUrl: 'https://i.pravatar.cc/150?img=5' },
-    result: 'lose',
-    ratingChange: -18,
-    endReason: 'timeout',
-    duration: 612,
-    playedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'g3',
-    opponent: { username: 'QueenGambit', rating: 1540, avatarUrl: 'https://i.pravatar.cc/150?img=8' },
-    result: 'draw',
-    ratingChange: 0,
-    endReason: 'draw',
-    duration: 1120,
-    playedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'g4',
-    opponent: { username: 'BishopSniper', rating: 1610, avatarUrl: 'https://i.pravatar.cc/150?img=12' },
-    result: 'win',
-    ratingChange: 28,
-    endReason: 'resignation',
-    duration: 450,
-    playedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'g5',
-    opponent: { username: 'PawnStorm', rating: 1465, avatarUrl: 'https://i.pravatar.cc/150?img=15' },
-    result: 'win',
-    ratingChange: 16,
-    endReason: 'checkmate',
-    duration: 920,
-    playedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-]
 
 // ─────────────── Matchmaking Status Enum ───────────────
 const QUEUE_STATUS = {
@@ -150,7 +83,9 @@ const SearchingOverlay = ({ status, searchTime, queueCount, onCancel, matchData 
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
-      <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-8 max-w-md w-full mx-4 text-center ${THEME.shadow.lg} animate-slideUp`}>
+      <div
+        className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-8 max-w-md w-full mx-4 text-center ${THEME.shadow.lg} animate-slideUp`}
+      >
         {/* Status Icon */}
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center">
@@ -174,7 +109,9 @@ const SearchingOverlay = ({ status, searchTime, queueCount, onCancel, matchData 
 
         {/* Queue Stats */}
         {config.showTimer && queueCount > 0 && (
-          <div className={`flex items-center justify-center gap-2 mb-6 text-sm ${THEME.text.secondary}`}>
+          <div
+            className={`flex items-center justify-center gap-2 mb-6 text-sm ${THEME.text.secondary}`}
+          >
             <Users className="w-4 h-4" />
             <span>~{queueCount} players in queue</span>
           </div>
@@ -214,16 +151,29 @@ const SearchingOverlay = ({ status, searchTime, queueCount, onCancel, matchData 
 // ═══════════════════════════════════════════════════════════
 const RecentGameCard = ({ game }) => {
   const resultStyles = {
-    win: { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-400', label: 'WIN' },
+    win: {
+      bg: 'bg-green-500/10',
+      border: 'border-green-500/30',
+      text: 'text-green-400',
+      label: 'WIN',
+    },
     lose: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', label: 'LOSS' },
-    draw: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-400', label: 'DRAW' },
+    draw: {
+      bg: 'bg-yellow-500/10',
+      border: 'border-yellow-500/30',
+      text: 'text-yellow-400',
+      label: 'DRAW',
+    },
   }
 
   const style = resultStyles[game.result] || resultStyles.draw
-  const duration = Math.floor(game.duration / 60) + ':' + String(game.duration % 60).padStart(2, '0')
+  const duration =
+    Math.floor(game.duration / 60) + ':' + String(game.duration % 60).padStart(2, '0')
 
   return (
-    <div className={`flex items-center gap-4 p-3 rounded-lg ${style.bg} border ${style.border} transition-all hover:scale-[1.01]`}>
+    <div
+      className={`flex items-center gap-4 p-3 rounded-lg ${style.bg} border ${style.border} transition-all hover:scale-[1.01]`}
+    >
       {/* Result Badge */}
       <div className={`w-14 text-center font-bold text-xs py-1 rounded ${style.text} ${style.bg}`}>
         {style.label}
@@ -231,11 +181,7 @@ const RecentGameCard = ({ game }) => {
 
       {/* Opponent Info */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <Avatar
-          src={game.opponent.avatarUrl}
-          name={game.opponent.username}
-          size="sm"
-        />
+        <Avatar src={game.opponent.avatarUrl} name={game.opponent.username} size="sm" />
         <div className="min-w-0">
           <p className={`text-sm font-medium ${THEME.text.primary} truncate`}>
             {game.opponent.username}
@@ -252,7 +198,9 @@ const RecentGameCard = ({ game }) => {
       {/* Duration & Time */}
       <div className="text-right hidden sm:block">
         <p className={`text-xs ${THEME.text.muted}`}>{duration}</p>
-        <p className={`text-xs ${THEME.text.muted} opacity-75`}>{formatRelativeTime(game.playedAt)}</p>
+        <p className={`text-xs ${THEME.text.muted} opacity-75`}>
+          {formatRelativeTime(game.playedAt)}
+        </p>
       </div>
     </div>
   )
@@ -274,16 +222,25 @@ const RankedLobbyPage = () => {
       storeUser
         ? {
             id: storeUser.id,
-            username: storeUser.username || MOCK_USER.username,
-            rating: storeUser.rating || MOCK_USER.rating,
-            avatarUrl: storeUser.avatarUrl || MOCK_USER.avatarUrl,
-            gamesPlayed: storeUser.gamesPlayed ?? MOCK_USER.gamesPlayed,
-            wins: storeUser.wins ?? MOCK_USER.wins,
-            losses: storeUser.losses ?? MOCK_USER.losses,
-            draws: storeUser.draws ?? MOCK_USER.draws,
+            username: storeUser.username || 'Người chơi',
+            rating: storeUser.rating || 1200,
+            avatarUrl: storeUser.avatarUrl || null,
+            gamesPlayed: storeUser.gamesPlayed ?? 0,
+            wins: storeUser.wins ?? 0,
+            losses: storeUser.losses ?? 0,
+            draws: storeUser.draws ?? 0,
           }
-        : MOCK_USER,
-    [storeUser],
+        : {
+            id: '',
+            username: 'Người chơi',
+            rating: 1200,
+            avatarUrl: null,
+            gamesPlayed: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0,
+          },
+    [storeUser]
   )
 
   // ──── Queue & Match State ────
@@ -297,22 +254,16 @@ const RankedLobbyPage = () => {
   const matchFoundRef = useRef(false) // guard against double-navigation
 
   // ──── WebSocket Hook ────
-  const {
-    isConnected,
-    joinQueue,
-    leaveQueue,
-    onMatchFound,
-    onQueueUpdate,
-  } = useRankedSocket()
+  const { isConnected, joinQueue, leaveQueue, onMatchFound, onQueueUpdate } = useRankedSocket()
 
   // ──── Load Recent Games ────
   useEffect(() => {
     const fetchRecentGames = async () => {
       try {
         const data = await gameService.getRankedHistory(1, 5)
-        setRecentGames(data.matches || MOCK_RECENT_GAMES)
+        setRecentGames(data.matches || [])
       } catch {
-        setRecentGames(MOCK_RECENT_GAMES)
+        setRecentGames([])
       } finally {
         setLoading(false)
       }
@@ -374,45 +325,6 @@ const RankedLobbyPage = () => {
     }
   }, [queueStatus])
 
-  // ──── Mock: Simulate match found after random time ────
-  useEffect(() => {
-    if (queueStatus !== QUEUE_STATUS.SEARCHING) return
-
-    // Mock: simulate queue count updates
-    const queueInterval = setInterval(() => {
-      setQueueCount(Math.floor(Math.random() * 80) + 20)
-    }, 3000)
-
-    // Mock: simulate match found after 5-15 seconds
-    const matchTimeout = setTimeout(() => {
-      // Guard: skip if real WS already matched
-      if (matchFoundRef.current) return
-      matchFoundRef.current = true
-
-      const mockMatch = {
-        matchId: 'match-' + Date.now(),
-        opponent: {
-          id: 2,
-          username: 'OpponentPlayer',
-          rating: user.rating + Math.floor(Math.random() * 200) - 100,
-          avatarUrl: 'https://i.pravatar.cc/150?img=' + Math.floor(Math.random() * 20 + 1),
-        },
-        color: Math.random() > 0.5 ? 'white' : 'black',
-      }
-
-      setQueueStatus(QUEUE_STATUS.FOUND)
-      setMatchData(mockMatch)
-
-      setTimeout(() => setQueueStatus(QUEUE_STATUS.CONNECTING), 1500)
-      setTimeout(() => navigate(`/ranked/game/${mockMatch.matchId}`, { state: { matchData: mockMatch } }), 3000)
-    }, Math.random() * 10000 + 5000)
-
-    return () => {
-      clearInterval(queueInterval)
-      clearTimeout(matchTimeout)
-    }
-  }, [queueStatus, navigate, user.rating])
-
   // ──── Handlers ────
   const handleFindMatch = useCallback(() => {
     matchFoundRef.current = false // reset guard for new search
@@ -455,14 +367,14 @@ const RankedLobbyPage = () => {
           {/* Quick Nav */}
           <div className="hidden md:flex items-center gap-3">
             <Link
-              to={isDemo ? "/demo/ranked/history" : "/ranked/history"}
+              to={isDemo ? '/demo/ranked/history' : '/ranked/history'}
               className={`flex items-center gap-2 text-sm ${THEME.text.secondary} hover:${THEME.text.primary} transition-colors px-3 py-2 rounded-lg hover:bg-gray-100`}
             >
               <History className="w-4 h-4" />
               History
             </Link>
             <Link
-              to={isDemo ? "/demo/ranked/stats" : "/ranked/stats"}
+              to={isDemo ? '/demo/ranked/stats' : '/ranked/stats'}
               className={`flex items-center gap-2 text-sm ${THEME.text.secondary} hover:${THEME.text.primary} transition-colors px-3 py-2 rounded-lg hover:bg-gray-100`}
             >
               <BarChart3 className="w-4 h-4" />
@@ -475,22 +387,18 @@ const RankedLobbyPage = () => {
           {/* ============ LEFT COLUMN: Main Action Area ============ */}
           <div className="lg:col-span-2 space-y-6">
             {/* ──── Player Rating Card ──── */}
-            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-6 ${THEME.shadow.DEFAULT}`}>
+            <div
+              className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-6 ${THEME.shadow.DEFAULT}`}
+            >
               <div className="flex items-center gap-5">
-                <Avatar
-                  src={user.avatarUrl}
-                  name={user.username}
-                  size="xl"
-                />
+                <Avatar src={user.avatarUrl} name={user.username} size="xl" />
                 <div className="flex-1">
                   <h2 className={`text-xl font-bold ${THEME.text.primary}`}>{user.username}</h2>
                   <div className="flex items-center gap-4 mt-2">
                     {/* Rating */}
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-yellow-400" />
-                      <span className="text-2xl font-bold text-yellow-400">
-                        {user.rating}
-                      </span>
+                      <span className="text-2xl font-bold text-yellow-400">{user.rating}</span>
                     </div>
 
                     {/* Rank Badge */}
@@ -531,7 +439,9 @@ const RankedLobbyPage = () => {
             </div>
 
             {/* ──── Find Match Button ──── */}
-            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-8 text-center ${THEME.shadow.DEFAULT}`}>
+            <div
+              className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-8 text-center ${THEME.shadow.DEFAULT}`}
+            >
               <div className="mb-6">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
                   <Swords className="w-10 h-10 text-green-600" />
@@ -578,14 +488,16 @@ const RankedLobbyPage = () => {
             </div>
 
             {/* ──── Recent Ranked Games ──── */}
-            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-6 ${THEME.shadow.DEFAULT}`}>
+            <div
+              className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-6 ${THEME.shadow.DEFAULT}`}
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className={`text-lg font-bold ${THEME.text.primary} flex items-center gap-2`}>
                   <Clock className={`w-5 h-5 ${THEME.text.secondary}`} />
                   Recent Games
                 </h3>
                 <Link
-                  to={isDemo ? "/demo/ranked/history" : "/ranked/history"}
+                  to={isDemo ? '/demo/ranked/history' : '/ranked/history'}
                   className="text-sm text-green-600 hover:text-green-500 flex items-center gap-1 transition-colors"
                 >
                   View All
@@ -616,8 +528,12 @@ const RankedLobbyPage = () => {
           {/* ============ RIGHT COLUMN: Info & Rules ============ */}
           <div className="space-y-6">
             {/* ──── Quick Stats ──── */}
-            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}>
-              <h3 className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4`}>
+            <div
+              className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}
+            >
+              <h3
+                className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4`}
+              >
                 Quick Stats
               </h3>
               <div className="grid grid-cols-2 gap-3">
@@ -642,7 +558,9 @@ const RankedLobbyPage = () => {
                 <div className="bg-blue-50 rounded-lg p-3 text-center col-span-2">
                   <div className="flex justify-around">
                     <div>
-                      <p className={`text-xl font-bold ${THEME.text.primary}`}>{user.gamesPlayed ?? 0}</p>
+                      <p className={`text-xl font-bold ${THEME.text.primary}`}>
+                        {user.gamesPlayed ?? 0}
+                      </p>
                       <p className={`text-xs ${THEME.text.muted}`}>Tổng ván</p>
                     </div>
                     <div>
@@ -651,7 +569,10 @@ const RankedLobbyPage = () => {
                     </div>
                     <div>
                       <p className="text-xl font-bold text-yellow-600">
-                        {user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0}%
+                        {user.gamesPlayed > 0
+                          ? Math.round((user.wins / user.gamesPlayed) * 100)
+                          : 0}
+                        %
                       </p>
                       <p className={`text-xs ${THEME.text.muted}`}>Tỉ lệ thắng</p>
                     </div>
@@ -661,8 +582,12 @@ const RankedLobbyPage = () => {
             </div>
 
             {/* ──── Ranked Rules ──── */}
-            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}>
-              <h3 className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4 flex items-center gap-2`}>
+            <div
+              className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}
+            >
+              <h3
+                className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4 flex items-center gap-2`}
+              >
                 <Info className="w-4 h-4" />
                 Ranked Rules
               </h3>
@@ -702,38 +627,44 @@ const RankedLobbyPage = () => {
             </div>
 
             {/* ──── Elo Formula ──── */}
-            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}>
-              <h3 className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4 flex items-center gap-2`}>
+            <div
+              className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}
+            >
+              <h3
+                className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4 flex items-center gap-2`}
+              >
                 <Zap className="w-4 h-4" />
                 Elo System
               </h3>
               <div className={`space-y-3 text-sm ${THEME.text.secondary}`}>
-                <p>
-                  Rating changes are calculated using the Elo formula:
-                </p>
+                <p>Rating changes are calculated using the Elo formula:</p>
                 <div className="bg-gray-100 rounded-lg p-3 font-mono text-xs text-center text-green-600">
                   ΔR = K × (S - E), K = 32
                 </div>
                 <div className="space-y-1 text-xs">
                   <p>
-                    <span className="text-green-400 font-semibold">Win</span>
-                    {' '}against higher rated → more points
+                    <span className="text-green-400 font-semibold">Win</span> against higher rated →
+                    more points
                   </p>
                   <p>
-                    <span className="text-red-400 font-semibold">Lose</span>
-                    {' '}against lower rated → more penalty
+                    <span className="text-red-400 font-semibold">Lose</span> against lower rated →
+                    more penalty
                   </p>
                   <p>
-                    <span className="text-yellow-400 font-semibold">Draw</span>
-                    {' '}→ small adjustment toward expected
+                    <span className="text-yellow-400 font-semibold">Draw</span> → small adjustment
+                    toward expected
                   </p>
                 </div>
               </div>
             </div>
 
             {/* ──── Ranking Tiers ──── */}
-            <div className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}>
-              <h3 className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4`}>
+            <div
+              className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 ${THEME.shadow.DEFAULT}`}
+            >
+              <h3
+                className={`text-sm font-semibold ${THEME.text.secondary} uppercase tracking-wider mb-4`}
+              >
                 Ranking Tiers
               </h3>
               <div className="space-y-2">
@@ -741,9 +672,7 @@ const RankedLobbyPage = () => {
                   <div
                     key={rank.name}
                     className={`flex items-center justify-between p-2 rounded-lg text-sm ${
-                      user.rating >= rank.min && user.rating < rank.max
-                        ? 'bg-gray-100'
-                        : ''
+                      user.rating >= rank.min && user.rating < rank.max ? 'bg-gray-100' : ''
                     }`}
                     style={
                       user.rating >= rank.min && user.rating < rank.max

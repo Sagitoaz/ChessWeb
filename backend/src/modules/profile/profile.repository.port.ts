@@ -1,6 +1,7 @@
 export interface UserProfileDoc {
   _id: string
   username: string
+  email?: string | null
   passwordHash?: string | null
   displayName?: string | null
   avatarUrl?: string | null
@@ -66,14 +67,39 @@ export interface UserGameDoc {
   mode: string | null
   whitePlayerId: string | null
   blackPlayerId: string | null
+  whiteUsername?: string | null
+  blackUsername?: string | null
   result: string | null
   createdAt: Date | null
   finishedAt: Date | null
 }
 
+export interface ReplayGameListItem {
+  id: string
+  mode: string | null
+  result: string | null
+  createdAt: string | null
+  whitePlayer: {
+    username: string
+  }
+  blackPlayer: {
+    username: string
+  }
+  metadata: {
+    totalMoves: number | null
+  }
+}
+
 export interface UserGamesQueryResult {
   items: UserGameDoc[]
   total: number
+}
+
+export interface UserModeStatsResult {
+  totalGames: number
+  wins: number
+  losses: number
+  draws: number
 }
 
 export interface EmailVerificationTokenDoc {
@@ -101,6 +127,7 @@ export interface ProfileRepositoryPort {
   updateUserProfileDisplayName(userId: string, displayName: string | null): Promise<UserProfileDoc | null>
   findLeaderboard(query: LeaderboardQuery): Promise<LeaderboardQueryResult>
   findUserGames(userId: string, query: UserGamesQuery): Promise<UserGamesQueryResult>
+  findUserModeStats(userId: string, mode?: 'ranked' | 'room' | 'bot' | 'tournament'): Promise<UserModeStatsResult>
   createEmailVerificationToken(token: EmailVerificationTokenDoc): Promise<void>
   verifyEmailByTokenHash(tokenHash: string, now: Date): Promise<VerifyTokenResult>
 }

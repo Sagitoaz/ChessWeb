@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useAuthStore } from '../store'
 import authService from '../services/authService'
 
@@ -11,9 +11,37 @@ import authService from '../services/authService'
  * @returns {Object} Auth state và methods
  */
 export const useAuth = () => {
-  const { user, isAuthenticated, login: setLogin, logout: setLogout, loadUser } = useAuthStore()
+  const { user, isAuthenticated, login: setLogin, logout: setLogout } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  const normalizeAuthPayload = useCallback(async (response) => {
+    const token = response?.token
+    const fallbackToken = localStorage.getItem('token')
+    const effectiveToken =
+      typeof token === 'string' && token.length > 0 && token !== 'undefined' && token !== 'null'
+        ? token
+        : fallbackToken
+
+    if (!effectiveToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ (thiếu access token).')
+    }
+
+    let resolvedUser = response?.user
+    if (!resolvedUser || typeof resolvedUser !== 'object' || !resolvedUser.username) {
+      const profileResponse = await authService.getCurrentUser()
+      const profileUser = profileResponse?.user ?? profileResponse
+      if (!profileUser || typeof profileUser !== 'object' || !profileUser.username) {
+        throw new Error('Không lấy được thông tin hồ sơ người dùng.')
+      }
+      resolvedUser = profileUser
+    }
+
+    return {
+      token: effectiveToken,
+      user: resolvedUser,
+    }
+  }, [])
 
   /**
    * Đăng nhập
@@ -26,16 +54,17 @@ export const useAuth = () => {
       setError(null)
       
       const response = await authService.login(credentials)
-      setLogin(response.user, response.token)
+      const normalized = await normalizeAuthPayload(response)
+      setLogin(normalized.user, normalized.token)
       
-      return response.user
+      return normalized.user
     } catch (err) {
       setError(err.message || 'Login failed')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [setLogin])
+  }, [setLogin, normalizeAuthPayload])
 
   /**
    * Đăng ký
@@ -48,16 +77,17 @@ export const useAuth = () => {
       setError(null)
       
       const response = await authService.register(userData)
-      setLogin(response.user, response.token)
+      const normalized = await normalizeAuthPayload(response)
+      setLogin(normalized.user, normalized.token)
       
-      return response.user
+      return normalized.user
     } catch (err) {
       setError(err.message || 'Registration failed')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [setLogin])
+  }, [setLogin, normalizeAuthPayload])
 
   /**
    * Đăng xuất
@@ -151,6 +181,9 @@ export const useAuth = () => {
       const responseData = await authService.getCurrentUser()
       const userData = responseData?.user ?? responseData
       const token = localStorage.getItem('token')
+      if (!userData || typeof userData !== 'object' || !userData.username) {
+        throw new Error('Không lấy được hồ sơ người dùng hiện tại.')
+      }
       setLogin(userData, token)
       
       return userData
@@ -198,11 +231,6 @@ export const useAuth = () => {
   const clearError = useCallback(() => {
     setError(null)
   }, [])
-
-  // Load user từ localStorage khi component mount
-  useEffect(() => {
-    loadUser()
-  }, [loadUser])
 
   return {
     // State

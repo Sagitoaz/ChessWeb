@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store'
-import MOCK_USERS from '@/mocks/users.json'
 
 const StatCard = ({ label, value, color = 'blue' }) => {
   const colors = {
@@ -49,108 +48,104 @@ const RecentGameRow = ({ opponent, result, eloChange, date }) => {
   )
 }
 
-// ── Mock recent games ──────────────────────────────────────────────────────
-const MOCK_GAMES = [
-  { opponent: 'GrandMaster', result: 'lose', eloChange: -16, date: '24/02' },
-  { opponent: 'ChessKing', result: 'win', eloChange: +24, date: '23/02' },
-  { opponent: 'Player123', result: 'win', eloChange: +20, date: '22/02' },
-  { opponent: 'NightRider', result: 'draw', eloChange: +2, date: '21/02' },
-  { opponent: 'KnightSlayer', result: 'win', eloChange: +18, date: '20/02' },
-]
-
 const ProfilePage = () => {
-  // TODO: thay bằng dữ liệu thật từ useAuth() + API
   const { user: authUser } = useAuthStore()
-  const mockUser = MOCK_USERS.users[0]
+  const recentGames = []
 
-  // Merge authUser fields with mock fallback (authUser thường thiếu stats)
+  // Render profile strictly from authenticated backend-backed session data.
   const user = {
-    username: authUser?.username ?? mockUser.username,
-    displayName: authUser?.displayName ?? mockUser.displayName,
-    email: authUser?.email ?? mockUser.email,
-    bio: authUser?.bio ?? mockUser.bio,
-    avatarUrl: authUser?.avatarUrl ?? mockUser.avatarUrl,
-    rating: authUser?.rating ?? mockUser.rating,
-    gamesPlayed: authUser?.gamesPlayed ?? mockUser.gamesPlayed,
-    wins: authUser?.wins ?? mockUser.wins,
-    losses: authUser?.losses ?? mockUser.losses,
-    draws: authUser?.draws ?? mockUser.draws,
+    username: authUser?.username ?? 'unknown',
+    displayName: authUser?.displayName ?? authUser?.username ?? 'Người chơi',
+    email: authUser?.email ?? '',
+    bio: authUser?.bio ?? '',
+    avatarUrl: authUser?.avatarUrl ?? null,
+    rating: authUser?.rating ?? 1200,
+    gamesPlayed: authUser?.gamesPlayed ?? 0,
+    wins: authUser?.wins ?? 0,
+    losses: authUser?.losses ?? 0,
+    draws: authUser?.draws ?? 0,
   }
 
   const winRate = user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0
 
   return (
     <div className="pb-12">
-        <div className="max-w-3xl mx-auto px-4 pt-6">
-          {/* Avatar + Info */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
-            {/* Cover strip */}
-            <div className="h-24 bg-gradient-to-r from-blue-600 to-indigo-600" />
-            {/* Profile info */}
-            <div className="px-6 pb-6">
-              <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-10">
-                <img
-                  src={user.avatarUrl ?? `https://i.pravatar.cc/100?u=${user.username}`}
-                  alt={user.username}
-                  className="w-20 h-20 rounded-2xl border-4 border-white shadow-md object-cover shrink-0"
-                />
-                <div className="flex-1 sm:pb-1">
-                  <h1 className="text-xl font-extrabold text-gray-900 leading-tight">
-                    {user.displayName ?? user.username}
-                  </h1>
-                  <p className="text-sm text-gray-500">@{user.username}</p>
-                  {user.bio && <p className="text-sm text-gray-600 mt-1">{user.bio}</p>}
-                </div>
-                <div className="flex gap-2 shrink-0 self-start sm:self-auto">
-                  <Link
-                    to="/profile/edit"
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition"
-                  >
-                    Chỉnh sửa
-                  </Link>
-                  <button
-                    onClick={() => { useAuthStore.getState().logout(); window.location.href = '/login' }}
-                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-lg border border-red-200 transition"
-                  >
-                    Logout
-                  </button>
-                </div>
+      <div className="max-w-3xl mx-auto px-4 pt-6">
+        {/* Avatar + Info */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
+          {/* Cover strip */}
+          <div className="h-24 bg-gradient-to-r from-blue-600 to-indigo-600" />
+          {/* Profile info */}
+          <div className="px-6 pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-10">
+              <img
+                src={user.avatarUrl ?? `https://i.pravatar.cc/100?u=${user.username}`}
+                alt={user.username}
+                className="w-20 h-20 rounded-2xl border-4 border-white shadow-md object-cover shrink-0"
+              />
+              <div className="flex-1 sm:pb-1">
+                <h1 className="text-xl font-extrabold text-gray-900 leading-tight">
+                  {user.displayName ?? user.username}
+                </h1>
+                <p className="text-sm text-gray-500">@{user.username}</p>
+                {user.bio && <p className="text-sm text-gray-600 mt-1">{user.bio}</p>}
+              </div>
+              <div className="flex gap-2 shrink-0 self-start sm:self-auto">
+                <Link
+                  to="/profile/edit"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition"
+                >
+                  Chỉnh sửa
+                </Link>
+                <button
+                  onClick={() => {
+                    useAuthStore.getState().logout()
+                    window.location.href = '/login'
+                  }}
+                  className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-lg border border-red-200 transition"
+                >
+                  Logout
+                </button>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Stats */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-4">
-            <h2 className="text-base font-bold text-gray-900 mb-4">Thống kê</h2>
+        {/* Stats */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-4">
+          <h2 className="text-base font-bold text-gray-900 mb-4">Thống kê</h2>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard label="Tổng ván" value={user.gamesPlayed} color="blue" />
-              <StatCard label="Thắng" value={user.wins} color="green" />
-              <StatCard label="Thua" value={user.losses} color="red" />
-              <StatCard label="Tỷ lệ thắng" value={`${winRate}%`} color="yellow" />
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="Tổng ván" value={user.gamesPlayed} color="blue" />
+            <StatCard label="Thắng" value={user.wins} color="green" />
+            <StatCard label="Thua" value={user.losses} color="red" />
+            <StatCard label="Tỷ lệ thắng" value={`${winRate}%`} color="yellow" />
           </div>
+        </div>
 
-          {/* ELO */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-4">
-            <h2 className="text-base font-bold text-gray-900 mb-2">ELO</h2>
-            <RatingBadge label="🏆 ELO hiện tại" value={user.rating ?? 1200} />
-          </div>
+        {/* ELO */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-4">
+          <h2 className="text-base font-bold text-gray-900 mb-2">ELO</h2>
+          <RatingBadge label="🏆 ELO hiện tại" value={user.rating ?? 1200} />
+        </div>
 
-          {/* Recent Games */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-0">
-            <h2 className="text-base font-bold text-gray-900 mb-3">Ván gần đây</h2>
-            {MOCK_GAMES.map((g, i) => (
-              <RecentGameRow key={i} {...g} />
-            ))}
-            <div className="mt-3 text-center">
-              <Link to="/ranked/history" className="text-sm text-blue-500 hover:underline">
-                Xem tất cả →
-              </Link>
-            </div>
+        {/* Recent Games */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-0">
+          <h2 className="text-base font-bold text-gray-900 mb-3">Ván gần đây</h2>
+          {recentGames.map((g, i) => (
+            <RecentGameRow key={i} {...g} />
+          ))}
+          {recentGames.length === 0 && (
+            <p className="text-sm text-gray-500 py-2">Chưa có lịch sử ván gần đây.</p>
+          )}
+          <div className="mt-3 text-center">
+            <Link to="/ranked/history" className="text-sm text-blue-500 hover:underline">
+              Xem tất cả →
+            </Link>
           </div>
         </div>
       </div>
+    </div>
   )
 }
 

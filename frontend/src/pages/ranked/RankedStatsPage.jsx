@@ -16,6 +16,7 @@ import {
   Award,
   Activity,
   Percent,
+  Minus,
   Star,
 } from 'lucide-react'
 import { Avatar, Loader } from '@components/common'
@@ -28,45 +29,22 @@ import { THEME } from '@/styles/theme'
 // ─────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────
-const getRankInfo = (rating) =>
-  RANKS.find((r) => rating >= r.min && rating < r.max) || RANKS[0]
-
-const MOCK_USER = {
-  id: 'player-1',
-  username: 'ChessPlayer',
-  rating: 1523,
-  avatarUrl: 'https://i.pravatar.cc/150?img=1',
-}
-
-/** Generate mock rating history (last 30 games) */
-const generateRatingHistory = (currentRating) => {
-  const points = []
-  let r = currentRating - 80 + Math.floor(Math.random() * 40)
-  for (let i = 0; i < 30; i++) {
-    r += Math.floor(Math.random() * 30) - 12
-    r = Math.max(800, Math.min(2400, r))
-    points.push({ game: i + 1, rating: r })
-  }
-  points[points.length - 1].rating = currentRating
-  return points
-}
-
-/** Generate mock monthly performance data */
-const generateMonthlyPerf = () => {
-  const months = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar']
-  return months.map((m) => ({
-    month: m,
-    wins: Math.floor(Math.random() * 15) + 5,
-    losses: Math.floor(Math.random() * 12) + 3,
-    draws: Math.floor(Math.random() * 6),
-  }))
-}
+const getRankInfo = (rating) => RANKS.find((r) => rating >= r.min && rating < r.max) || RANKS[0]
 
 // ═════════════════════════════════════════════════════
 // SUB-CMP: StatCard — reusable stat display card
 // ═════════════════════════════════════════════════════
-const StatCard = ({ icon: Icon, label, value, subValue, iconColor = 'text-[#81b64c]', valueColor }) => (
-  <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} hover:border-gray-300 transition-colors ${THEME.shadow.DEFAULT}`}>
+const StatCard = ({
+  icon: Icon,
+  label,
+  value,
+  subValue,
+  iconColor = 'text-[#81b64c]',
+  valueColor,
+}) => (
+  <div
+    className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} hover:border-gray-300 transition-colors ${THEME.shadow.DEFAULT}`}
+  >
     <div className="flex items-center gap-2 mb-2">
       <Icon className={`w-4 h-4 ${iconColor}`} />
       <span className={`text-xs ${THEME.text.secondary} uppercase tracking-wider font-semibold`}>
@@ -107,23 +85,14 @@ const MiniRatingChart = ({ data }) => {
   // Y-axis tick marks
   const yTicks = 5
   const tickStep = (maxR - minR) / yTicks
-  const ticks = Array.from({ length: yTicks + 1 }, (_, i) =>
-    Math.round(minR + i * tickStep),
-  )
+  const ticks = Array.from({ length: yTicks + 1 }, (_, i) => Math.round(minR + i * tickStep))
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
       {/* Grid lines */}
       {ticks.map((t) => (
         <g key={t}>
-          <line
-            x1={pad.l}
-            y1={y(t)}
-            x2={width - pad.r}
-            y2={y(t)}
-            stroke="#333"
-            strokeWidth="0.5"
-          />
+          <line x1={pad.l} y1={y(t)} x2={width - pad.r} y2={y(t)} stroke="#333" strokeWidth="0.5" />
           <text
             x={pad.l - 8}
             y={y(t) + 4}
@@ -147,7 +116,14 @@ const MiniRatingChart = ({ data }) => {
       <path d={area} fill="url(#areaGrad)" />
 
       {/* Line */}
-      <path d={line} fill="none" stroke="#81b64c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={line}
+        fill="none"
+        stroke="#81b64c"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
       {/* Data points */}
       {data.map((d, i) => (
@@ -176,13 +152,7 @@ const MiniRatingChart = ({ data }) => {
       </text>
 
       {/* X-axis label */}
-      <text
-        x={width / 2}
-        y={height - 4}
-        textAnchor="middle"
-        fill="#555"
-        fontSize="10"
-      >
+      <text x={width / 2} y={height - 4} textAnchor="middle" fill="#555" fontSize="10">
         Last {data.length} games
       </text>
     </svg>
@@ -219,7 +189,9 @@ const WinRateDonut = ({ wins, losses, draws, total }) => {
 
         {/* Draws */}
         <circle
-          cx={cx} cy={cy} r={r}
+          cx={cx}
+          cy={cy}
+          r={r}
           fill="none"
           stroke="#3B82F6"
           strokeWidth={stroke}
@@ -231,7 +203,9 @@ const WinRateDonut = ({ wins, losses, draws, total }) => {
 
         {/* Losses */}
         <circle
-          cx={cx} cy={cy} r={r}
+          cx={cx}
+          cy={cy}
+          r={r}
           fill="none"
           stroke="#EF4444"
           strokeWidth={stroke}
@@ -243,7 +217,9 @@ const WinRateDonut = ({ wins, losses, draws, total }) => {
 
         {/* Wins */}
         <circle
-          cx={cx} cy={cy} r={r}
+          cx={cx}
+          cy={cy}
+          r={r}
           fill="none"
           stroke="#22C55E"
           strokeWidth={stroke}
@@ -337,7 +313,9 @@ const RankProgressBar = ({ rating }) => {
   const progress = ((rating - prevMin) / (nextMin - prevMin)) * 100
 
   return (
-    <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.DEFAULT}`}>
+    <div
+      className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.DEFAULT}`}
+    >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Award className="w-4 h-4" style={{ color: rank.color }} />
@@ -388,29 +366,45 @@ const RankedStatsPage = () => {
         ? {
             id: storeUser.id,
             username: storeUser.username,
-            rating: storeUser.rating || MOCK_USER.rating,
-            avatarUrl: storeUser.avatarUrl || MOCK_USER.avatarUrl,
+            rating: storeUser.rating || 1200,
+            avatarUrl: storeUser.avatarUrl || null,
           }
-        : MOCK_USER,
-    [storeUser],
+        : {
+            id: '',
+            username: 'Người chơi',
+            rating: 1200,
+            avatarUrl: null,
+          },
+    [storeUser]
   )
 
   // ─── Data ───
   const [stats, setStats] = useState(null)
+  const [botStats, setBotStats] = useState({ games: 0, wins: 0, losses: 0, draws: 0, winRate: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // ─── Mock chart data ───
-  const ratingHistory = useMemo(() => generateRatingHistory(user.rating), [user.rating])
-  const monthlyPerf = useMemo(() => generateMonthlyPerf(), [])
+  const ratingHistory = Array.isArray(stats?.ratingHistory) ? stats.ratingHistory : []
+  const monthlyPerf = Array.isArray(stats?.monthlyPerformance) ? stats.monthlyPerformance : []
 
   // ─── Fetch stats ───
   const fetchStats = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await gameService.getRankedStats()
+      const [data, botModeStats] = await Promise.all([
+        gameService.getRankedStats(),
+        gameService.getUserModeStats('bot'),
+      ])
+
       setStats(data)
+      setBotStats({
+        games: Number(botModeStats?.totalGames || 0),
+        wins: Number(botModeStats?.wins || 0),
+        losses: Number(botModeStats?.losses || 0),
+        draws: Number(botModeStats?.draws || 0),
+        winRate: Number(botModeStats?.winRate || 0),
+      })
     } catch (err) {
       setError('Không thể tải thống kê.')
       console.error('Failed to load stats:', err)
@@ -423,7 +417,7 @@ const RankedStatsPage = () => {
     fetchStats()
   }, [fetchStats])
 
-  const rank = getRankInfo(user.rating)
+  const rank = getRankInfo(Number(stats?.currentRating || user.rating || 1200))
 
   // ─── Loading / Error ───
   if (loading) {
@@ -483,16 +477,15 @@ const RankedStatsPage = () => {
         </div>
 
         {/* ─── Player Profile Strip ─── */}
-        <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} mb-6 ${THEME.shadow.DEFAULT}`}>
+        <div
+          className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} mb-6 ${THEME.shadow.DEFAULT}`}
+        >
           <div className="flex items-center gap-4">
             <Avatar src={user.avatarUrl} alt={user.username} size="lg" />
             <div className="flex-1">
               <h2 className={`text-xl font-bold ${THEME.text.primary}`}>{user.username}</h2>
               <div className="flex items-center gap-3 mt-1">
-                <span
-                  className="text-lg font-mono font-bold"
-                  style={{ color: rank.color }}
-                >
+                <span className="text-lg font-mono font-bold" style={{ color: rank.color }}>
                   {stats.currentRating}
                 </span>
                 <span
@@ -504,9 +497,7 @@ const RankedStatsPage = () => {
                 >
                   {rank.name}
                 </span>
-                <span className="text-xs text-gray-500">
-                  Peak: {stats.peakRating}
-                </span>
+                <span className="text-xs text-gray-500">Peak: {stats.peakRating ?? '-'}</span>
               </div>
             </div>
             <div className="hidden sm:flex gap-6 text-center">
@@ -556,7 +547,7 @@ const RankedStatsPage = () => {
           <StatCard
             icon={Percent}
             label="Win Rate"
-            value={`${stats.winRate.toFixed(1)}%`}
+            value={`${Number(stats.winRate || 0).toFixed(1)}%`}
             iconColor="text-blue-400"
           />
           <StatCard
@@ -577,21 +568,35 @@ const RankedStatsPage = () => {
         {/* ─── Charts Row ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Rating History Chart (2 cols) */}
-          <div className={`lg:col-span-2 ${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm}`}>
+          <div
+            className={`lg:col-span-2 ${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm}`}
+          >
             <div className="flex items-center gap-2 mb-4">
               <Activity className="w-4 h-4 text-[#81b64c]" />
-              <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
+              <h3
+                className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}
+              >
                 Rating History
               </h3>
             </div>
-            <MiniRatingChart data={ratingHistory} />
+            {ratingHistory.length > 0 ? (
+              <MiniRatingChart data={ratingHistory} />
+            ) : (
+              <p className={`text-sm ${THEME.text.secondary}`}>
+                Chưa có dữ liệu tiến trình rating.
+              </p>
+            )}
           </div>
 
           {/* Win Rate Donut (1 col) */}
-          <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} flex flex-col items-center justify-center`}>
+          <div
+            className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} flex flex-col items-center justify-center`}
+          >
             <div className="flex items-center gap-2 mb-4 self-start">
               <Target className="w-4 h-4 text-[#81b64c]" />
-              <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
+              <h3
+                className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}
+              >
                 Win Distribution
               </h3>
             </div>
@@ -605,32 +610,44 @@ const RankedStatsPage = () => {
         </div>
 
         {/* ─── Monthly Performance ─── */}
-        <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} mb-6`}>
+        <div
+          className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} mb-6`}
+        >
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-4 h-4 text-[#81b64c]" />
             <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
               Monthly Performance
             </h3>
           </div>
-          <MonthlyPerfChart data={monthlyPerf} />
-          <div className="flex justify-center gap-6 mt-3">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-green-500" />
-              <span className={`text-xs ${THEME.text.secondary}`}>Wins</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-red-500" />
-              <span className={`text-xs ${THEME.text.secondary}`}>Losses</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-blue-500" />
-              <span className={`text-xs ${THEME.text.secondary}`}>Draws</span>
-            </div>
-          </div>
+          {monthlyPerf.length > 0 ? (
+            <>
+              <MonthlyPerfChart data={monthlyPerf} />
+              <div className="flex justify-center gap-6 mt-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm bg-green-500" />
+                  <span className={`text-xs ${THEME.text.secondary}`}>Wins</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm bg-red-500" />
+                  <span className={`text-xs ${THEME.text.secondary}`}>Losses</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm bg-blue-500" />
+                  <span className={`text-xs ${THEME.text.secondary}`}>Draws</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className={`text-sm ${THEME.text.secondary}`}>
+              Chưa có dữ liệu hiệu suất theo tháng.
+            </p>
+          )}
         </div>
 
         {/* ─── Time Controls ─── */}
-        <div className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} mb-6`}>
+        <div
+          className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} mb-6`}
+        >
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-4 h-4 text-[#81b64c]" />
             <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
@@ -638,7 +655,7 @@ const RankedStatsPage = () => {
             </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {Object.entries(stats.timeControls).map(([mode, data]) => {
+            {Object.entries(stats.timeControls || {}).map(([mode, data]) => {
               const modeIcons = { blitz: Zap, rapid: Clock, classical: Star }
               const ModeIcon = modeIcons[mode] || Clock
 
@@ -661,10 +678,55 @@ const RankedStatsPage = () => {
                 </div>
               )
             })}
+            {Object.keys(stats.timeControls || {}).length === 0 && (
+              <p className={`text-sm ${THEME.text.secondary}`}>
+                Chưa có dữ liệu theo time control.
+              </p>
+            )}
           </div>
         </div>
 
         {/* ─── Bottom Actions ─── */}
+        <div
+          className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} mb-6`}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="w-4 h-4 text-[#81b64c]" />
+            <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
+              Bot Performance
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <StatCard
+              icon={Swords}
+              label="Games"
+              value={botStats.games}
+              iconColor="text-yellow-400"
+            />
+            <StatCard
+              icon={TrendingUp}
+              label="Wins"
+              value={botStats.wins}
+              valueColor="text-green-400"
+              iconColor="text-green-400"
+            />
+            <StatCard
+              icon={TrendingDown}
+              label="Losses"
+              value={botStats.losses}
+              valueColor="text-red-400"
+              iconColor="text-red-400"
+            />
+            <StatCard icon={Minus} label="Draws" value={botStats.draws} iconColor="text-blue-400" />
+            <StatCard
+              icon={Percent}
+              label="Win Rate"
+              value={`${botStats.winRate.toFixed(1)}%`}
+              iconColor="text-purple-400"
+            />
+          </div>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={() => navigate(isDemo ? '/demo/ranked' : '/ranked')}

@@ -1,50 +1,50 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Loader } from '@/components/common'
-import { 
-  ArrowLeft, Trophy, Users, Calendar, Clock, Award,
-  Eye, UserX, Play, XCircle, ChevronRight, MapPin,
-  CheckCircle, Target
+import gameService from '@/services/gameService'
+import {
+  ArrowLeft,
+  Trophy,
+  Users,
+  Calendar,
+  Clock,
+  Award,
+  Eye,
+  UserX,
+  Play,
+  XCircle,
+  ChevronRight,
+  MapPin,
+  CheckCircle,
+  Target,
 } from 'lucide-react'
 
-// Mock tournament data
-const MOCK_TOURNAMENT = {
-  id: 'tour1',
-  name: 'Giải Cờ Vua Mùa Xuân 2026',
-  organizer: {
-    id: 'org1',
-    username: 'ChessClub',
-    avatar: null
-  },
-  startDate: '2026-03-15T10:00:00Z',
-  registrationDeadline: '2026-03-10T23:59:00Z',
-  participants: [
-    { id: '1', username: 'Player1', rating: 1500, status: 'active', seed: 1 },
-    { id: '2', username: 'Player2', rating: 1450, status: 'active', seed: 2 },
-    { id: '3', username: 'Player3', rating: 1420, status: 'active', seed: 3 },
-    { id: '4', username: 'Player4', rating: 1380, status: 'active', seed: 4 },
-    { id: '5', username: 'Player5', rating: 1350, status: 'active', seed: 5 },
-    { id: '6', username: 'Player6', rating: 1320, status: 'withdrawn', seed: 6 },
-    { id: '7', username: 'Player7', rating: 1280, status: 'active', seed: 7 },
-    { id: '8', username: 'Player8', rating: 1250, status: 'eliminated', seed: 8 }
-  ],
-  maxParticipants: 16,
-  format: 'Single Elimination',
-  timeControl: '10+0',
-  status: 'registration',
-  prize: '1,000,000 VND',
-  description: 'Giải đấu mùa xuân dành cho tất cả các kỳ thủ yêu thích cờ vua. Hãy đăng ký để thể hiện kỹ năng của bạn!',
-  currentRound: null,
-  rounds: [
-    {
-      name: 'Round 1',
-      matches: [
-        { id: 'm1', player1: 'Player1', player2: 'Player8', result: '1-0', status: 'completed' },
-        { id: 'm2', player1: 'Player4', player2: 'Player5', result: null, status: 'scheduled' }
-      ]
-    }
-  ]
-}
+const normalizeTournament = (tournament, tournamentId) => ({
+  id: tournament?.id || tournament?._id || tournamentId,
+  name: tournament?.name || 'Giải đấu',
+  organizer:
+    typeof tournament?.organizer === 'string'
+      ? { username: tournament.organizer }
+      : tournament?.organizer || { username: 'Unknown' },
+  startDate: tournament?.startDate || tournament?.start_date || new Date().toISOString(),
+  registrationDeadline:
+    tournament?.registrationDeadline ||
+    tournament?.registration_deadline ||
+    new Date().toISOString(),
+  participants: Array.isArray(tournament?.participants)
+    ? tournament.participants
+    : Array.isArray(tournament?.players)
+      ? tournament.players
+      : [],
+  maxParticipants: tournament?.maxParticipants || tournament?.max_players || 0,
+  format: tournament?.format || 'Unknown',
+  timeControl: tournament?.timeControl || tournament?.time_control || '10+0',
+  status: tournament?.status || 'registration',
+  prize: tournament?.prize || null,
+  description: tournament?.description || '',
+  currentRound: tournament?.currentRound || null,
+  rounds: Array.isArray(tournament?.rounds) ? tournament.rounds : [],
+})
 
 export default function TournamentDetailPage() {
   const { tournamentId } = useParams()
@@ -53,15 +53,24 @@ export default function TournamentDetailPage() {
   const [loading, setLoading] = useState(true)
   const [tournament, setTournament] = useState(null)
   const [isRegistered, setIsRegistered] = useState(false)
-  const [isOrganizer, setIsOrganizer] = useState(false) // Mock: check if current user is organizer
+  const [isOrganizer, setIsOrganizer] = useState(false)
 
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setTournament(MOCK_TOURNAMENT)
-      setLoading(false)
-    }, 500)
-    return () => clearTimeout(timer)
+    const loadTournament = async () => {
+      setLoading(true)
+      try {
+        const response = await gameService.getTournament(tournamentId)
+        const payload = response?.data ?? response
+        const normalized = normalizeTournament(payload, tournamentId)
+        setTournament(normalized)
+      } catch (_error) {
+        setTournament(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadTournament()
   }, [tournamentId])
 
   const handleRegister = () => {
@@ -93,7 +102,7 @@ export default function TournamentDetailPage() {
       registration: { text: 'Đang mở đăng ký', color: 'bg-green-100 text-green-800' },
       full: { text: 'Đã đủ người', color: 'bg-blue-100 text-blue-800' },
       ongoing: { text: 'Đang diễn ra', color: 'bg-yellow-100 text-yellow-800' },
-      completed: { text: 'Đã kết thúc', color: 'bg-gray-100 text-gray-800' }
+      completed: { text: 'Đã kết thúc', color: 'bg-gray-100 text-gray-800' },
     }
     const badge = badges[status] || badges.registration
     return (
@@ -123,12 +132,20 @@ export default function TournamentDetailPage() {
   if (!tournament) {
     return (
       <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">
-        <Card variant="elevated" padding="none" className="max-w-md w-full bg-white shadow-md border-none rounded-xl">
+        <Card
+          variant="elevated"
+          padding="none"
+          className="max-w-md w-full bg-white shadow-md border-none rounded-xl"
+        >
           <div className="p-8 text-center">
             <Trophy size={48} className="mx-auto mb-4 text-gray-400" />
             <h2 className="text-xl font-bold text-gray-900 mb-2">Không tìm thấy giải đấu</h2>
             <p className="text-gray-600 mb-4">Giải đấu này không tồn tại hoặc đã bị xóa</p>
-            <Button onClick={() => navigate('/tournaments')} variant="primary" className="bg-blue-600 hover:bg-blue-700">
+            <Button
+              onClick={() => navigate('/tournaments')}
+              variant="primary"
+              className="bg-blue-600 hover:bg-blue-700"
+            >
               Quay lại danh sách
             </Button>
           </div>
@@ -137,20 +154,17 @@ export default function TournamentDetailPage() {
     )
   }
 
-  const canRegister = tournament.status === 'registration' && 
-                      tournament.participants.length < tournament.maxParticipants &&
-                      !isRegistered
+  const canRegister =
+    tournament.status === 'registration' &&
+    tournament.participants.length < tournament.maxParticipants &&
+    !isRegistered
 
   return (
     <div className="min-h-screen bg-[#e1edff] p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/tournaments')}
-            size="sm"
-          >
+          <Button variant="ghost" onClick={() => navigate('/tournaments')} size="sm">
             <ArrowLeft size={18} />
             Quay lại
           </Button>
@@ -236,10 +250,7 @@ export default function TournamentDetailPage() {
                 </Button>
               )}
               {isRegistered && tournament.status === 'registration' && (
-                <Button
-                  variant="outline"
-                  onClick={handleWithdraw}
-                >
+                <Button variant="outline" onClick={handleWithdraw}>
                   <UserX size={18} />
                   Rút lui
                 </Button>
@@ -267,10 +278,7 @@ export default function TournamentDetailPage() {
                       Bắt đầu giải đấu
                     </Button>
                   )}
-                  <Button
-                    variant="danger"
-                    onClick={handleCancelTournament}
-                  >
+                  <Button variant="danger" onClick={handleCancelTournament}>
                     <XCircle size={18} />
                     Hủy giải đấu
                   </Button>
@@ -290,10 +298,14 @@ export default function TournamentDetailPage() {
             <div className="flex overflow-x-auto">
               {[
                 { key: 'overview', label: 'Tổng quan', icon: Trophy },
-                { key: 'participants', label: `Người chơi (${tournament.participants.length})`, icon: Users },
+                {
+                  key: 'participants',
+                  label: `Người chơi (${tournament.participants.length})`,
+                  icon: Users,
+                },
                 { key: 'matches', label: 'Kết quả', icon: Target },
-                { key: 'bracket', label: 'Bracket', icon: MapPin }
-              ].map(tab => {
+                { key: 'bracket', label: 'Bracket', icon: MapPin },
+              ].map((tab) => {
                 const Icon = tab.icon
                 return (
                   <button
@@ -341,7 +353,10 @@ export default function TournamentDetailPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      <span>Hạn đăng ký: {new Date(tournament.registrationDeadline).toLocaleString('vi-VN')}</span>
+                      <span>
+                        Hạn đăng ký:{' '}
+                        {new Date(tournament.registrationDeadline).toLocaleString('vi-VN')}
+                      </span>
                     </li>
                     {tournament.prize && (
                       <li className="flex items-start gap-2">
@@ -358,16 +373,19 @@ export default function TournamentDetailPage() {
             {activeTab === 'participants' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">
-                  Danh sách người chơi ({tournament.participants.length}/{tournament.maxParticipants})
+                  Danh sách người chơi ({tournament.participants.length}/
+                  {tournament.maxParticipants})
                 </h3>
                 <div className="space-y-2">
-                  {tournament.participants.map(participant => (
+                  {tournament.participants.map((participant) => (
                     <div
                       key={participant.id}
                       className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="text-gray-500 font-mono text-sm w-8">#{participant.seed}</div>
+                        <div className="text-gray-500 font-mono text-sm w-8">
+                          #{participant.seed}
+                        </div>
                         <UserAvatar username={participant.username} />
                         <div>
                           <p className="font-semibold text-gray-900">{participant.username}</p>
@@ -405,7 +423,7 @@ export default function TournamentDetailPage() {
                   <div key={index} className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-3">{round.name}</h4>
                     <div className="space-y-2">
-                      {round.matches.map(match => (
+                      {round.matches.map((match) => (
                         <div
                           key={match.id}
                           className="flex items-center justify-between p-4 rounded-lg border border-gray-200"
@@ -441,9 +459,7 @@ export default function TournamentDetailPage() {
               <div className="text-center py-12">
                 <MapPin size={48} className="mx-auto mb-4 text-gray-400" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Xem Bracket</h3>
-                <p className="text-gray-600 mb-4">
-                  Bracket sẽ hiển thị khi giải đấu bắt đầu
-                </p>
+                <p className="text-gray-600 mb-4">Bracket sẽ hiển thị khi giải đấu bắt đầu</p>
                 <Button
                   variant="primary"
                   onClick={() => navigate(`/tournaments/${tournamentId}/bracket`)}

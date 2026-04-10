@@ -7,34 +7,70 @@ export const useAuthStore = create((set) => ({
   user: null,
   token: null,
   isAuthenticated: false,
-  
-  setUser: (user) => set({ user, isAuthenticated: true }),
-  setToken: (token) => set({ token }),
-  
+  hasHydrated: false,
+
+  setUser: (user) => set({ user, isAuthenticated: true, hasHydrated: true }),
+  setToken: (token) => set({ token, hasHydrated: true }),
+
   login: (user, token) => {
+    const hasValidToken =
+      typeof token === 'string' &&
+      token.length > 0 &&
+      token !== 'undefined' &&
+      token !== 'null' &&
+      !token.startsWith('mock')
+    const hasValidUser = Boolean(user && typeof user === 'object' && user.username)
+
+    if (!hasValidToken || !hasValidUser) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
+      return
+    }
+
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(user))
-    set({ user, token, isAuthenticated: true })
+    set({ user, token, isAuthenticated: true, hasHydrated: true })
   },
-  
+
   logout: () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-    set({ user: null, token: null, isAuthenticated: false })
+    set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
   },
-  
+
   // Load user từ localStorage khi app khởi động
   loadUser: () => {
     const token = localStorage.getItem('token')
     const userStr = localStorage.getItem('user')
-    
-    if (token && token !== 'undefined' && token !== 'null' && !token.startsWith('mock-jwt-token') && userStr) {
-      const user = JSON.parse(userStr)
-      set({ user, token, isAuthenticated: true })
-    } else {
+
+    const hasValidToken =
+      typeof token === 'string' &&
+      token.length > 0 &&
+      token !== 'undefined' &&
+      token !== 'null' &&
+      !token.startsWith('mock')
+
+    if (!hasValidToken || !userStr || userStr === 'undefined' || userStr === 'null') {
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
+      set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
+      return
+    }
+
+    try {
+      const user = JSON.parse(userStr)
+      if (!user || typeof user !== 'object' || !user.username) {
+        throw new Error('Invalid stored user object')
+      }
+      set({ user, token, isAuthenticated: true, hasHydrated: true })
+    } catch {
+      localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
     }
   },
 }))
@@ -45,7 +81,7 @@ export const useAuthStore = create((set) => ({
 export const useGameStore = create((set) => ({
   currentGame: null,
   isPlaying: false,
-  
+
   setCurrentGame: (game) => set({ currentGame: game, isPlaying: true }),
   endGame: () => set({ currentGame: null, isPlaying: false }),
 }))
@@ -56,7 +92,7 @@ export const useGameStore = create((set) => ({
 export const useUIStore = create((set) => ({
   sidebarOpen: false,
   theme: 'light',
-  
+
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setTheme: (theme) => set({ theme }),
 }))

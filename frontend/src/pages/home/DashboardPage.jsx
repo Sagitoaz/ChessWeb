@@ -10,59 +10,23 @@
  * Protected route - Requires authentication
  */
 
-import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { THEME, STATUS_COLORS } from '@/styles/theme'
-import { Button, Avatar } from '@/components/common'
+import { Avatar } from '@/components/common'
 import {
   Trophy,
   Users,
   Swords,
   Bot,
-  TrendingUp,
   Clock,
   Target,
-  Medal,
   PlayCircle,
   Calendar,
   ArrowRight,
   Star,
   Zap,
 } from 'lucide-react'
-
-// ==================== MOCK DATA ====================
-const MOCK_RECENT_GAMES = [
-  {
-    id: 1,
-    opponent: 'GrandMaster',
-    result: 'win',
-    eloChange: +24,
-    mode: 'Ranked',
-    time: '2 giờ trước',
-  },
-  {
-    id: 2,
-    opponent: 'ChessKing',
-    result: 'lose',
-    eloChange: -18,
-    mode: 'Ranked',
-    time: '5 giờ trước',
-  },
-  {
-    id: 3,
-    opponent: 'Bot Level 3',
-    result: 'win',
-    eloChange: 0,
-    mode: 'Bot',
-    time: '1 ngày trước',
-  },
-]
-
-const MOCK_TOURNAMENTS = [
-  { id: 1, name: 'Giải Cờ Vua Mùa Xuân', players: '16/32', startTime: '2 ngày nữa' },
-  { id: 2, name: 'Blitz Championship', players: '24/64', startTime: '5 ngày nữa' },
-]
 
 // ==================== SUB-COMPONENTS ====================
 
@@ -189,12 +153,31 @@ const TournamentCard = ({ tournament }) => (
 // ==================== MAIN COMPONENT ====================
 
 export default function DashboardPage() {
-  const { user } = useAuthStore()
-  const navigate = useNavigate()
+  const { user, hasHydrated } = useAuthStore()
+  const recentGames = []
+  const upcomingTournaments = []
 
-  if (!user) return <Navigate to="/login" replace />
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-sm text-gray-500">Đang tải dashboard...</div>
+      </div>
+    )
+  }
 
-  const winRate = user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0
+  const fallbackUser = {
+    username: 'Kỳ thủ',
+    displayName: 'Kỳ thủ',
+    avatarUrl: 'https://i.pravatar.cc/150?img=12',
+    rating: 1200,
+    gamesPlayed: 0,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+  }
+  const profile = user ?? fallbackUser
+  const winRate =
+    profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0
 
   return (
     <div className={`min-h-screen ${THEME.background.page} py-6`}>
@@ -202,10 +185,10 @@ export default function DashboardPage() {
         {/* Welcome Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-2">
-            <Avatar src={user.avatarUrl} alt={user.username} size="lg" />
+            <Avatar src={profile.avatarUrl} alt={profile.username} size="lg" />
             <div>
               <h1 className={`text-3xl font-bold ${THEME.text.primary}`}>
-                Xin chào, {user.displayName || user.username}! 👋
+                Xin chào, {profile.displayName || profile.username}! 👋
               </h1>
               <p className={THEME.text.secondary}>Sẵn sàng cho trận đấu tiếp theo?</p>
             </div>
@@ -217,12 +200,12 @@ export default function DashboardPage() {
           <StatCard
             icon={Star}
             label="ELO Rating"
-            value={user.rating || 1200}
+            value={profile.rating || 1200}
             change={24}
             trend="up"
           />
-          <StatCard icon={Trophy} label="Thắng" value={user.wins || 0} />
-          <StatCard icon={Clock} label="Tổng Ván" value={user.gamesPlayed || 0} />
+          <StatCard icon={Trophy} label="Thắng" value={profile.wins || 0} />
+          <StatCard icon={Clock} label="Tổng Ván" value={profile.gamesPlayed || 0} />
           <StatCard icon={Target} label="Tỷ Lệ Thắng" value={`${winRate}%`} />
         </div>
 
@@ -252,21 +235,15 @@ export default function DashboardPage() {
               </div>
 
               <div>
-                {MOCK_RECENT_GAMES.map((game) => (
+                {recentGames.map((game) => (
                   <RecentGameRow key={game.id} game={game} />
                 ))}
               </div>
 
-              {MOCK_RECENT_GAMES.length === 0 && (
+              {recentGames.length === 0 && (
                 <div className="text-center py-8">
                   <PlayCircle className={`w-16 h-16 mx-auto mb-3 ${THEME.text.muted}`} />
                   <p className={THEME.text.secondary}>Chưa có ván đấu nào</p>
-                  <Button
-                    onClick={() => navigate('/ranked')}
-                    className={`mt-4 ${THEME.primary.DEFAULT} ${THEME.primary.hover}`}
-                  >
-                    Chơi Ngay
-                  </Button>
                 </div>
               )}
             </div>
@@ -283,9 +260,12 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-3">
-                {MOCK_TOURNAMENTS.map((tournament) => (
+                {upcomingTournaments.map((tournament) => (
                   <TournamentCard key={tournament.id} tournament={tournament} />
                 ))}
+                {upcomingTournaments.length === 0 && (
+                  <p className={`text-sm ${THEME.text.secondary}`}>Chưa có giải đấu sắp diễn ra.</p>
+                )}
               </div>
 
               <Link

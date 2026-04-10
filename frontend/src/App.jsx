@@ -1,4 +1,5 @@
 import { BrowserRouter as Router } from 'react-router-dom'
+import { useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { NotificationProvider } from '@/components/common'
@@ -15,31 +16,11 @@ const queryClient = new QueryClient({
   },
 })
 
-// Tài khoản mặc định — tự động đăng nhập khi chưa có session
-// (Thay bằng luồng login thật khi backend sẵn sàng)
-if (!localStorage.getItem('token')) {
-  localStorage.setItem('token', 'mock-token')
-  localStorage.setItem(
-    'user',
-    JSON.stringify({
-      id: 1,
-      username: 'chesslover',
-      email: 'chesslover@chessweb.vn',
-      displayName: 'Nguyễn Văn An',
-      avatarUrl: 'https://i.pravatar.cc/150?img=12',
-      bio: 'Yêu cờ vua từ năm 10 tuổi 🤍',
-      rating: 1520,
-      gamesPlayed: 87,
-      wins: 45,
-      losses: 32,
-      draws: 10,
-    })
-  )
-}
-
 function App() {
-  // Load persisted auth on startup (also picks up the mock user seeded above)
-  useAuthStore.getState().loadUser()
+  useEffect(() => {
+    useAuthStore.getState().loadUser()
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationProvider position="top-right">

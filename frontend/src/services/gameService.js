@@ -1,42 +1,97 @@
-import axios from 'axios'
-import { API_URL, USE_MOCK } from '../utils/constants'
+import { API_URL } from '../utils/constants'
+import api from './api'
 
 /**
  * Game Service
  * Handles all game-related API calls
  */
 
-// Create axios instance for game API
-const gameAPI = axios.create({
-  baseURL: API_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
+// Reuse shared auth-aware API client so bot requests get refresh-token handling too.
+const gameAPI = api
 
-// Request interceptor - Add token to headers
-gameAPI.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
+const unwrapApiEnvelope = (payload) => payload?.data ?? payload
 
-// Response interceptor
-gameAPI.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
-    console.error('Game API Error:', error.response?.data || error.message)
-    return Promise.reject(error.response?.data || error)
+const normalizeRankedResult = (result) => {
+  const v = typeof result === 'string' ? result.toLowerCase() : ''
+  if (v === 'win' || v === 'white_win' || v === '1-0' || v === 'white') return 'win'
+  if (v === 'lose' || v === 'loss' || v === 'black_win' || v === '0-1' || v === 'black')
+    return 'loss'
+  return 'draw'
+}
+
+const normalizeRankedHistory = (payload) => {
+  const data = unwrapApiEnvelope(payload)
+  const items = Array.isArray(data?.matches)
+    ? data.matches
+    : Array.isArray(data?.items)
+      ? data.items
+      : []
+
+  const matches = items.map((item) => ({
+    id: item.id || item.gameId || item._id,
+    opponent: {
+      username:
+        item.opponent?.username ||
+        item.opponentUsername ||
+        item.blackUsername ||
+        item.whiteUsername ||
+        item.opponentId ||
+        'Unknown',
+      rating: Number(item.opponent?.rating || item.opponentRating || 1200),
+      avatarUrl: item.opponent?.avatarUrl || item.opponentAvatarUrl || null,
+    },
+    result: normalizeRankedResult(item.result),
+    ratingChange: Number(item.ratingChange || item.eloChange || 0),
+    playerColor: item.playerColor || item.color || 'white',
+    endReason: item.endReason || item.finishReason || 'draw',
+    moves: Number(item.moves || item.totalMoves || 0),
+    duration: Number(item.duration || item.durationSeconds || 0),
+    playedAt: item.playedAt || item.finishedAt || item.createdAt || new Date().toISOString(),
+  }))
+
+  const page = Number(data?.pagination?.page || data?.page || 1)
+  const pageSize = Number(
+    data?.pagination?.pageSize || data?.pagination?.limit || data?.pageSize || 10
+  )
+  const total = Number(data?.pagination?.total || data?.total || matches.length)
+  const totalPages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)))
+
+  return {
+    matches,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+    },
   }
-)
+}
+
+const normalizeRankedStats = (payload) => {
+  const data = unwrapApiEnvelope(payload)
+  const gamesPlayed = Number(data?.gamesPlayed ?? data?.totalGames ?? 0)
+  const wins = Number(data?.wins ?? 0)
+  const losses = Number(data?.losses ?? 0)
+  const draws = Number(data?.draws ?? 0)
+  const computedWinRate = gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0
+
+  return {
+    currentRating: Number(data?.currentRating ?? data?.rating ?? 1200),
+    peakRating: Number(data?.peakRating ?? data?.currentRating ?? data?.rating ?? 1200),
+    gamesPlayed,
+    wins,
+    losses,
+    draws,
+    winRate: Number(data?.winRate ?? computedWinRate ?? 0),
+    currentStreak: Number(data?.currentStreak ?? 0),
+    bestStreak: Number(data?.bestStreak ?? 0),
+    avgOpponentRating: Number(data?.avgOpponentRating ?? 0),
+    timeControls:
+      data?.timeControls && typeof data.timeControls === 'object' ? data.timeControls : {},
+    ratingHistory: Array.isArray(data?.ratingHistory) ? data.ratingHistory : [],
+    monthlyPerformance: Array.isArray(data?.monthlyPerformance) ? data.monthlyPerformance : [],
+  }
+}
 
 /**
  * Mock responses for development
@@ -466,102 +521,59 @@ const mockGameAPI = {
  */
 const gameService = {
   // Ranked Match APIs
-  joinRankedQueue: () => {
-    if (USE_MOCK) return mockGameAPI.joinRankedQueue()
-    return gameAPI.post('/ranked/queue/join')
+  joinRankedQueue: () => gameAPI.post('/ranked/queue/join'),
+
+  leaveRankedQueue: () => gameAPI.post('/ranked/queue/leave'),
+
+  getMatch: (matchId) => gameAPI.get(`/ranked/matches/${matchId}`),
+
+  getRankedHistory: async (page = 1, limit = 10) => {
+    const response = await gameAPI.get('/ranked/history', { params: { page, pageSize: limit } })
+    return normalizeRankedHistory(response)
   },
 
-  leaveRankedQueue: () => {
-    if (USE_MOCK) return mockGameAPI.leaveRankedQueue()
-    return gameAPI.post('/ranked/queue/leave')
+  getRankedStats: async () => {
+    const response = await gameAPI.get('/ranked/stats')
+    return normalizeRankedStats(response)
   },
 
-  getMatch: (matchId) => {
-    if (USE_MOCK) return mockGameAPI.getMatch(matchId)
-    return gameAPI.get(`/ranked/matches/${matchId}`)
+  getUserModeStats: async (mode) => {
+    const response = await gameAPI.get('/users/stats/by-mode', {
+      params: mode ? { mode } : {},
+    })
+    return unwrapApiEnvelope(response)
   },
 
-  getRankedHistory: (page = 1, limit = 10) => {
-    if (USE_MOCK) return mockGameAPI.getRankedHistory(page, limit)
-    return gameAPI.get('/ranked/history', { params: { page, limit } })
-  },
+  makeMove: (matchId, move) => gameAPI.post(`/game/${matchId}/move`, { move }),
 
-  getRankedStats: () => {
-    if (USE_MOCK) return mockGameAPI.getRankedStats()
-    return gameAPI.get('/ranked/stats')
-  },
+  resignGame: (matchId) => gameAPI.post(`/game/${matchId}/resign`),
 
-  makeMove: (matchId, move) => {
-    if (USE_MOCK) return mockGameAPI.makeMove(matchId, move)
-    return gameAPI.post(`/game/${matchId}/move`, { move })
-  },
+  offerDraw: (matchId) => gameAPI.post(`/game/${matchId}/draw/offer`),
 
-  resignGame: (matchId) => {
-    if (USE_MOCK) return mockGameAPI.resignGame(matchId)
-    return gameAPI.post(`/game/${matchId}/resign`)
-  },
-
-  offerDraw: (matchId) => {
-    if (USE_MOCK) return mockGameAPI.offerDraw(matchId)
-    return gameAPI.post(`/game/${matchId}/draw/offer`)
-  },
-
-  respondToDrawOffer: (matchId, accept) => {
-    if (USE_MOCK) return mockGameAPI.respondToDrawOffer(matchId, accept)
-    return gameAPI.post(`/game/${matchId}/draw/respond`, { accept })
-  },
+  respondToDrawOffer: (matchId, accept) =>
+    gameAPI.post(`/game/${matchId}/draw/respond`, { accept }),
 
   // Room APIs
-  createRoom: (settings) => {
-    if (USE_MOCK) return mockGameAPI.createRoom(settings)
-    return gameAPI.post('/rooms', settings)
-  },
+  createRoom: (settings) => gameAPI.post('/rooms', settings),
 
-  joinRoom: (roomCode) => {
-    if (USE_MOCK) return mockGameAPI.joinRoom(roomCode)
-    return gameAPI.post(`/rooms/${roomCode}/join`)
-  },
+  joinRoom: (roomCode) => gameAPI.post(`/rooms/${roomCode}/join`),
 
-  leaveRoom: (roomCode) => {
-    if (USE_MOCK) return mockGameAPI.leaveRoom(roomCode)
-    return gameAPI.post(`/rooms/${roomCode}/leave`)
-  },
+  leaveRoom: (roomCode) => gameAPI.post(`/rooms/${roomCode}/leave`),
 
-  getRoom: (roomCode) => {
-    if (USE_MOCK) return mockGameAPI.getRoom(roomCode)
-    return gameAPI.get(`/rooms/${roomCode}`)
-  },
+  getRoom: (roomCode) => gameAPI.get(`/rooms/${roomCode}`),
 
-  startRoomGame: (roomCode) => {
-    if (USE_MOCK) return mockGameAPI.startRoomGame(roomCode)
-    return gameAPI.post(`/rooms/${roomCode}/start`)
-  },
+  startRoomGame: (roomCode) => gameAPI.post(`/rooms/${roomCode}/start`),
 
   // Tournament APIs
-  getTournaments: (filters = {}) => {
-    if (USE_MOCK) return mockGameAPI.getTournaments(filters)
-    return gameAPI.get('/tournaments', { params: filters })
-  },
+  getTournaments: (filters = {}) => gameAPI.get('/tournaments', { params: filters }),
 
-  getTournament: (tournamentId) => {
-    if (USE_MOCK) return mockGameAPI.getTournament(tournamentId)
-    return gameAPI.get(`/tournaments/${tournamentId}`)
-  },
+  getTournament: (tournamentId) => gameAPI.get(`/tournaments/${tournamentId}`),
 
-  joinTournament: (tournamentId) => {
-    if (USE_MOCK) return mockGameAPI.joinTournament(tournamentId)
-    return gameAPI.post(`/tournaments/${tournamentId}/join`)
-  },
+  joinTournament: (tournamentId) => gameAPI.post(`/tournaments/${tournamentId}/join`),
 
-  withdrawTournament: (tournamentId) => {
-    if (USE_MOCK) return mockGameAPI.withdrawTournament(tournamentId)
-    return gameAPI.post(`/tournaments/${tournamentId}/withdraw`)
-  },
+  withdrawTournament: (tournamentId) => gameAPI.post(`/tournaments/${tournamentId}/withdraw`),
 
-  createTournament: (data) => {
-    if (USE_MOCK) return mockGameAPI.createTournament(data)
-    return gameAPI.post('/tournaments', data)
-  },
+  createTournament: (data) => gameAPI.post('/tournaments', data),
 }
 
 export default gameService
@@ -577,8 +589,6 @@ export const botGameAPI = {
    * Errors: 401, 422 (invalid level), 429, 503 (bot unavailable), 504
    */
   startBotGame: async (level) => {
-    if (USE_MOCK) return mockGameAPI.startBotGame(level)
-
     const difficultyMap = {
       1: 'beginner',
       2: 'intermediate',
@@ -609,34 +619,21 @@ export const botGameAPI = {
    * 200: { gameFinished, fen, lastMove } | { gameFinished: true, result, finalFEN }
    * Errors: 400, 401, 403, 404, 409 (not your turn), 422 (illegal move), 503, 504
    */
-  submitPlayerMove: (gameId, move) =>
-    USE_MOCK
-      ? mockGameAPI.submitPlayerMove(gameId, move)
-      : gameAPI.post(`/games/${gameId}/moves`, { move }),
+  submitPlayerMove: (gameId, move) => gameAPI.post(`/games/${gameId}/moves`, { move }),
 
   getBotMove: async (sessionId, fen) => {
-    if (USE_MOCK) {
-      return mockGameAPI.getBotMove(sessionId, fen)
-    }
     const response = await gameAPI.post('/bot/move', { sessionId, fen })
     return response?.data ?? response
   },
 
-  pauseBotGame: (gameId) =>
-    USE_MOCK
-      ? mockGameAPI.pauseBotGame(gameId)
-      : gameAPI.patch(`/games/${gameId}/state`, { action: 'pause' }),
+  pauseBotGame: (gameId) => gameAPI.patch(`/games/${gameId}/state`, { action: 'pause' }),
 
-  resumeBotGame: (gameId) =>
-    USE_MOCK
-      ? mockGameAPI.resumeBotGame(gameId)
-      : gameAPI.patch(`/games/${gameId}/state`, { action: 'resume' }),
+  resumeBotGame: (gameId) => gameAPI.patch(`/games/${gameId}/state`, { action: 'resume' }),
 
   /**
    * UC6: Save Game to History — SM: Finished → Saved
    */
-  saveBotGame: (gameId, data) =>
-    USE_MOCK ? mockGameAPI.saveBotGame(gameId, data) : gameAPI.post(`/games/${gameId}/save`, data),
+  saveBotGame: (gameId, data) => gameAPI.post(`/games/${gameId}/save`, data),
 }
 
 // =============================================
@@ -648,11 +645,16 @@ export const replayAPI = {
    * Kiểm tra state === 'Saved' trước khi cho replay
    * Errors: 400, 401, 403, 404, 429, 503, 504
    */
-  getGame: (gameId) => (USE_MOCK ? mockGameAPI.getGame(gameId) : gameAPI.get(`/games/${gameId}`)),
+  getGame: async (gameId) => {
+    const response = await gameAPI.get(`/games/${gameId}`)
+    return unwrapApiEnvelope(response)
+  },
 
   /**
    * GET /games?mode=HumanVsBot|HumanVsHuman&result=WhiteWin|BlackWin|Draw
    */
-  getGameHistory: (filters = {}) =>
-    USE_MOCK ? mockGameAPI.getGameHistory(filters) : gameAPI.get('/games', { params: filters }),
+  getGameHistory: async (filters = {}) => {
+    const response = await gameAPI.get('/games', { params: filters })
+    return unwrapApiEnvelope(response)
+  },
 }

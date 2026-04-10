@@ -35,14 +35,28 @@ const MoveListPanel = ({ moves }) => {
         {pairs.map((p) => (
           <div key={p.n} className="flex items-center gap-1 text-sm">
             <span className="w-7 text-gray-400 text-xs font-mono text-right shrink-0">{p.n}.</span>
-            <span className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
-              p.wi === moves.length - 1 ? 'bg-yellow-100 text-yellow-800 font-semibold' : 'text-gray-700 hover:bg-gray-100'
-            }`}>{p.w?.san || ''}</span>
+            <span
+              className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
+                p.wi === moves.length - 1
+                  ? 'bg-yellow-100 text-yellow-800 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              {p.w?.san || ''}
+            </span>
             {p.b ? (
-              <span className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
-                p.bi === moves.length - 1 ? 'bg-yellow-100 text-yellow-800 font-semibold' : 'text-gray-700 hover:bg-gray-100'
-              }`}>{p.b.san}</span>
-            ) : <span className="flex-1" />}
+              <span
+                className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
+                  p.bi === moves.length - 1
+                    ? 'bg-yellow-100 text-yellow-800 font-semibold'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                {p.b.san}
+              </span>
+            ) : (
+              <span className="flex-1" />
+            )}
           </div>
         ))}
         <div ref={endRef} />
@@ -119,8 +133,15 @@ export default function BotGamePage() {
       botGameAPI
         .saveBotGame(gameId, {
           result: gameResult,
+          state: 'Saved',
           moves: moveHistory,
-          mode: 'HumanVsBot',
+          mode: 'bot',
+          initialFEN: gameData?.initialFEN,
+          whitePlayer: playerColor === 'White' ? gameData?.humanPlayer : gameData?.botPlayer,
+          blackPlayer: playerColor === 'White' ? gameData?.botPlayer : gameData?.humanPlayer,
+          metadata: {
+            totalMoves: moveHistory.length,
+          },
         })
         .then(() => {
           setGameState('Saved') // SM: Finished → Saved
@@ -260,13 +281,20 @@ export default function BotGamePage() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   useEffect(() => {
     if (!gameActive) return
-    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    const handler = (e) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [gameActive])
 
   const handleLeaveRequest = () => {
-    if (gameActive) { setShowLeaveConfirm(true) } else { navigate('/bot') }
+    if (gameActive) {
+      setShowLeaveConfirm(true)
+    } else {
+      navigate('/bot')
+    }
   }
 
   const handleForfeitAndLeave = async () => {
@@ -274,8 +302,21 @@ export default function BotGamePage() {
     setGameResult(forfeitResult)
     setGameState('Finished')
     try {
-      await botGameAPI.saveBotGame(gameId, { result: forfeitResult, moves: moveHistory, mode: 'HumanVsBot' })
-    } catch { /* silent */ }
+      await botGameAPI.saveBotGame(gameId, {
+        result: forfeitResult,
+        state: 'Saved',
+        moves: moveHistory,
+        mode: 'bot',
+        initialFEN: gameData?.initialFEN,
+        whitePlayer: playerColor === 'White' ? gameData?.humanPlayer : gameData?.botPlayer,
+        blackPlayer: playerColor === 'White' ? gameData?.botPlayer : gameData?.humanPlayer,
+        metadata: {
+          totalMoves: moveHistory.length,
+        },
+      })
+    } catch {
+      /* silent */
+    }
     setShowLeaveConfirm(false)
     navigate('/bot')
   }
@@ -300,24 +341,24 @@ export default function BotGamePage() {
   const statusText = isFinished
     ? resultText
     : isBotThinking
-    ? '🤖 Bot đang suy nghĩ...'
-    : isCheck && isPlayerTurn
-    ? '⚡ Bạn đang bị chiếu!'
-    : isPlayerTurn
-    ? '🟢 Lượt của bạn'
-    : '⏳ Bot đang tính nước...'
+      ? '🤖 Bot đang suy nghĩ...'
+      : isCheck && isPlayerTurn
+        ? '⚡ Bạn đang bị chiếu!'
+        : isPlayerTurn
+          ? '🟢 Lượt của bạn'
+          : '⏳ Bot đang tính nước...'
 
   const statusColor = isFinished
     ? gameResult === 'Draw'
       ? 'bg-blue-50 text-blue-700'
       : (gameResult === 'WhiteWin') === (playerColor === 'White')
-      ? 'bg-green-50 text-green-700'
-      : 'bg-red-50 text-red-700'
+        ? 'bg-green-50 text-green-700'
+        : 'bg-red-50 text-red-700'
     : isCheck && isPlayerTurn
-    ? 'bg-red-50 text-red-600'
-    : isPlayerTurn
-    ? 'bg-green-50 text-green-700'
-    : 'bg-gray-50 text-gray-500'
+      ? 'bg-red-50 text-red-600'
+      : isPlayerTurn
+        ? 'bg-green-50 text-green-700'
+        : 'bg-gray-50 text-gray-500'
 
   return (
     <MainLayout>
@@ -352,7 +393,11 @@ export default function BotGamePage() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 text-center max-w-sm w-full mx-4 shadow-2xl border border-gray-200">
             <div className="text-5xl mb-4">
-              {gameResult === 'Draw' ? '🤝' : (gameResult === 'WhiteWin') === (playerColor === 'White') ? '🏆' : '😔'}
+              {gameResult === 'Draw'
+                ? '🤝'
+                : (gameResult === 'WhiteWin') === (playerColor === 'White')
+                  ? '🏆'
+                  : '😔'}
             </div>
             <h2 className="text-2xl font-bold mb-2 text-gray-900">{resultText}</h2>
             <p className="text-gray-500 text-sm mb-6">
@@ -407,30 +452,41 @@ export default function BotGamePage() {
             <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-gray-200 mb-1">
               <span className="text-2xl leading-none">🤖</span>
               <div className="min-w-0">
-                <span className="font-semibold text-gray-900 text-sm">{gameData.botPlayer?.username}</span>
+                <span className="font-semibold text-gray-900 text-sm">
+                  {gameData.botPlayer?.username}
+                </span>
                 <span className="text-xs text-gray-400 ml-2">~{gameData.botPlayer?.rating}</span>
                 {isBotThinking && (
-                  <span className="ml-2 text-xs text-yellow-600 animate-pulse font-medium">Đang suy nghĩ...</span>
+                  <span className="ml-2 text-xs text-yellow-600 animate-pulse font-medium">
+                    Đang suy nghĩ...
+                  </span>
                 )}
               </div>
             </div>
 
             {/* Chess board */}
-            <div className="w-full my-1" style={{ maxWidth: 'calc(100vh - 180px)', margin: '4px auto' }}>
+            <div
+              className="w-full my-1"
+              style={{ maxWidth: 'calc(100vh - 180px)', margin: '4px auto' }}
+            >
               <ChessBoard
                 gameState={chess}
                 onMove={handleMove}
                 playerColor={playerColor.toLowerCase()}
-                disabled={gameState !== 'InGame' || chess.turn() !== playerColorCode || isBotThinking}
+                disabled={
+                  gameState !== 'InGame' || chess.turn() !== playerColorCode || isBotThinking
+                }
                 highlightCheck
                 soundEnabled={false}
               />
             </div>
 
             {/* Human bar (bottom) */}
-            <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border mt-1 transition-all duration-300 ${
-              isPlayerTurn ? 'bg-green-50 border-green-400' : 'bg-white border-gray-200'
-            }`}>
+            <div
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg border mt-1 transition-all duration-300 ${
+                isPlayerTurn ? 'bg-green-50 border-green-400' : 'bg-white border-gray-200'
+              }`}
+            >
               <div className="relative">
                 <Avatar
                   src={gameData.humanPlayer?.avatarUrl}
@@ -442,7 +498,9 @@ export default function BotGamePage() {
                 )}
               </div>
               <div className="min-w-0">
-                <span className="font-semibold text-gray-900 text-sm">{gameData.humanPlayer?.username}</span>
+                <span className="font-semibold text-gray-900 text-sm">
+                  {gameData.humanPlayer?.username}
+                </span>
                 <span className="text-xs text-gray-500 ml-1">({playerColor})</span>
               </div>
             </div>
@@ -454,14 +512,18 @@ export default function BotGamePage() {
             style={{ maxHeight: 'calc(100vh - 120px)' }}
           >
             {/* Status strip */}
-            <div className={`px-4 py-2 text-sm font-semibold text-center border-b border-gray-200 ${statusColor}`}>
+            <div
+              className={`px-4 py-2 text-sm font-semibold text-center border-b border-gray-200 ${statusColor}`}
+            >
               {statusText}
             </div>
 
             {/* Moves header */}
             <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50">
               <List className="w-4 h-4 text-gray-500" />
-              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Nước đi</span>
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Nước đi
+              </span>
               <span className="text-xs text-gray-400 ml-auto">{moveHistory.length} nước</span>
             </div>
 
@@ -489,4 +551,3 @@ export default function BotGamePage() {
     </MainLayout>
   )
 }
-

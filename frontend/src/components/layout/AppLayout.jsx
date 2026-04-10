@@ -1,6 +1,7 @@
 import { Outlet, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import MainLayout from './MainLayout'
+import { Loader } from '@/components/common'
 
 /**
  * AppLayout - Layout route tự động thêm Sidebar + Header + Footer cho tất cả trang con
@@ -25,7 +26,15 @@ import MainLayout from './MainLayout'
  */
 
 const AppLayout = () => {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, hasHydrated } = useAuthStore()
+
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader size="lg" text="Đang khôi phục phiên làm việc..." />
+      </div>
+    )
+  }
 
   // Chưa đăng nhập → đưa về trang login
   if (!isAuthenticated) {

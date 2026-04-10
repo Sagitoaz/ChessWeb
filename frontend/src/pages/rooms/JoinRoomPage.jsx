@@ -1,43 +1,26 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Card, Button, Input, Loader } from '@/components/common'
+import { Card, Button, Input } from '@/components/common'
+import gameService from '@/services/gameService'
 import { Users, Clock, Lock, Globe, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
 
-// Mock room data - sau này sẽ lấy từ API
-const mockValidateRoom = async (code) => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 800))
-  
-  // Mock validation
-  if (code === 'INVALID') {
-    throw new Error('Mã phòng không tồn tại')
-  }
-  if (code === 'FULL123') {
-    throw new Error('Phòng đã đầy')
-  }
-  
-  // Return mock room info
-  return {
-    code: code,
-    name: 'Phòng của bạn bè',
-    host: {
-      username: 'ChessMaster99',
-      avatar: null
-    },
-    settings: {
-      timeControl: '10+0',
-      increment: 0,
-      isPrivate: true
-    },
-    playerCount: 1,
-    maxPlayers: 2
-  }
-}
+const normalizeRoomInfo = (room, code) => ({
+  code: room?.code || code,
+  name: room?.name || `Phòng ${code}`,
+  host: room?.host || room?.owner || { username: 'Unknown', avatar: null },
+  settings: {
+    timeControl: room?.settings?.timeControl || room?.timeControl || '10+0',
+    increment: room?.settings?.increment || room?.increment || 0,
+    isPrivate: room?.settings?.isPrivate ?? room?.isPrivate ?? true,
+  },
+  playerCount: room?.playerCount || room?.players?.length || 0,
+  maxPlayers: room?.maxPlayers || 2,
+})
 
 export default function JoinRoomPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  
+
   const [roomCode, setRoomCode] = useState('')
   const [isValidating, setIsValidating] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
@@ -46,11 +29,28 @@ export default function JoinRoomPage() {
 
   // Get code from URL query params if exists
   useEffect(() => {
-    const codeFromUrl = searchParams.get('code')
-    if (codeFromUrl) {
-      setRoomCode(codeFromUrl.toUpperCase())
-      handleValidateRoom(codeFromUrl.toUpperCase())
+    const validateFromUrl = async () => {
+      const codeFromUrl = searchParams.get('code')
+      if (!codeFromUrl) return
+
+      const normalizedCode = codeFromUrl.toUpperCase()
+      setRoomCode(normalizedCode)
+      setError('')
+      setIsValidating(true)
+      setRoomInfo(null)
+
+      try {
+        const response = await gameService.getRoom(normalizedCode)
+        const room = response?.data ?? response
+        setRoomInfo(normalizeRoomInfo(room, normalizedCode))
+      } catch (err) {
+        setError(err.message || 'Không thể kiểm tra mã phòng')
+      } finally {
+        setIsValidating(false)
+      }
     }
+
+    validateFromUrl()
   }, [searchParams])
 
   const handleValidateRoom = async (code = roomCode) => {
@@ -64,10 +64,10 @@ export default function JoinRoomPage() {
     setRoomInfo(null)
 
     try {
-      // TODO: Replace with real API call
-      // socket.emit('room:validateCode', code)
-      const info = await mockValidateRoom(code.toUpperCase())
-      setRoomInfo(info)
+      const normalizedCode = code.toUpperCase()
+      const response = await gameService.getRoom(normalizedCode)
+      const room = response?.data ?? response
+      setRoomInfo(normalizeRoomInfo(room, normalizedCode))
     } catch (err) {
       setError(err.message || 'Không thể kiểm tra mã phòng')
     } finally {
@@ -77,17 +77,14 @@ export default function JoinRoomPage() {
 
   const handleJoinRoom = async () => {
     setIsJoining(true)
-    
-    // Simulate joining
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // TODO: Real implementation
-    // socket.emit('room:join', roomCode)
-    // socket.on('room:joined', () => {
-    //   navigate(`/rooms/${roomInfo.code}`)
-    // })
-    
-    navigate(`/rooms/${roomInfo.code}`)
+    try {
+      await gameService.joinRoom(roomInfo.code)
+      navigate(`/rooms/${roomInfo.code}`)
+    } catch (err) {
+      setError(err.message || 'Không thể tham gia phòng')
+    } finally {
+      setIsJoining(false)
+    }
   }
 
   const handleBack = () => {
@@ -99,20 +96,12 @@ export default function JoinRoomPage() {
       <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-6">
-          <Button
-            variant="ghost"
-            onClick={handleBack}
-            className="mb-4"
-          >
+          <Button variant="ghost" onClick={handleBack} className="mb-4">
             <ArrowLeft size={18} />
             Quay lại
           </Button>
-          <h1 className="text-4xl font-bold text-blue-600 mb-2">
-            Tham gia phòng
-          </h1>
-          <p className="text-lg text-gray-800">
-            Nhập mã phòng để tham gia trận đấu với bạn bè
-          </p>
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">Tham gia phòng</h1>
+          <p className="text-lg text-gray-800">Nhập mã phòng để tham gia trận đấu với bạn bè</p>
         </div>
 
         <Card
@@ -129,9 +118,7 @@ export default function JoinRoomPage() {
             {/* Room Code Input */}
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Mã phòng
-                </label>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Mã phòng</label>
                 <div className="flex gap-3">
                   <Input
                     placeholder="Nhập mã (VD: ABC123)"
@@ -285,11 +272,11 @@ export default function JoinRoomPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 font-bold">3.</span>
-                    Nhấn "Kiểm tra" để xác nhận phòng
+                    Nhấn &quot;Kiểm tra&quot; để xác nhận phòng
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 font-bold">4.</span>
-                    Nhấn "Tham gia phòng" để vào chơi
+                    Nhấn &quot;Tham gia phòng&quot; để vào chơi
                   </li>
                 </ul>
               </div>

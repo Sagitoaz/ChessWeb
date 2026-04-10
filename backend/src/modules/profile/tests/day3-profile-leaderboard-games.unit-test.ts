@@ -134,6 +134,24 @@ class InMemoryProfileRepository implements ProfileRepositoryPort {
     }
   }
 
+  async findUserModeStats(
+    userId: string,
+    mode?: 'ranked' | 'room' | 'bot' | 'tournament',
+  ): Promise<{ totalGames: number; wins: number; losses: number; draws: number }> {
+    const filtered = this.games.filter((game) => {
+      if (game.whitePlayerId !== userId && game.blackPlayerId !== userId) return false
+      if (mode && game.mode !== mode) return false
+      return true
+    })
+
+    return {
+      totalGames: filtered.length,
+      wins: filtered.filter((g) => g.result === 'win').length,
+      losses: filtered.filter((g) => g.result === 'lose').length,
+      draws: filtered.filter((g) => g.result === 'draw').length,
+    }
+  }
+
   async createEmailVerificationToken(_token: EmailVerificationTokenDoc): Promise<void> {
     return
   }

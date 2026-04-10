@@ -7,8 +7,8 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
 
-// Mock API cho development (set false khi có backend thật)
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+// Mock mode is force-disabled: frontend always uses real backend APIs.
+const USE_MOCK = false
 
 export const API_ENDPOINTS = {
   // Auth

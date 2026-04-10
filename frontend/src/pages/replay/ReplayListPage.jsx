@@ -10,21 +10,35 @@ import { replayAPI } from '@services/gameService'
 import { useNotification } from '@hooks'
 import { THEME, STATUS_COLORS } from '@/styles/theme'
 import { Loader, Button } from '@components/common'
-import { PlayCircle, Users, Bot, Calendar } from 'lucide-react'
+import { PlayCircle } from 'lucide-react'
 
 function ResultBadge({ result }) {
   const cfg = {
-    WhiteWin: { label: '⬜ Trắng thắng', bg: STATUS_COLORS.playing.bg, text: STATUS_COLORS.playing.text },
+    WhiteWin: {
+      label: '⬜ Trắng thắng',
+      bg: STATUS_COLORS.playing.bg,
+      text: STATUS_COLORS.playing.text,
+    },
     BlackWin: { label: '⬛ Đen thắng', bg: STATUS_COLORS.draw.bg, text: STATUS_COLORS.draw.text },
     Draw: { label: '🤝 Hòa', bg: STATUS_COLORS.waiting.bg, text: STATUS_COLORS.waiting.text },
   }
-  const { label, bg, text } = cfg[result] ?? { label: result, bg: STATUS_COLORS.draw.bg, text: STATUS_COLORS.draw.text }
-  return <span className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${bg} ${text}`}>{label}</span>
+  const { label, bg, text } = cfg[result] ?? {
+    label: result,
+    bg: STATUS_COLORS.draw.bg,
+    text: STATUS_COLORS.draw.text,
+  }
+  return (
+    <span className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${bg} ${text}`}>
+      {label}
+    </span>
+  )
 }
 
 function ModeBadge({ mode }) {
   return (
-    <span className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${STATUS_COLORS.playing.bg} ${STATUS_COLORS.playing.text}`}>
+    <span
+      className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${STATUS_COLORS.playing.bg} ${STATUS_COLORS.playing.text}`}
+    >
       {mode === 'HumanVsBot' ? '🤖 vs Bot' : mode === 'HumanVsHuman' ? '👤 vs Human' : mode}
     </span>
   )
@@ -44,12 +58,29 @@ export default function ReplayListPage() {
     const filters = {}
     if (modeFilter) filters.mode = modeFilter
     if (resultFilter) filters.result = resultFilter
+
+    const normalizeGames = (payload) => {
+      if (Array.isArray(payload?.games)) return payload.games
+      if (Array.isArray(payload?.items)) {
+        return payload.items.map((item) => ({
+          id: item.gameId || item.id,
+          mode: item.mode === 'bot' ? 'HumanVsBot' : 'HumanVsHuman',
+          result: item.result,
+          createdAt: item.createdAt,
+          whitePlayer: { username: item.whitePlayerId || 'White' },
+          blackPlayer: { username: item.blackPlayerId || 'Black' },
+          metadata: { totalMoves: null },
+        }))
+      }
+      return []
+    }
+
     replayAPI
       .getGameHistory(filters)
-      .then((data) => setGames(data.games))
+      .then((data) => setGames(normalizeGames(data)))
       .catch(() => showError('Không thể tải lịch sử'))
       .finally(() => setIsLoading(false))
-  }, [modeFilter, resultFilter])
+  }, [modeFilter, resultFilter, showError])
 
   const handleSelect = (gameId) => navigate(`/replays/${gameId}`)
 
@@ -58,12 +89,16 @@ export default function ReplayListPage() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <div className="text-6xl mb-4 text-center">📹</div>
-          <h1 className={`text-3xl font-bold ${THEME.text.primary} mb-2 text-center`}>Lịch Sử Ván Đấu</h1>
+          <h1 className={`text-3xl font-bold ${THEME.text.primary} mb-2 text-center`}>
+            Lịch Sử Ván Đấu
+          </h1>
           <p className={`${THEME.text.secondary} text-center`}>Xem lại các ván đấu đã chơi</p>
         </div>
 
         {/* Filters */}
-        <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-4 mb-6`}>
+        <div
+          className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-4 mb-6`}
+        >
           <div className="flex flex-wrap gap-3">
             <select
               value={modeFilter}
@@ -94,7 +129,9 @@ export default function ReplayListPage() {
         )}
 
         {!isLoading && games.length === 0 && (
-          <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} text-center py-16`}>
+          <div
+            className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} text-center py-16`}
+          >
             <span className="text-6xl">♟</span>
             <p className={`${THEME.text.secondary} mt-4`}>Chưa có ván đấu nào</p>
             <Button
@@ -131,7 +168,9 @@ export default function ReplayListPage() {
                       </span>
                     )}
                     <span>{new Date(game.createdAt).toLocaleDateString('vi-VN')}</span>
-                    <span className={`${THEME.primary.text} group-hover:underline flex items-center gap-1`}>
+                    <span
+                      className={`${THEME.primary.text} group-hover:underline flex items-center gap-1`}
+                    >
                       <PlayCircle className="w-4 h-4" />
                       Replay
                     </span>
