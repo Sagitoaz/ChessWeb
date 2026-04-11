@@ -141,6 +141,11 @@ export function useGameSocket(matchId) {
     [matchId, emit]
   )
 
+  const joinGame = useCallback(() => {
+    if (!matchId) return
+    emit('game:join', { matchId })
+  }, [matchId, emit])
+
   // Resign game
   const resign = useCallback(() => {
     if (!matchId) return
@@ -181,6 +186,7 @@ export function useGameSocket(matchId) {
 
   return {
     isConnected,
+    joinGame,
     sendMove,
     resign,
     offerDraw,
@@ -192,6 +198,7 @@ export function useGameSocket(matchId) {
     onDrawOffer,
     onOpponentDisconnected,
     onOpponentReconnected,
+    off,
   }
 }
 

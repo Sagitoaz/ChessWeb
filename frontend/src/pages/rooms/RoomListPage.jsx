@@ -67,8 +67,8 @@ export default function RoomListPage() {
     navigate(`/rooms/join?code=${code}`)
   }
 
-  const handleRejoinRoom = (roomId) => {
-    navigate(`/rooms/${roomId}`)
+  const handleRejoinRoom = (roomCode) => {
+    navigate(`/rooms/${roomCode}`)
   }
 
   const getStatusBadge = (status) => {
@@ -214,7 +214,7 @@ export default function RoomListPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleRejoinRoom(room.id)}
+                            onClick={() => handleRejoinRoom(room.code)}
                           >
                             {room.status === 'playing' ? 'Tiếp tục' : 'Vào phòng'}
                           </Button>

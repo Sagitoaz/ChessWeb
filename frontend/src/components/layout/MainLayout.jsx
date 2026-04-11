@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import Header from './Header'
 import Sidebar from './Sidebar'
@@ -24,7 +25,12 @@ import { useUIStore } from '@/store'
  */
 const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const { sidebarOpen, toggleSidebar } = useUIStore()
+  const { sidebarOpen, toggleSidebar, setSidebarOpen } = useUIStore()
+  const location = useLocation()
+
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname, setSidebarOpen])
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#e1edff]">
@@ -52,10 +58,7 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
             {sidebarOpen && (
               <>
                 {/* Overlay */}
-                <div
-                  className="fixed inset-0 bg-black/40 z-40 md:hidden"
-                  onClick={toggleSidebar}
-                />
+                <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={toggleSidebar} />
                 {/* Drawer */}
                 <div className="fixed top-0 left-0 h-full z-50 md:hidden flex flex-col">
                   <Sidebar collapsed={false} />

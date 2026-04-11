@@ -24,6 +24,16 @@ export class SocialBotRepository {
     return this.db.collection("rooms").findOne({ code: roomCode });
   }
 
+  async updateRoomByCode(roomCode: string, update: Record<string, unknown>) {
+    return this.db
+      .collection("rooms")
+      .findOneAndUpdate(
+        { code: roomCode },
+        { $set: update },
+        { returnDocument: "after" },
+      );
+  }
+
   async findRoomMembers(roomId: ObjectId | string) {
     return this.db.collection("room_members").find({ roomId }).toArray();
   }

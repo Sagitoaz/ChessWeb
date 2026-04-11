@@ -38,7 +38,13 @@ export class SocialBotService {
       name: dto.name ?? null,
       timeControl: dto.timeControl ?? "rapid",
       initialTimeSeconds: dto.initialTimeSeconds ?? 600,
-      status: "open",
+      isPrivate: dto.isPrivate ?? true,
+      status: "waiting",
+      playerCount: 1,
+      maxPlayers: 2,
+      activeGameId: null,
+      whitePlayerId: userId,
+      blackPlayerId: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -59,10 +65,18 @@ export class SocialBotService {
       throw new NotFoundException("Room not found");
     }
 
+    if (room.status === "playing") {
+      throw new BadRequestException("Room already started");
+    }
+
     const members = await this.repo.findRoomMembers(room._id);
     const alreadyJoined = members.some((m: any) => m.userId === userId);
     if (alreadyJoined) {
       return room;
+    }
+
+    if (members.length >= 2) {
+      throw new BadRequestException("Room is full");
     }
 
     await this.repo.addRoomMember({
@@ -95,6 +109,87 @@ export class SocialBotService {
       throw new BadRequestException("User is not a member of the room");
     }
     return { left: true };
+  }
+
+  async startRoomGame(userId: string, code: string) {
+    const room = await this.repo.findRoomByCode(code);
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+
+    if (room.ownerUserId !== userId) {
+      throw new BadRequestException("Only room owner can start the game");
+    }
+
+    if (room.activeGameId) {
+      return {
+        roomCode: code,
+        gameId: String(room.activeGameId),
+        status: room.status || "playing",
+        whitePlayerId: room.whitePlayerId || room.ownerUserId,
+        blackPlayerId: room.blackPlayerId || null,
+      };
+    }
+
+    const members = await this.repo.findRoomMembers(room._id);
+    const memberUserIds = Array.from(
+      new Set([
+        room.ownerUserId,
+        ...members.map((member: any) => member.userId),
+      ]),
+    ).filter(
+      (memberUserId): memberUserId is string =>
+        typeof memberUserId === "string" && memberUserId.length > 0,
+    );
+
+    if (memberUserIds.length < 2) {
+      throw new BadRequestException(
+        "Need at least 2 players to start the game",
+      );
+    }
+
+    const whitePlayerId = room.ownerUserId;
+    const blackPlayerId = memberUserIds.find(
+      (memberUserId) => memberUserId !== whitePlayerId,
+    );
+    if (!blackPlayerId) {
+      throw new BadRequestException(
+        "Could not determine opponent for room game",
+      );
+    }
+
+    const now = new Date();
+    const game = await this.repo.createGame({
+      mode: "room",
+      roomCode: code,
+      roomId: room._id,
+      whitePlayerId,
+      blackPlayerId,
+      result: null,
+      state: "InGame",
+      status: "active",
+      initialFEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      createdAt: now,
+      updatedAt: now,
+      finishedAt: null,
+    });
+
+    await this.repo.updateRoomByCode(code, {
+      status: "playing",
+      activeGameId: String(game._id),
+      whitePlayerId,
+      blackPlayerId,
+      startedAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      roomCode: code,
+      gameId: String(game._id),
+      status: "playing",
+      whitePlayerId,
+      blackPlayerId,
+    };
   }
 
   async joinTournament(userId: string, tournamentId: string) {

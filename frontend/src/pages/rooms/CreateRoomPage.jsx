@@ -1,14 +1,15 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Input } from '@/components/common'
+import gameService from '@/services/gameService'
+import { useAuthStore } from '@store'
 import { Users, Clock, Lock, Globe, Copy, Check, Share2, ArrowLeft, Play } from 'lucide-react'
 
 // Time control options
 const TIME_CONTROLS = [
-  { value: '5+0', label: '5 min', description: 'Blitz' },
-  { value: '10+0', label: '10 min', description: 'Rapid' },
-  { value: '15+10', label: '15+10', description: 'Standard' },
-  { value: '30+0', label: '30 min', description: 'Classical' },
+  { value: 'blitz', label: '5 min', description: 'Blitz', initialTimeSeconds: 300 },
+  { value: 'rapid', label: '10 min', description: 'Rapid', initialTimeSeconds: 600 },
+  { value: 'classical', label: '15+10', description: 'Standard', initialTimeSeconds: 900 },
 ]
 
 const INCREMENTS = [
@@ -18,25 +19,17 @@ const INCREMENTS = [
   { value: 15, label: '+15 giây' },
 ]
 
-// Generate random room code
-const generateRoomCode = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let code = ''
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return code
-}
-
 export default function CreateRoomPage() {
   const navigate = useNavigate()
-  
+  const user = useAuthStore((state) => state.user)
+  const token = useAuthStore((state) => state.token)
+
   // Form state
   const [roomName, setRoomName] = useState('')
-  const [timeControl, setTimeControl] = useState('10+0')
+  const [timeControl, setTimeControl] = useState('rapid')
   const [increment, setIncrement] = useState(0)
   const [isPrivate, setIsPrivate] = useState(true)
-  
+
   // Room created state
   const [isCreating, setIsCreating] = useState(false)
   const [roomCreated, setRoomCreated] = useState(false)
@@ -44,22 +37,63 @@ export default function CreateRoomPage() {
   const [copiedCode, setCopiedCode] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [waitingForPlayer, setWaitingForPlayer] = useState(false)
+  const [error, setError] = useState('')
+
+  const selectedControl =
+    TIME_CONTROLS.find((option) => option.value === timeControl) || TIME_CONTROLS[1]
+
+  const withTimeout = async (promise, timeoutMs = 8000) => {
+    let timeoutId
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error('Yeu cau tao phong bi treo qua lau')),
+            timeoutMs
+          )
+        }),
+      ])
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }
 
   const handleCreateRoom = async () => {
     setIsCreating(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    const code = generateRoomCode()
-    setRoomCode(code)
-    setRoomCreated(true)
-    setWaitingForPlayer(true)
-    setIsCreating(false)
-    
-    // TODO: Real implementation
-    // socket.emit('room:create', { roomName, timeControl, increment, isPrivate })
-    // socket.on('room:created', (data) => { setRoomCode(data.code) })
+    setError('')
+
+    if (!user || !token) {
+      setError('Phien dang nhap khong hop le. Vui long dang nhap lai.')
+      setIsCreating(false)
+      navigate('/login')
+      return
+    }
+
+    try {
+      const response = await withTimeout(
+        gameService.createRoom({
+          name: roomName.trim() || undefined,
+          timeControl,
+          isPrivate,
+          initialTimeSeconds: selectedControl.initialTimeSeconds,
+        })
+      )
+      const room = response?.data?.data ?? response?.data ?? response
+      const createdCode = room?.code || room?.roomCode || room?.data?.code
+      if (!createdCode) {
+        throw new Error('Không nhận được mã phòng từ máy chủ')
+      }
+      setRoomCode(createdCode)
+      setRoomCreated(true)
+      setWaitingForPlayer(true)
+    } catch (createError) {
+      const message =
+        createError?.response?.data?.message || createError?.message || 'Không thể tạo phòng'
+      setError(message)
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const handleCopyCode = async () => {
@@ -76,8 +110,17 @@ export default function CreateRoomPage() {
   }
 
   const handleStartGame = () => {
-    // TODO: socket.emit('room:start', roomCode)
-    navigate(`/rooms/${roomCode}`)
+    if (!roomCode) return
+
+    gameService
+      .startRoomGame(roomCode)
+      .then((response) => {
+        const data = response?.data ?? response
+        navigate(`/rooms/${roomCode}`, { state: { activeGameId: data?.gameId || null } })
+      })
+      .catch(() => {
+        navigate(`/rooms/${roomCode}`)
+      })
   }
 
   const handleCancel = () => {
@@ -102,12 +145,8 @@ export default function CreateRoomPage() {
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check size={32} className="text-green-600" />
               </div>
-              <h1 className="text-2xl font-bold text-blue-400 mb-2">
-                Phòng đã được tạo!
-              </h1>
-              <p className="text-gray-600">
-                Chia sẻ mã phòng để mời bạn bè tham gia
-              </p>
+              <h1 className="text-2xl font-bold text-blue-400 mb-2">Phòng đã được tạo!</h1>
+              <p className="text-gray-600">Chia sẻ mã phòng để mời bạn bè tham gia</p>
             </div>
 
             {/* Room Code Display */}
@@ -118,17 +157,11 @@ export default function CreateRoomPage() {
                   {roomCode}
                 </div>
                 <div className="flex gap-3 justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={handleCopyCode}
-                  >
+                  <Button variant="outline" onClick={handleCopyCode}>
                     {copiedCode ? <Check size={16} /> : <Copy size={16} />}
                     {copiedCode ? 'Đã sao chép!' : 'Sao chép mã'}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleCopyLink}
-                  >
+                  <Button variant="outline" onClick={handleCopyLink}>
                     {copiedLink ? <Check size={16} /> : <Share2 size={16} />}
                     {copiedLink ? 'Đã sao chép!' : 'Sao chép link'}
                   </Button>
@@ -142,9 +175,7 @@ export default function CreateRoomPage() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-gray-600">Tên phòng:</p>
-                  <p className="font-semibold text-gray-900">
-                    {roomName || 'Không có tên'}
-                  </p>
+                  <p className="font-semibold text-gray-900">{roomName || 'Không có tên'}</p>
                 </div>
                 <div>
                   <p className="text-gray-600">Thời gian:</p>
@@ -179,11 +210,7 @@ export default function CreateRoomPage() {
 
             {/* Actions */}
             <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                fullWidth
-              >
+              <Button variant="outline" onClick={handleCancel} fullWidth>
                 Hủy phòng
               </Button>
               <Button
@@ -208,20 +235,12 @@ export default function CreateRoomPage() {
       <div className="w-full max-w-3xl">
         {/* Header */}
         <div className="text-center mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/rooms')}
-            className="mb-4"
-          >
+          <Button variant="ghost" onClick={() => navigate('/rooms')} className="mb-4">
             <ArrowLeft size={18} />
             Quay lại
           </Button>
-          <h1 className="text-4xl font-bold text-blue-600 mb-2">
-            Tạo phòng mới
-          </h1>
-          <p className="text-lg text-gray-800">
-            Tùy chỉnh cài đặt phòng và mời bạn bè chơi cùng
-          </p>
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">Tạo phòng mới</h1>
+          <p className="text-lg text-gray-800">Tùy chỉnh cài đặt phòng và mời bạn bè chơi cùng</p>
         </div>
 
         <Card
@@ -230,6 +249,12 @@ export default function CreateRoomPage() {
           className="bg-white shadow-md border-none rounded-xl overflow-hidden"
         >
           <div className="p-8 space-y-6">
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
             <div className="mb-4">
               <h2 className="text-2xl font-bold text-blue-400 mb-1">Cài đặt phòng</h2>
               <p className="text-gray-600">Chọn thời gian và chế độ chơi cho phòng</p>
@@ -247,9 +272,7 @@ export default function CreateRoomPage() {
                 fullWidth
                 maxLength={50}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Để trống nếu không muốn đặt tên
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Để trống nếu không muốn đặt tên</p>
             </div>
 
             {/* Time Control */}
@@ -305,9 +328,7 @@ export default function CreateRoomPage() {
 
             {/* Privacy */}
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Chế độ phòng
-              </label>
+              <label className="block text-sm font-semibold text-gray-900 mb-3">Chế độ phòng</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setIsPrivate(true)}
@@ -322,9 +343,7 @@ export default function CreateRoomPage() {
                     className={`mx-auto mb-2 ${isPrivate ? 'text-blue-600' : 'text-gray-400'}`}
                   />
                   <div className="font-semibold text-gray-900">Riêng tư</div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    Chỉ người có mã mới vào được
-                  </div>
+                  <div className="text-xs text-gray-600 mt-1">Chỉ người có mã mới vào được</div>
                 </button>
                 <button
                   onClick={() => setIsPrivate(false)}
@@ -339,20 +358,14 @@ export default function CreateRoomPage() {
                     className={`mx-auto mb-2 ${!isPrivate ? 'text-blue-600' : 'text-gray-400'}`}
                   />
                   <div className="font-semibold text-gray-900">Công khai</div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    Hiển thị trong danh sách
-                  </div>
+                  <div className="text-xs text-gray-600 mt-1">Hiển thị trong danh sách</div>
                 </button>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex gap-3 pt-6 border-t border-gray-100">
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                fullWidth
-              >
+              <Button variant="outline" onClick={handleCancel} fullWidth>
                 Hủy
               </Button>
               <Button

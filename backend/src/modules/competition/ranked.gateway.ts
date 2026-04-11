@@ -13,8 +13,10 @@ import { Server, Socket } from "socket.io";
 import { env } from "../../shared/config/env";
 import { CompetitionService } from "./competition.service";
 import {
+  CompleteRankedMatchDto,
   JoinRankedQueueDto,
   PreferredColor,
+  RankedMatchCompletionResult,
   RankedTimeControl,
 } from "./dto/competition.dto";
 
@@ -41,6 +43,10 @@ type GameMovePayload = {
     promotion?: string;
     san?: string;
   };
+};
+
+type GameResignPayload = {
+  matchId?: string;
 };
 
 @WebSocketGateway({
@@ -236,6 +242,70 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         byUserId: user.userId,
         at: new Date().toISOString(),
       });
+  }
+
+  @SubscribeMessage("game:resign")
+  async onGameResign(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: GameResignPayload | undefined,
+  ): Promise<void> {
+    const user = this.getSocketUser(client);
+    const matchId = body?.matchId;
+
+    if (!matchId || typeof matchId !== "string") {
+      throw new UnauthorizedException("Missing matchId");
+    }
+
+    const participants =
+      await this.competitionService.getMatchParticipants(matchId);
+    if (!participants) {
+      throw new UnauthorizedException("Match participants not found");
+    }
+
+    if (
+      user.userId !== participants.whitePlayerId &&
+      user.userId !== participants.blackPlayerId
+    ) {
+      throw new UnauthorizedException(
+        "User is not a participant of this match",
+      );
+    }
+
+    const result =
+      user.userId === participants.whitePlayerId ? "BlackWin" : "WhiteWin";
+
+    try {
+      const completionPayload: CompleteRankedMatchDto = {
+        reason: "resignation",
+        result:
+          user.userId === participants.whitePlayerId
+            ? RankedMatchCompletionResult.BLACK_WIN
+            : RankedMatchCompletionResult.WHITE_WIN,
+      };
+
+      const completion = await this.competitionService.completeRankedMatch(
+        { userId: user.userId, roles: user.roles || [] },
+        matchId,
+        completionPayload,
+      );
+
+      this.server.to(`match:${matchId}`).emit("game:end", {
+        matchId,
+        reason: "resignation",
+        result: completion.result,
+        resignedByUserId: user.userId,
+        at: new Date().toISOString(),
+      });
+      return;
+    } catch {
+      this.server.to(`match:${matchId}`).emit("game:end", {
+        matchId,
+        reason: "resignation",
+        result,
+        resignedByUserId: user.userId,
+        at: new Date().toISOString(),
+      });
+    }
   }
 
   private emitMatchFound(match: {

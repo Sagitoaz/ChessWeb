@@ -71,6 +71,16 @@ export class SocialBotController {
     return successResponse(data, requestId || null);
   }
 
+  @Post("rooms/:code/start")
+  async startRoomGame(
+    @Req() req: AuthRequest,
+    @Param("code") code: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.startRoomGame(this.getUserId(req), code);
+    return successResponse(data, requestId || null);
+  }
+
   @Post("tournaments/:id/join")
   async joinTournament(
     @Req() req: AuthRequest,

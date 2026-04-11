@@ -204,6 +204,10 @@ export class ProfileService {
       this.repository.findUserRatingByUserId(userId),
     ]);
 
+    const statsWithLegacy = stats as
+      | ({ gamesPlayed?: number } & typeof stats)
+      | null;
+
     return {
       ok: true,
       data: {
@@ -219,7 +223,9 @@ export class ProfileService {
             : Boolean(profile.isActive),
         rating: rating?.rating ?? null,
         peakRating: rating?.peakRating ?? null,
-        gamesPlayed: Number(stats?.totalGames || 0),
+        gamesPlayed: Number(
+          statsWithLegacy?.gamesPlayed ?? stats?.totalGames ?? 0,
+        ),
         wins: Number(stats?.wins || 0),
         losses: Number(stats?.losses || 0),
         draws: Number(stats?.draws || 0),

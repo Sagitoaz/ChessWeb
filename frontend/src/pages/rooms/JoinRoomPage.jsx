@@ -13,8 +13,12 @@ const normalizeRoomInfo = (room, code) => ({
     increment: room?.settings?.increment || room?.increment || 0,
     isPrivate: room?.settings?.isPrivate ?? room?.isPrivate ?? true,
   },
-  playerCount: room?.playerCount || room?.players?.length || 0,
+  playerCount: room?.playerCount || room?.members?.length || room?.players?.length || 0,
   maxPlayers: room?.maxPlayers || 2,
+  status: room?.status || 'waiting',
+  activeGameId: room?.activeGameId || null,
+  whitePlayerId: room?.whitePlayerId || null,
+  blackPlayerId: room?.blackPlayerId || null,
 })
 
 export default function JoinRoomPage() {

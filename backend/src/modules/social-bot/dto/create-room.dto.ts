@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -22,6 +23,10 @@ export class CreateRoomDto {
   @IsOptional()
   @IsEnum(RoomTimeControl)
   timeControl?: RoomTimeControl;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrivate?: boolean;
 
   @IsOptional()
   @IsInt()

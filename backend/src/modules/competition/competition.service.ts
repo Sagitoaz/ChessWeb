@@ -78,15 +78,35 @@ export class CompetitionService {
   }
 
   private ratingsCollection() {
-    return this.mongoService.getDb().collection("user_ratings");
+    return this.mongoService.getDb().collection<{
+      _id: string;
+      rating?: number;
+      rankedElo?: number;
+      peakRating?: number;
+      createdAt?: Date;
+      updatedAt?: Date;
+    }>("user_ratings");
   }
 
   private statsCollection() {
-    return this.mongoService.getDb().collection("user_stats");
+    return this.mongoService.getDb().collection<{
+      userId: string;
+      gamesPlayed?: number;
+      totalGames?: number;
+      wins?: number;
+      losses?: number;
+      draws?: number;
+      createdAt?: Date;
+      updatedAt?: Date;
+    }>("user_stats");
   }
 
   private profilesCollection() {
-    return this.mongoService.getDb().collection("user_profiles");
+    return this.mongoService.getDb().collection<{
+      _id: string;
+      rating?: number;
+      updatedAt?: Date;
+    }>("user_profiles");
   }
 
   private expectedScore(playerRating: number, opponentRating: number): number {
@@ -676,28 +696,40 @@ export class CompetitionService {
   async getMatchParticipants(
     matchId: string,
   ): Promise<{ whitePlayerId: string; blackPlayerId: string } | null> {
-    const rankedMatches = this.matchesCollection();
     const query = ObjectId.isValid(matchId)
-      ? {
-          $or: [{ _id: new ObjectId(matchId) }, { matchId }],
-        }
+      ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
       : { matchId };
 
-    const match = await rankedMatches.findOne(query, {
+    const rankedMatch = await this.matchesCollection().findOne(query, {
       projection: { whitePlayerId: 1, blackPlayerId: 1 },
     });
 
     if (
-      !match ||
-      typeof match.whitePlayerId !== "string" ||
-      typeof match.blackPlayerId !== "string"
+      rankedMatch &&
+      typeof rankedMatch.whitePlayerId === "string" &&
+      typeof rankedMatch.blackPlayerId === "string"
+    ) {
+      return {
+        whitePlayerId: rankedMatch.whitePlayerId,
+        blackPlayerId: rankedMatch.blackPlayerId,
+      };
+    }
+
+    const gameMatch = await this.gamesCollection().findOne(query, {
+      projection: { whitePlayerId: 1, blackPlayerId: 1 },
+    });
+
+    if (
+      !gameMatch ||
+      typeof gameMatch.whitePlayerId !== "string" ||
+      typeof gameMatch.blackPlayerId !== "string"
     ) {
       return null;
     }
 
     return {
-      whitePlayerId: match.whitePlayerId,
-      blackPlayerId: match.blackPlayerId,
+      whitePlayerId: gameMatch.whitePlayerId,
+      blackPlayerId: gameMatch.blackPlayerId,
     };
   }
 

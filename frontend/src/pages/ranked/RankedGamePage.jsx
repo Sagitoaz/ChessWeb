@@ -23,6 +23,7 @@ import { ChessGame } from '@utils/chessLogic'
 import { RANKS } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor } from '@utils/formatters'
 import { THEME } from '@/styles/theme'
+import gameService from '@services/gameService'
 
 // ─────────────────────────────────────────────────────
 // CONSTANTS
@@ -86,6 +87,24 @@ const calcMockRatingDelta = (result, pRating, oRating) => {
   const E = 1 / (1 + Math.pow(10, (oRating - pRating) / 400))
   const S = result === 'win' ? 1 : result === 'draw' ? 0.5 : 0
   return Math.round(32 * (S - E))
+}
+
+const toRankedApiResult = (playerColor, localResult) => {
+  if (localResult === 'draw') return 'Draw'
+  if (localResult === 'win') return playerColor === 'white' ? 'WhiteWin' : 'BlackWin'
+  return playerColor === 'white' ? 'BlackWin' : 'WhiteWin'
+}
+
+const toLocalResultFromServer = (playerColor, serverResult) => {
+  const normalized = typeof serverResult === 'string' ? serverResult.toLowerCase() : ''
+  if (normalized === 'draw' || normalized === '1/2-1/2') return 'draw'
+  if (normalized === 'whitewin' || normalized === '1-0' || normalized === 'white_win') {
+    return playerColor === 'white' ? 'win' : 'lose'
+  }
+  if (normalized === 'blackwin' || normalized === '0-1' || normalized === 'black_win') {
+    return playerColor === 'black' ? 'win' : 'lose'
+  }
+  return 'draw'
 }
 
 // ─────────────────────────────────────────────────────
@@ -484,6 +503,8 @@ const RankedGamePage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const storeUser = useAuthStore((s) => s.user)
+  const setAuthLogin = useAuthStore((s) => s.login)
+  const authToken = useAuthStore((s) => s.token)
 
   // ─── Nhận dữ liệu trận đấu từ Lobby (qua navigate state) ───
   const locationMatchData = location.state?.matchData
@@ -531,6 +552,7 @@ const RankedGamePage = () => {
   // ─── End game ───
   const [endResult, setEndResult] = useState(null) // { result, reason }
   const [showEndModal, setShowEndModal] = useState(false)
+  const [persistedResultData, setPersistedResultData] = useState(null)
   const endedRef = useRef(false)
 
   // ─── Draw / Resign ───
@@ -598,6 +620,43 @@ const RankedGamePage = () => {
 
   // ─── WebSocket (for future online play) ───
   const gameSocket = useGameSocket(matchId)
+
+  const persistRankedResult = useCallback(
+    async (reason, result) => {
+      if (!matchId) return
+
+      try {
+        const payload = {
+          result: toRankedApiResult(playerColor, result),
+          reason,
+          moves: gameRef.current.history({ verbose: true }),
+        }
+
+        const response = await gameService.completeRankedMatch(matchId, payload)
+        const data = response?.data ?? response
+        setPersistedResultData(data)
+
+        const player = data?.player
+        if (!player) return
+
+        const token = authToken || localStorage.getItem('token')
+        if (!token) return
+
+        const mergedUser = {
+          ...(storeUser || {}),
+          rating: player.ratingAfter,
+          gamesPlayed: player.gamesPlayed,
+          wins: player.wins,
+          losses: player.losses,
+          draws: player.draws,
+        }
+        setAuthLogin(mergedUser, token)
+      } catch (error) {
+        console.error('Failed to persist ranked result:', error)
+      }
+    },
+    [authToken, matchId, playerColor, setAuthLogin, storeUser]
+  )
 
   // ─── Derived state (recalculated each render) ───
   const currentTurn = gameRef.current.turn() // 'w' | 'b'
@@ -733,9 +792,10 @@ const RankedGamePage = () => {
         { text: `Game Over — ${txt} (${reason})`, isSystem: true },
       ])
       playSound('gameEnd')
+      void persistRankedResult(reason, result)
       setTimeout(() => setShowEndModal(true), 600)
     },
-    [playSound]
+    [persistRankedResult, playSound]
   )
 
   // ─── Timeout detection (runs each clock tick) ───
@@ -816,10 +876,17 @@ const RankedGamePage = () => {
       setChatMessages((prev) => [...prev, { text: '✅ Opponent reconnected.', isSystem: true }])
     }
 
+    const handleGameEnd = (payload) => {
+      const reason = payload?.reason || 'completed'
+      const result = toLocalResultFromServer(playerColor, payload?.result)
+      endGame(reason, result)
+    }
+
     gameSocket.onMoveUpdate(handleMoveUpdate)
+    gameSocket.onGameEnd(handleGameEnd)
     gameSocket.onOpponentDisconnected(handleOpponentDisconnect)
     gameSocket.onOpponentReconnected(handleOpponentReconnect)
-  }, [gameSocket, checkGameEnd, playSound])
+  }, [gameSocket, checkGameEnd, playSound, playerColor, endGame])
 
   // ═══════════════════════════════════════════
   // COMMIT MOVE  — shared by drag-drop & click
@@ -857,16 +924,17 @@ const RankedGamePage = () => {
   // ═══════════════════════════════════════════
   const handleResign = useCallback(() => {
     if (showResignConfirm) {
-      // Bên đang đến lượt đầu hàng → bên kia thắng
-      const resigningColor = gameRef.current.turn()
-      const result = resigningColor === 'w' ? 'lose' : 'win' // relative to player (white)
-      endGame('resignation', playerColor === 'white' ? result : result === 'win' ? 'lose' : 'win')
+      if (gameSocket?.isConnected && matchId) {
+        gameSocket.resign()
+      } else {
+        endGame('resignation', 'lose')
+      }
       setShowResignConfirm(false)
     } else {
       setShowResignConfirm(true)
       setTimeout(() => setShowResignConfirm(false), 4000)
     }
-  }, [showResignConfirm, endGame, playerColor])
+  }, [showResignConfirm, gameSocket, matchId, endGame])
 
   const handleOfferDraw = useCallback(() => {
     if (drawOffer) return
@@ -959,10 +1027,11 @@ const RankedGamePage = () => {
   // ═══════════════════════════════════════════
   // COMPUTED VALUES FOR RENDER
   // ═══════════════════════════════════════════
-  const ratingChange = endResult
+  const fallbackRatingChange = endResult
     ? calcMockRatingDelta(endResult.result, player.rating, opponent.rating)
     : 0
-  const newRating = player.rating + ratingChange
+  const ratingChange = Number(persistedResultData?.player?.ratingDelta ?? fallbackRatingChange)
+  const newRating = Number(persistedResultData?.player?.ratingAfter ?? player.rating + ratingChange)
 
   // Board orientation: top = opponent, bottom = player
   const topPlayer = isWhite ? opponent : player
