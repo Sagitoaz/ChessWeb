@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react'
 import { useAuthStore } from '../store'
 import authService from '../services/authService'
+import socketService from '../services/socketService'
 
 /**
  * Custom hook để quản lý authentication
- * 
+ *
  * @example
  * const { user, login, logout, loading, error } = useAuth()
- * 
+ *
  * @returns {Object} Auth state và methods
  */
 export const useAuth = () => {
@@ -17,11 +18,10 @@ export const useAuth = () => {
 
   const normalizeAuthPayload = useCallback(async (response) => {
     const token = response?.token
-    const fallbackToken = localStorage.getItem('token')
     const effectiveToken =
       typeof token === 'string' && token.length > 0 && token !== 'undefined' && token !== 'null'
         ? token
-        : fallbackToken
+        : null
 
     if (!effectiveToken) {
       throw new Error('Phiên đăng nhập không hợp lệ (thiếu access token).')
@@ -48,46 +48,54 @@ export const useAuth = () => {
    * @param {Object} credentials - Username/email và password
    * @returns {Promise<Object>} User data
    */
-  const login = useCallback(async (credentials) => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const response = await authService.login(credentials)
-      const normalized = await normalizeAuthPayload(response)
-      setLogin(normalized.user, normalized.token)
-      
-      return normalized.user
-    } catch (err) {
-      setError(err.message || 'Login failed')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [setLogin, normalizeAuthPayload])
+  const login = useCallback(
+    async (credentials) => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const response = await authService.login(credentials)
+        const normalized = await normalizeAuthPayload(response)
+        setLogin(normalized.user, normalized.token)
+        socketService.connect(normalized.token)
+
+        return normalized.user
+      } catch (err) {
+        setError(err.message || 'Login failed')
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [setLogin, normalizeAuthPayload]
+  )
 
   /**
    * Đăng ký
    * @param {Object} userData - Thông tin đăng ký
    * @returns {Promise<Object>} User data
    */
-  const register = useCallback(async (userData) => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const response = await authService.register(userData)
-      const normalized = await normalizeAuthPayload(response)
-      setLogin(normalized.user, normalized.token)
-      
-      return normalized.user
-    } catch (err) {
-      setError(err.message || 'Registration failed')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [setLogin, normalizeAuthPayload])
+  const register = useCallback(
+    async (userData) => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const response = await authService.register(userData)
+        const normalized = await normalizeAuthPayload(response)
+        setLogin(normalized.user, normalized.token)
+        socketService.connect(normalized.token)
+
+        return normalized.user
+      } catch (err) {
+        setError(err.message || 'Registration failed')
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [setLogin, normalizeAuthPayload]
+  )
 
   /**
    * Đăng xuất
@@ -96,12 +104,14 @@ export const useAuth = () => {
     try {
       setLoading(true)
       setError(null)
-      
+
       await authService.logout()
+      socketService.disconnect()
       setLogout()
     } catch (err) {
       setError(err.message || 'Logout failed')
       // Vẫn logout ở client dù API lỗi
+      socketService.disconnect()
       setLogout()
     } finally {
       setLoading(false)
@@ -117,7 +127,7 @@ export const useAuth = () => {
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await authService.forgotPassword(email)
       return response
     } catch (err) {
@@ -138,7 +148,7 @@ export const useAuth = () => {
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await authService.resetPassword(token, newPassword)
       return response
     } catch (err) {
@@ -158,7 +168,7 @@ export const useAuth = () => {
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await authService.changePassword(passwords)
       return response
     } catch (err) {
@@ -177,7 +187,7 @@ export const useAuth = () => {
     try {
       setLoading(true)
       setError(null)
-      
+
       const responseData = await authService.getCurrentUser()
       const userData = responseData?.user ?? responseData
       const token = localStorage.getItem('token')
@@ -185,7 +195,7 @@ export const useAuth = () => {
         throw new Error('Không lấy được hồ sơ người dùng hiện tại.')
       }
       setLogin(userData, token)
-      
+
       return userData
     } catch (err) {
       setError(err.message || 'Failed to refresh user data')
@@ -238,7 +248,7 @@ export const useAuth = () => {
     isAuthenticated,
     loading,
     error,
-    
+
     // Methods
     login,
     register,

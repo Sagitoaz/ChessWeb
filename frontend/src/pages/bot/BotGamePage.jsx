@@ -85,6 +85,28 @@ export default function BotGamePage() {
   const [isBotThinking, setIsBotThinking] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
 
+  const buildReplayMoves = useCallback(() => {
+    try {
+      const verboseMoves = chess.history({ verbose: true })
+      return verboseMoves.map((mv, idx) => ({
+        ply: idx + 1,
+        from: mv.from,
+        to: mv.to,
+        piece: mv.piece,
+        captured: mv.captured,
+        promotion: mv.promotion,
+        san: mv.san,
+        uci: `${mv.from}${mv.to}`,
+        color: mv.color === 'w' ? 'White' : 'Black',
+        isCheck: mv.san?.includes('+') || mv.san?.includes('#') || false,
+        isCheckmate: mv.san?.includes('#') || false,
+        timestamp: new Date().toISOString(),
+      }))
+    } catch {
+      return []
+    }
+  }, [chess])
+
   const playerColor = gameData?.playerColor ?? 'White'
   const playerColorCode = playerColor === 'White' ? 'w' : 'b'
 
@@ -130,17 +152,29 @@ export default function BotGamePage() {
   // =============================================
   useEffect(() => {
     if (gameState === 'Finished' && gameResult && !isSaved) {
+      const derivedMoves = buildReplayMoves()
+      const finalMoves = derivedMoves.length >= moveHistory.length ? derivedMoves : moveHistory
+      const fallbackHuman = { username: 'You', isBot: false }
+      const fallbackBot = { username: 'Bot', isBot: true }
+
       botGameAPI
         .saveBotGame(gameId, {
           result: gameResult,
           state: 'Saved',
-          moves: moveHistory,
+          moves: finalMoves,
           mode: 'bot',
-          initialFEN: gameData?.initialFEN,
-          whitePlayer: playerColor === 'White' ? gameData?.humanPlayer : gameData?.botPlayer,
-          blackPlayer: playerColor === 'White' ? gameData?.botPlayer : gameData?.humanPlayer,
+          initialFEN:
+            gameData?.initialFEN || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+          whitePlayer:
+            playerColor === 'White'
+              ? gameData?.humanPlayer || fallbackHuman
+              : gameData?.botPlayer || fallbackBot,
+          blackPlayer:
+            playerColor === 'White'
+              ? gameData?.botPlayer || fallbackBot
+              : gameData?.humanPlayer || fallbackHuman,
           metadata: {
-            totalMoves: moveHistory.length,
+            totalMoves: finalMoves.length,
           },
         })
         .then(() => {
@@ -150,7 +184,7 @@ export default function BotGamePage() {
         })
         .catch(() => showError('Không thể lưu ván đấu'))
     }
-  }, [gameState, gameResult, isSaved])
+  }, [gameState, gameResult, isSaved, buildReplayMoves, moveHistory, gameId, gameData, playerColor, showSuccess, showError])
 
   // =============================================
   // BOT MOVE
@@ -235,7 +269,7 @@ export default function BotGamePage() {
           promotion: moveResult.promotion,
           san: moveResult.san,
           uci: `${moveResult.from}${moveResult.to}`,
-          color: 'White',
+          color: moveResult.color === 'w' ? 'White' : 'Black',
           isCheck: chess.inCheck(),
           isCheckmate: chess.isCheckmate(),
           timestamp: new Date().toISOString(),
@@ -302,16 +336,28 @@ export default function BotGamePage() {
     setGameResult(forfeitResult)
     setGameState('Finished')
     try {
+      const derivedMoves = buildReplayMoves()
+      const finalMoves = derivedMoves.length >= moveHistory.length ? derivedMoves : moveHistory
+      const fallbackHuman = { username: 'You', isBot: false }
+      const fallbackBot = { username: 'Bot', isBot: true }
+
       await botGameAPI.saveBotGame(gameId, {
         result: forfeitResult,
         state: 'Saved',
-        moves: moveHistory,
+        moves: finalMoves,
         mode: 'bot',
-        initialFEN: gameData?.initialFEN,
-        whitePlayer: playerColor === 'White' ? gameData?.humanPlayer : gameData?.botPlayer,
-        blackPlayer: playerColor === 'White' ? gameData?.botPlayer : gameData?.humanPlayer,
+        initialFEN:
+          gameData?.initialFEN || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        whitePlayer:
+          playerColor === 'White'
+            ? gameData?.humanPlayer || fallbackHuman
+            : gameData?.botPlayer || fallbackBot,
+        blackPlayer:
+          playerColor === 'White'
+            ? gameData?.botPlayer || fallbackBot
+            : gameData?.humanPlayer || fallbackHuman,
         metadata: {
-          totalMoves: moveHistory.length,
+          totalMoves: finalMoves.length,
         },
       })
     } catch {

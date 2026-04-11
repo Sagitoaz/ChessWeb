@@ -501,7 +501,7 @@ const RankedGamePage = () => {
         : DEFAULT_PLAYER,
     [storeUser]
   )
-  const [opponent] = useState(
+  const [opponent, setOpponent] = useState(
     locationMatchData?.opponent
       ? {
           id: locationMatchData.opponent.id || 'opp-1',
@@ -511,8 +511,7 @@ const RankedGamePage = () => {
         }
       : DEFAULT_OPPONENT
   )
-  // Chế độ local 2 người: bỏ qua màu được gán, cả 2 cùng đi trên 1 máy
-  const playerColor = locationMatchData?.color || 'white'
+  const [playerColor, setPlayerColor] = useState(locationMatchData?.color || 'white')
 
   // ─── Chess Logic ───
   const gameRef = useRef(new ChessGame())
@@ -602,10 +601,29 @@ const RankedGamePage = () => {
 
   // ─── Derived state (recalculated each render) ───
   const currentTurn = gameRef.current.turn() // 'w' | 'b'
-  // Local 2P: luôn cho phép di chuyển — cả 2 người cùng ngồi 1 máy
-  const isMyTurn = gamePhase === GAME_PHASE.PLAYING && !endedRef.current
+  const myColorCode = playerColor === 'white' ? 'w' : 'b'
+  const isMyTurn =
+    gamePhase === GAME_PHASE.PLAYING && !endedRef.current && currentTurn === myColorCode
   const isCheck = gameRef.current.inCheck()
   const isWhite = playerColor === 'white'
+
+  useEffect(() => {
+    if (!locationMatchData) return
+
+    if (locationMatchData?.color === 'white' || locationMatchData?.color === 'black') {
+      setPlayerColor(locationMatchData.color)
+    }
+
+    if (locationMatchData?.opponent) {
+      setOpponent((prev) => ({
+        ...prev,
+        id: locationMatchData.opponent.id || locationMatchData.opponent.userId || prev.id,
+        username: locationMatchData.opponent.username || prev.username,
+        rating: locationMatchData.opponent.rating || prev.rating,
+        avatarUrl: locationMatchData.opponent.avatarUrl || prev.avatarUrl,
+      }))
+    }
+  }, [locationMatchData])
 
   // ─── Captured pieces & material ───
   const { capturedByWhite, capturedByBlack, matAdv } = useMemo(() => {
@@ -761,6 +779,30 @@ const RankedGamePage = () => {
   useEffect(() => {
     if (!gameSocket) return
 
+    const handleMoveUpdate = (payload) => {
+      const move = payload?.move
+      if (!move?.from || !move?.to) return
+
+      const result = gameRef.current.move({
+        from: move.from,
+        to: move.to,
+        promotion: move.promotion || 'q',
+      })
+
+      if (!result) return
+
+      setFen(gameRef.current.fen())
+      setMoveHistory(gameRef.current.history({ verbose: true }))
+      setLastMove({ from: result.from, to: result.to })
+      setDrawOffer(null)
+
+      if (result.captured) playSound('capture')
+      else playSound('move')
+
+      const ended = checkGameEnd()
+      if (!ended && gameRef.current.inCheck()) playSound('check')
+    }
+
     const handleOpponentDisconnect = () => {
       setOpponentDisconnected(true)
       setChatMessages((prev) => [
@@ -774,9 +816,10 @@ const RankedGamePage = () => {
       setChatMessages((prev) => [...prev, { text: '✅ Opponent reconnected.', isSystem: true }])
     }
 
+    gameSocket.onMoveUpdate(handleMoveUpdate)
     gameSocket.onOpponentDisconnected(handleOpponentDisconnect)
     gameSocket.onOpponentReconnected(handleOpponentReconnect)
-  }, [gameSocket])
+  }, [gameSocket, checkGameEnd, playSound])
 
   // ═══════════════════════════════════════════
   // COMMIT MOVE  — shared by drag-drop & click
@@ -795,7 +838,7 @@ const RankedGamePage = () => {
       const ended = checkGameEnd()
       if (!ended && gameRef.current.inCheck()) playSound('check')
 
-      if (gameSocket?.isConnected) {
+      if (gameSocket?.isConnected && matchId) {
         gameSocket.sendMove({
           from: move.from,
           to: move.to,
@@ -804,7 +847,7 @@ const RankedGamePage = () => {
         })
       }
     },
-    [checkGameEnd, gameSocket, playSound]
+    [checkGameEnd, gameSocket, playSound, matchId]
   )
 
   // AI đã bị tắt — chế độ local 2 người chơi luân phiên trên 1 máy
@@ -940,7 +983,6 @@ const RankedGamePage = () => {
   const botCapColor = isWhite ? 'b' : 'w'
 
   // Status text
-  // Local 2P: hiển thị lượt hiện tại
   const currentPlayerName =
     currentTurn === 'w' ? `${player.username} (Trắng)` : `${opponent.username} (Đen)`
   const statusText =
@@ -1002,7 +1044,7 @@ const RankedGamePage = () => {
                 Ranked Match
               </h1>
               <p className="text-xs text-gray-500 font-mono">
-                {matchId || 'local'} · 10+0 · Có xếp hạng · Local 2P
+                {matchId || 'match'} · 10+0 · Có xếp hạng · Realtime Socket
               </p>
             </div>
           </div>
@@ -1039,7 +1081,7 @@ const RankedGamePage = () => {
                 gameState={gameRef.current}
                 onMove={handleChessBoardMove}
                 playerColor={playerColor}
-                disabled={gamePhase !== GAME_PHASE.PLAYING || endedRef.current}
+                disabled={gamePhase !== GAME_PHASE.PLAYING || endedRef.current || !isMyTurn}
                 customSquareStyles={squareStyles}
                 showCoordinates={true}
                 highlightCheck={true}

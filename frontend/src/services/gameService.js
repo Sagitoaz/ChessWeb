@@ -527,6 +527,8 @@ const gameService = {
 
   getMatch: (matchId) => gameAPI.get(`/ranked/matches/${matchId}`),
 
+  completeRankedMatch: (matchId, data) => gameAPI.post(`/ranked/matches/${matchId}/complete`, data),
+
   getRankedHistory: async (page = 1, limit = 10) => {
     const response = await gameAPI.get('/ranked/history', { params: { page, pageSize: limit } })
     return normalizeRankedHistory(response)
@@ -651,10 +653,33 @@ export const replayAPI = {
   },
 
   /**
-   * GET /games?mode=HumanVsBot|HumanVsHuman&result=WhiteWin|BlackWin|Draw
+   * GET /games?mode=bot|ranked|room|tournament&result=win|lose|draw
+   * Also accepts legacy UI values and normalizes them before sending.
    */
   getGameHistory: async (filters = {}) => {
-    const response = await gameAPI.get('/games', { params: filters })
+    const modeMap = {
+      HumanVsBot: 'bot',
+      HumanVsHuman: 'ranked',
+      bot: 'bot',
+      ranked: 'ranked',
+      room: 'room',
+      tournament: 'tournament',
+    }
+
+    const resultMap = {
+      WhiteWin: 'win',
+      BlackWin: 'lose',
+      Draw: 'draw',
+      win: 'win',
+      lose: 'lose',
+      draw: 'draw',
+    }
+
+    const params = { ...filters }
+    if (params.mode) params.mode = modeMap[params.mode] || params.mode
+    if (params.result) params.result = resultMap[params.result] || params.result
+
+    const response = await gameAPI.get('/games', { params })
     return unwrapApiEnvelope(response)
   },
 }

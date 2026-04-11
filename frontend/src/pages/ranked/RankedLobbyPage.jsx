@@ -48,6 +48,18 @@ const QUEUE_STATUS = {
   CONNECTING: 'connecting',
 }
 
+const QUEUE_TIME_CONTROLS = [
+  { value: 'blitz', label: 'Blitz 10+0' },
+  { value: 'rapid', label: 'Rapid 15+10' },
+  { value: 'classical', label: 'Classical 30+0' },
+]
+
+const QUEUE_PREFERRED_COLORS = [
+  { value: 'random', label: 'Random' },
+  { value: 'white', label: 'White' },
+  { value: 'black', label: 'Black' },
+]
+
 // ═══════════════════════════════════════════════════════════
 // COMPONENT: SearchingOverlay
 // ═══════════════════════════════════════════════════════════
@@ -250,6 +262,8 @@ const RankedLobbyPage = () => {
   const [matchData, setMatchData] = useState(null)
   const [recentGames, setRecentGames] = useState([])
   const [loading, setLoading] = useState(true)
+  const [queueTimeControl, setQueueTimeControl] = useState('blitz')
+  const [queuePreferredColor, setQueuePreferredColor] = useState('random')
   const searchTimerRef = useRef(null)
   const matchFoundRef = useRef(false) // guard against double-navigation
 
@@ -289,13 +303,13 @@ const RankedLobbyPage = () => {
 
       // After 3s → redirect to game
       setTimeout(() => {
-        navigate(`/ranked/game/${data.matchId}`)
+        navigate(`/ranked/game/${data.matchId}`, { state: { matchData: data } })
       }, 3000)
     }
 
     const handleQueueUpdate = (data) => {
       // data: { playersInQueue }
-      if (data?.playersInQueue) {
+      if (typeof data?.playersInQueue === 'number') {
         setQueueCount(data.playersInQueue)
       }
     }
@@ -330,11 +344,13 @@ const RankedLobbyPage = () => {
     matchFoundRef.current = false // reset guard for new search
     setQueueStatus(QUEUE_STATUS.SEARCHING)
     setMatchData(null)
-    setQueueCount(Math.floor(Math.random() * 60) + 20)
 
     // Emit WebSocket event
-    joinQueue(user.id, user.rating)
-  }, [joinQueue, user.id, user.rating])
+    joinQueue({
+      timeControl: queueTimeControl,
+      preferredColor: queuePreferredColor,
+    })
+  }, [joinQueue, queuePreferredColor, queueTimeControl])
 
   const handleCancelSearch = useCallback(() => {
     setQueueStatus(QUEUE_STATUS.IDLE)
@@ -448,13 +464,55 @@ const RankedLobbyPage = () => {
                 </div>
                 <h3 className={`text-xl font-bold ${THEME.text.primary} mb-2`}>Ready to Play?</h3>
                 <p className={`${THEME.text.secondary} text-sm`}>
-                  10 minutes per player • Rated • ±100 Elo matching
+                  Rated • ±100 Elo matching • chọn time control và màu trước khi vào queue
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5 text-left max-w-xl mx-auto">
+                <label className="block">
+                  <span
+                    className={`block text-xs font-semibold uppercase tracking-wider ${THEME.text.muted} mb-2`}
+                  >
+                    Time Control
+                  </span>
+                  <select
+                    value={queueTimeControl}
+                    onChange={(e) => setQueueTimeControl(e.target.value)}
+                    disabled={isSearching || !isConnected}
+                    className={`w-full ${THEME.background.card} ${THEME.text.primary} border ${THEME.border.DEFAULT} ${THEME.rounded.DEFAULT} px-4 py-3 text-sm disabled:opacity-60`}
+                  >
+                    {QUEUE_TIME_CONTROLS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span
+                    className={`block text-xs font-semibold uppercase tracking-wider ${THEME.text.muted} mb-2`}
+                  >
+                    Preferred Color
+                  </span>
+                  <select
+                    value={queuePreferredColor}
+                    onChange={(e) => setQueuePreferredColor(e.target.value)}
+                    disabled={isSearching || !isConnected}
+                    className={`w-full ${THEME.background.card} ${THEME.text.primary} border ${THEME.border.DEFAULT} ${THEME.rounded.DEFAULT} px-4 py-3 text-sm disabled:opacity-60`}
+                  >
+                    {QUEUE_PREFERRED_COLORS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
 
               <button
                 onClick={handleFindMatch}
-                disabled={isSearching}
+                disabled={isSearching || !isConnected}
                 className="
                   relative w-full max-w-xs mx-auto
                   px-10 py-4 text-lg font-bold text-white

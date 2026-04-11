@@ -10,18 +10,36 @@ class SocketService {
   constructor() {
     this.socket = null
     this.listeners = new Map()
+    this.authToken = null
   }
 
   connect(token) {
-    if (this.socket?.connected) {
-      // eslint-disable-next-line no-console
-      console.log('Socket already connected')
+    const nextToken = token || localStorage.getItem('token')
+
+    if (!nextToken) {
+      console.warn('No auth token found for socket connection')
       return
     }
 
+    const tokenChanged = Boolean(this.authToken && this.authToken !== nextToken)
+
+    if (this.socket?.connected && !tokenChanged) {
+      // eslint-disable-next-line no-console
+      console.log('Socket already connected with current token')
+      return this.socket
+    }
+
+    if (this.socket && tokenChanged) {
+      this.socket.disconnect()
+      this.socket = null
+      this.listeners.clear()
+    }
+
+    this.authToken = nextToken
+
     this.socket = io(SOCKET_URL, {
       auth: {
-        token: token || localStorage.getItem('token'),
+        token: nextToken,
       },
       reconnection: true,
       reconnectionDelay: 1000,
@@ -55,6 +73,7 @@ class SocketService {
       this.socket.disconnect()
       this.socket = null
       this.listeners.clear()
+      this.authToken = null
       // eslint-disable-next-line no-console
       console.log('Socket disconnected manually')
     }
@@ -106,8 +125,8 @@ class SocketService {
   // Convenience methods for common events
 
   // Ranked match
-  joinRankedQueue(userId, rating) {
-    this.emit('ranked:joinQueue', { userId, rating })
+  joinRankedQueue(options = {}) {
+    this.emit('ranked:joinQueue', options)
   }
 
   leaveRankedQueue() {

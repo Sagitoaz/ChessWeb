@@ -4,7 +4,7 @@ import socketService from '../services/socketService'
 /**
  * Custom React hook for WebSocket connection management
  * Provides a clean interface for components to interact with WebSocket
- * 
+ *
  * @param {boolean} autoConnect - Whether to auto-connect on mount
  * @returns {Object} WebSocket utilities and state
  */
@@ -17,7 +17,6 @@ export function useWebSocket(autoConnect = true) {
   const connect = useCallback((token) => {
     try {
       socketService.connect(token)
-      setIsConnected(true)
       setConnectionError(null)
     } catch (error) {
       setConnectionError(error.message)
@@ -34,7 +33,7 @@ export function useWebSocket(autoConnect = true) {
   // Subscribe to an event
   const on = useCallback((event, callback) => {
     socketService.on(event, callback)
-    
+
     // Track listener for cleanup
     if (!listenersRef.current.has(event)) {
       listenersRef.current.set(event, [])
@@ -45,7 +44,7 @@ export function useWebSocket(autoConnect = true) {
   // Unsubscribe from an event
   const off = useCallback((event, callback) => {
     socketService.off(event, callback)
-    
+
     // Remove from tracked listeners
     if (listenersRef.current.has(event)) {
       const callbacks = listenersRef.current.get(event)
@@ -128,6 +127,11 @@ export function useWebSocket(autoConnect = true) {
 export function useGameSocket(matchId) {
   const { isConnected, on, off, emit } = useWebSocket()
 
+  useEffect(() => {
+    if (!matchId || !isConnected) return
+    emit('game:join', { matchId })
+  }, [matchId, isConnected, emit])
+
   // Send move
   const sendMove = useCallback(
     (move) => {
@@ -166,8 +170,14 @@ export function useGameSocket(matchId) {
   const onTimeUpdate = useCallback((callback) => on('game:timeUpdate', callback), [on])
   const onGameEnd = useCallback((callback) => on('game:end', callback), [on])
   const onDrawOffer = useCallback((callback) => on('game:drawOffer', callback), [on])
-  const onOpponentDisconnected = useCallback((callback) => on('game:opponentDisconnected', callback), [on])
-  const onOpponentReconnected = useCallback((callback) => on('game:opponentReconnected', callback), [on])
+  const onOpponentDisconnected = useCallback(
+    (callback) => on('game:opponentDisconnected', callback),
+    [on]
+  )
+  const onOpponentReconnected = useCallback(
+    (callback) => on('game:opponentReconnected', callback),
+    [on]
+  )
 
   return {
     isConnected,
@@ -193,8 +203,8 @@ export function useRankedSocket() {
 
   // Join ranked queue
   const joinQueue = useCallback(
-    (userId, rating) => {
-      emit('ranked:joinQueue', { userId, rating })
+    (options = {}) => {
+      emit('ranked:joinQueue', options)
     },
     [emit]
   )
@@ -312,8 +322,14 @@ export function useTournamentSocket(tournamentId) {
   }, [tournamentId, emit])
 
   // Subscribe to tournament events
-  const onPlayerRegistered = useCallback((callback) => on('tournament:playerRegistered', callback), [on])
-  const onPlayerWithdrawn = useCallback((callback) => on('tournament:playerWithdrawn', callback), [on])
+  const onPlayerRegistered = useCallback(
+    (callback) => on('tournament:playerRegistered', callback),
+    [on]
+  )
+  const onPlayerWithdrawn = useCallback(
+    (callback) => on('tournament:playerWithdrawn', callback),
+    [on]
+  )
   const onTournamentStarted = useCallback((callback) => on('tournament:started', callback), [on])
   const onRoundUpdate = useCallback((callback) => on('tournament:roundUpdate', callback), [on])
   const onMatchReady = useCallback((callback) => on('tournament:matchReady', callback), [on])

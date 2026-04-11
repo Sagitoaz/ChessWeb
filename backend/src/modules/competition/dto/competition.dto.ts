@@ -1,5 +1,6 @@
-import { Transform, Type } from 'class-transformer'
+import { Transform, Type } from "class-transformer";
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsInt,
@@ -10,28 +11,48 @@ import {
   MaxLength,
   Min,
   MinLength,
-} from 'class-validator'
+} from "class-validator";
 
 export enum RankedTimeControl {
-  BLITZ = 'blitz',
-  RAPID = 'rapid',
-  CLASSICAL = 'classical',
+  BLITZ = "blitz",
+  RAPID = "rapid",
+  CLASSICAL = "classical",
 }
 
 export enum PreferredColor {
-  WHITE = 'white',
-  BLACK = 'black',
-  RANDOM = 'random',
+  WHITE = "white",
+  BLACK = "black",
+  RANDOM = "random",
 }
 
 export class JoinRankedQueueDto {
   @IsOptional()
   @IsEnum(RankedTimeControl)
-  timeControl?: RankedTimeControl
+  timeControl?: RankedTimeControl;
 
   @IsOptional()
   @IsEnum(PreferredColor)
-  preferredColor?: PreferredColor
+  preferredColor?: PreferredColor;
+}
+
+export enum RankedMatchCompletionResult {
+  WHITE_WIN = "WhiteWin",
+  BLACK_WIN = "BlackWin",
+  DRAW = "Draw",
+}
+
+export class CompleteRankedMatchDto {
+  @IsEnum(RankedMatchCompletionResult)
+  result!: RankedMatchCompletionResult;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  reason?: string;
+
+  @IsOptional()
+  @IsArray()
+  moves?: Array<Record<string, unknown>>;
 }
 
 export class RankedPaginationQueryDto {
@@ -39,34 +60,34 @@ export class RankedPaginationQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1
+  page?: number = 1;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(50)
-  pageSize?: number = 10
+  pageSize?: number = 10;
 }
 
 export enum TournamentStatus {
-  DRAFT = 'draft',
-  OPEN = 'open',
-  ONGOING = 'ongoing',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
+  DRAFT = "draft",
+  OPEN = "open",
+  ONGOING = "ongoing",
+  COMPLETED = "completed",
+  CANCELLED = "cancelled",
 }
 
 export class TournamentQueryDto extends RankedPaginationQueryDto {
   @IsOptional()
   @IsEnum(TournamentStatus)
-  status?: TournamentStatus
+  status?: TournamentStatus;
 }
 
 export enum TournamentFormat {
-  SWISS = 'swiss',
-  ROUND_ROBIN = 'round_robin',
-  KNOCKOUT = 'knockout',
+  SWISS = "swiss",
+  ROUND_ROBIN = "round_robin",
+  KNOCKOUT = "knockout",
 }
 
 export class CreateTournamentDto {
@@ -74,46 +95,46 @@ export class CreateTournamentDto {
   @IsNotEmpty()
   @MinLength(3)
   @MaxLength(120)
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  name!: string
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  name!: string;
 
   @IsEnum(TournamentFormat)
-  format!: TournamentFormat
+  format!: TournamentFormat;
 
   @IsDateString()
-  startAt!: string
+  startAt!: string;
 
   @IsDateString()
-  endAt!: string
+  endAt!: string;
 
   @Type(() => Number)
   @IsInt()
   @Min(2)
   @Max(4096)
-  maxParticipants!: number
+  maxParticipants!: number;
 }
 
 export enum CompetitionGameMode {
-  RANKED = 'ranked',
-  TOURNAMENT = 'tournament',
+  RANKED = "ranked",
+  TOURNAMENT = "tournament",
 }
 
 export class CreateCompetitionGameDto {
   @IsEnum(CompetitionGameMode)
-  mode!: CompetitionGameMode
+  mode!: CompetitionGameMode;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(128)
-  opponentId!: string
+  opponentId!: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(128)
-  tournamentId?: string
+  tournamentId?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(128)
-  initialFen?: string
+  initialFen?: string;
 }
