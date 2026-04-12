@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Loader } from '@/components/common'
 import gameService from '@/services/gameService'
@@ -34,7 +34,7 @@ export default function TournamentBracketPage() {
     loadBracket()
   }, [tournamentId])
 
-  const MatchCard = ({ match, roundIndex }) => {
+  const MatchCard = ({ match }) => {
     const getStatusColor = (status) => {
       const colors = {
         completed: 'border-green-300 bg-green-50',
@@ -73,7 +73,7 @@ export default function TournamentBracketPage() {
         className={`border-2 rounded-lg transition-all ${getStatusColor(match.status)} ${
           match.status !== 'pending' ? 'hover:shadow-md cursor-pointer' : 'opacity-70'
         }`}
-        onClick={() => match.status !== 'pending' && alert(`View match ${match.id} details`)}
+        onClick={() => navigate(`/tournaments/${tournamentId}`)}
       >
         <div className="p-3">
           <div className="flex items-center justify-between mb-2">
@@ -137,7 +137,13 @@ export default function TournamentBracketPage() {
 
           {match.status !== 'pending' && (
             <div className="mt-2 pt-2 border-t border-gray-200">
-              <Button variant="ghost" size="sm" fullWidth className="text-xs">
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                className="text-xs"
+                onClick={() => navigate(`/tournaments/${tournamentId}`)}
+              >
                 <Eye size={12} />
                 Xem chi tiết
               </Button>
@@ -293,8 +299,8 @@ export default function TournamentBracketPage() {
                   <p className="font-semibold mb-1">Lưu ý:</p>
                   <p>
                     Click vào các trận đấu để xem chi tiết. Bracket sẽ tự động cập nhật khi có kết
-                    quả mới. Các trận đấu "TBD" (To Be Determined) sẽ được xác định sau khi vòng
-                    trước kết thúc.
+                    quả mới. Các trận đấu &quot;TBD&quot; (To Be Determined) sẽ được xác định sau
+                    khi vòng trước kết thúc.
                   </p>
                 </div>
               </div>

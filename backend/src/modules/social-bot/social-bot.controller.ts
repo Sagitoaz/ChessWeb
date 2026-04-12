@@ -15,9 +15,12 @@ import { SocialBotService } from "./social-bot.service";
 import { BotMoveDto } from "./dto/bot-move.dto";
 import { CreateBotGameDto } from "./dto/create-bot-game.dto";
 import { CreateRoomDto } from "./dto/create-room.dto";
+import { UpdateTournamentMatchResultDto } from "./dto/manage-tournament-result.dto";
 import { SaveBotGameDto } from "./dto/save-bot-game.dto";
 
-type AuthRequest = { user?: { sub?: string; userId?: string } };
+type AuthRequest = {
+  user?: { sub?: string; userId?: string; roles?: string[] };
+};
 
 @Controller()
 @UseGuards(JwtAuthGuard)
@@ -30,6 +33,17 @@ export class SocialBotController {
       throw new UnauthorizedException("User ID not found in request");
     }
     return userId;
+  }
+
+  private getPrincipal(req: AuthRequest) {
+    return {
+      userId: this.getUserId(req),
+      roles: Array.isArray(req.user?.roles)
+        ? req.user.roles.filter(
+            (role): role is string => typeof role === "string",
+          )
+        : [],
+    };
   }
 
   @Post("rooms")
@@ -107,7 +121,67 @@ export class SocialBotController {
     @Param("id") id: string,
     @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<unknown>> {
-    const data = await this.service.startTournament(this.getUserId(req), id);
+    const data = await this.service.startTournament(this.getPrincipal(req), id);
+    return successResponse(data, requestId || null);
+  }
+
+  @Post("tournaments/:id/cancel")
+  async cancelTournament(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.cancelTournament(
+      this.getPrincipal(req),
+      id,
+    );
+    return successResponse(data, requestId || null);
+  }
+
+  @Post("tournaments/:id/matches/:matchId/result")
+  async updateTournamentMatchResult(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Param("matchId") matchId: string,
+    @Body() body: UpdateTournamentMatchResultDto,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.updateTournamentMatchResult(
+      this.getPrincipal(req),
+      id,
+      matchId,
+      body,
+    );
+    return successResponse(data, requestId || null);
+  }
+
+  @Post("tournaments/:id/participants/:userId/approve")
+  async approveTournamentParticipant(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Param("userId") userId: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.approveTournamentParticipant(
+      this.getPrincipal(req),
+      id,
+      userId,
+    );
+    return successResponse(data, requestId || null);
+  }
+
+  @Post("tournaments/:id/participants/:userId/reject")
+  async rejectTournamentParticipant(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Param("userId") userId: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.rejectTournamentParticipant(
+      this.getPrincipal(req),
+      id,
+      userId,
+    );
     return successResponse(data, requestId || null);
   }
 

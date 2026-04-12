@@ -100,8 +100,26 @@ export class CreateTournamentDto {
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   name!: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  prize?: string;
+
   @IsEnum(TournamentFormat)
   format!: TournamentFormat;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  timeControl?: string;
 
   @IsDateString()
   startAt!: string;

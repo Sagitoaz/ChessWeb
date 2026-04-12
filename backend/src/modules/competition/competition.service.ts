@@ -1465,6 +1465,8 @@ export class CompetitionService {
     const now = new Date();
     const document = {
       name: payload.name,
+      description: payload.description || null,
+      prize: payload.prize || null,
       format: payload.format,
       formatLabel:
         payload.format === "knockout"
@@ -1472,6 +1474,7 @@ export class CompetitionService {
           : payload.format === "round_robin"
             ? "Round Robin"
             : "Swiss",
+      timeControl: payload.timeControl || "10+0",
       startAt,
       endAt,
       registrationDeadline: startAt,

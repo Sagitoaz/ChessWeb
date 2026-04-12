@@ -153,8 +153,11 @@ export default function CreateTournamentPage() {
 
       const payload = {
         name: formData.name.trim(),
+        description: formData.description.trim() || undefined,
+        prize: formData.prize.trim() || undefined,
         format: formatMap[formData.format] || 'knockout',
         maxParticipants: Number(formData.maxParticipants),
+        timeControl: formData.timeControl,
         startAt: startAt.toISOString(),
         endAt: endAt.toISOString(),
       }

@@ -584,6 +584,17 @@ const gameService = {
 
   startTournament: (tournamentId) => gameAPI.post(`/tournaments/${tournamentId}/start`),
 
+  cancelTournament: (tournamentId) => gameAPI.post(`/tournaments/${tournamentId}/cancel`),
+
+  recordTournamentMatchResult: (tournamentId, matchId, data) =>
+    gameAPI.post(`/tournaments/${tournamentId}/matches/${matchId}/result`, data),
+
+  approveTournamentParticipant: (tournamentId, userId) =>
+    gameAPI.post(`/tournaments/${tournamentId}/participants/${userId}/approve`),
+
+  rejectTournamentParticipant: (tournamentId, userId) =>
+    gameAPI.post(`/tournaments/${tournamentId}/participants/${userId}/reject`),
+
   createTournament: (data) => gameAPI.post('/tournaments', data),
 }
 

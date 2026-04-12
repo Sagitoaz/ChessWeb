@@ -58,6 +58,15 @@ export default function TournamentDetailPage() {
   const [isOrganizer, setIsOrganizer] = useState(false)
   const [actionError, setActionError] = useState('')
 
+  const authRoles = Array.isArray(authUser?.roles)
+    ? authUser.roles.filter((role) => typeof role === 'string')
+    : authUser?.role && typeof authUser.role === 'string'
+      ? [authUser.role]
+      : []
+
+  const canManageTournament =
+    isOrganizer || authRoles.includes('admin') || authRoles.includes('mod')
+
   const loadTournament = useCallback(async () => {
     if (!tournamentId) return
     setLoading(true)
@@ -121,10 +130,26 @@ export default function TournamentDetailPage() {
     }
   }
 
-  const handleCancelTournament = () => {
-    // TODO: Real implementation
-    if (confirm('Bạn có chắc muốn hủy giải đấu này?')) {
-      navigate('/tournaments')
+  const handleCancelTournament = async () => {
+    if (!tournamentId) return
+    if (!window.confirm('Bạn có chắc muốn hủy giải đấu này?')) return
+    try {
+      await gameService.cancelTournament(tournamentId)
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể hủy giải đấu. Vui lòng thử lại.')
+    }
+  }
+
+  const handleSetMatchResult = async (matchId, winnerSlot) => {
+    if (!tournamentId) return
+    try {
+      await gameService.recordTournamentMatchResult(tournamentId, matchId, {
+        winnerSlot,
+      })
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể lưu kết quả trận đấu. Vui lòng thử lại.')
     }
   }
 
@@ -296,7 +321,7 @@ export default function TournamentDetailPage() {
                   Xem bracket
                 </Button>
               )}
-              {isOrganizer && (
+              {canManageTournament && (
                 <>
                   {tournament.status === 'registration' && (
                     <Button
@@ -460,31 +485,56 @@ export default function TournamentDetailPage() {
                   <div key={index} className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-3">{round.name}</h4>
                     <div className="space-y-2">
-                      {round.matches.map((match) => (
-                        <div
-                          key={match.id}
-                          className="flex items-center justify-between p-4 rounded-lg border border-gray-200"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900">{match.player1}</span>
-                              <span className="text-gray-500">vs</span>
-                              <span className="font-medium text-gray-900">{match.player2}</span>
+                      {round.matches.map((match) => {
+                        const player1Name = match.player1?.name || match.player1?.username || 'TBD'
+                        const player2Name = match.player2?.name || match.player2?.username || 'TBD'
+                        const resultLabel =
+                          match.result === '1-0'
+                            ? `${player1Name} thắng`
+                            : match.result === '0-1'
+                              ? `${player2Name} thắng`
+                              : match.result || 'Chưa thi đấu'
+
+                        return (
+                          <div key={match.id} className="rounded-lg border border-gray-200 p-4">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-900">{player1Name}</span>
+                                  <span className="text-gray-500">vs</span>
+                                  <span className="font-medium text-gray-900">{player2Name}</span>
+                                </div>
+                                <p className="mt-1 text-xs text-gray-500">#{match.id}</p>
+                              </div>
+                              <div className="flex items-center gap-3 flex-wrap justify-end">
+                                <span className="font-bold text-blue-600">{resultLabel}</span>
+                                {canManageTournament && match.status !== 'completed' && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleSetMatchResult(match.id, 'player1')}
+                                    >
+                                      {player1Name} thắng
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleSetMatchResult(match.id, 'player2')}
+                                    >
+                                      {player2Name} thắng
+                                    </Button>
+                                  </>
+                                )}
+                                <Button variant="outline" size="sm">
+                                  <Eye size={14} />
+                                  Xem
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            {match.result ? (
-                              <span className="font-bold text-blue-600">{match.result}</span>
-                            ) : (
-                              <span className="text-gray-500 text-sm">Chưa thi đấu</span>
-                            )}
-                            <Button variant="outline" size="sm">
-                              <Eye size={14} />
-                              Xem
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 ))}

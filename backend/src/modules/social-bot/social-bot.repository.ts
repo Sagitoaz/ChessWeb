@@ -107,6 +107,20 @@ export class SocialBotRepository {
     return doc;
   }
 
+  async updateTournamentParticipantStatus(
+    tournamentId: ObjectId | string,
+    userId: string,
+    status: string,
+  ) {
+    return this.db
+      .collection("tournament_participants")
+      .findOneAndUpdate(
+        { tournamentId, userId },
+        { $set: { status, updatedAt: new Date() } },
+        { returnDocument: "after" },
+      );
+  }
+
   async removeTournamentParticipant(
     tournamentId: ObjectId | string,
     userId: string,
