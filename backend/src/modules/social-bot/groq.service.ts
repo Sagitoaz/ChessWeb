@@ -140,15 +140,15 @@ export class GroqService {
       "Đầu vào là lịch sử ván đấu (PGN).",
       "BẮT BUỘC trả lời bằng tiếng Việt CÓ DẤU.",
       "Không được tiết lộ nước đi cụ thể, không được viết dạng tọa độ (ví dụ: e4, Nf3).",
-      "Chỉ đưa định hướng chiến thuật tổng quát, dễ áp dụng ngay.",
+      "Chỉ đưa định hướng chiến thuật tổng quát, dễ áp dụng ngay; phải nói rõ người chơi cần để ý điều gì trên bàn cờ và nên tìm kiểu nước đi nào, nhưng tuyệt đối không nói luôn nước đi.",
       isDetailed
         ? "Mức chi tiết: CHI TIẾT. Trả lời 6-10 câu, rõ ràng, có lưu ý rủi ro."
         : "Mức chi tiết: NHANH. Trả lời 3-4 câu súc tích.",
       "Định dạng bắt buộc:",
       "1) Nhận xét tổng quan: ...",
       "2) Điểm mạnh nên duy trì: ...",
-      "3) Lưu ý chiến thuật quan trọng: ...",
-      "4) Kế hoạch 2-3 lượt tới (ý tưởng): ...",
+      "3) Lưu ý chiến thuật quan trọng: nêu tín hiệu cần quan sát và bẫy cần tránh.",
+      "4) Kế hoạch 2-3 lượt tới (ý tưởng): mô tả kiểu nước nên ưu tiên, ví dụ đổi quân, siết trung tâm, tăng áp lực, nhưng không được nêu nước đi cụ thể.",
       "5) Cạm bẫy cần tránh: ...",
       "Ưu tiên các chủ đề: kiểm soát trung tâm, an toàn vua, phối hợp quân, cột mở, ô yếu, quân treo.",
       `PGN: ${sanitizedPgn}`,

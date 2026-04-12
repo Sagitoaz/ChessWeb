@@ -17,6 +17,7 @@ import { SaveBotGameDto } from "./dto/save-bot-game.dto";
 import { BotTacticalHintDto } from "./dto/bot-tactical-hint.dto";
 import { GroqService } from "./groq.service";
 import { StockfishService } from "./stockfish.service";
+import { RankedGateway } from "../competition/ranked.gateway";
 
 interface TournamentPrincipal {
   userId: string;
@@ -38,15 +39,23 @@ type ReplayAiCacheEntry = {
 export class SocialBotService {
   private readonly aiFallbackMessage =
     "AI đang bận, vui lòng phân tích lại sau";
+  private readonly tournamentNoShowTimeoutMs = 5 * 60 * 1000;
+  private readonly tournamentMonitorTickMs = 30 * 1000;
   private readonly replayAiCache = new Map<string, ReplayAiCacheEntry>();
   private readonly replayAiCacheTtlMs = 10 * 60 * 1000;
   private readonly replayAiCacheMaxEntries = 1000;
+  private readonly tournamentMonitorTimer: NodeJS.Timeout;
 
   constructor(
     private readonly repo: SocialBotRepository,
     private readonly stockfishService: StockfishService,
     private readonly groqService: GroqService,
-  ) {}
+    private readonly rankedGateway: RankedGateway,
+  ) {
+    this.tournamentMonitorTimer = setInterval(() => {
+      void this.processTournamentNoShows();
+    }, this.tournamentMonitorTickMs);
+  }
 
   private makeReplayAiCacheKey(
     gameId: string,
@@ -445,12 +454,106 @@ export class SocialBotService {
         state: "InGame",
         status: "active",
         initialFEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        noShowDeadlineAt: new Date(
+          now.getTime() + this.tournamentNoShowTimeoutMs,
+        ),
         createdAt: now,
         updatedAt: now,
         finishedAt: null,
       });
 
       match.gameId = String(game._id);
+    }
+  }
+
+  private async processTournamentNoShows(): Promise<void> {
+    const tournaments = await this.repo.findTournamentsByStatus([
+      "ongoing",
+      "scheduled",
+    ]);
+
+    const now = Date.now();
+
+    for (const tournament of tournaments as Array<any>) {
+      const tournamentId = String(tournament?._id || "");
+      if (!tournamentId) continue;
+
+      const rounds = this.cloneTournamentRounds(tournament.rounds);
+      let cancelledByNoShow = false;
+
+      for (const round of rounds as Array<any>) {
+        const matches = Array.isArray(round?.matches) ? round.matches : [];
+
+        for (const match of matches as Array<any>) {
+          const matchStatus = this.normalizeMatchStatus(match?.status);
+          if (matchStatus !== "scheduled" && matchStatus !== "ongoing")
+            continue;
+
+          const gameId = String(match?.gameId || "");
+          if (!gameId) continue;
+
+          const game = await this.repo.findGameById(gameId);
+          if (!game) continue;
+          if (game.finishedAt || game.state === "Saved") continue;
+
+          const deadlineRaw = game.noShowDeadlineAt || game.createdAt;
+          const deadline = deadlineRaw ? new Date(deadlineRaw).getTime() : NaN;
+          if (!Number.isFinite(deadline) || now < deadline) continue;
+
+          const moves = Array.isArray(game.moves) ? game.moves : [];
+
+          if (moves.length === 0) {
+            await this.repo.updateGameById(gameId, {
+              state: "Saved",
+              status: "cancelled",
+              result: "draw",
+              finishedAt: new Date(),
+              updatedAt: new Date(),
+              endReason: "double_no_show",
+            });
+
+            await this.repo.updateTournamentById(tournamentId, {
+              status: "cancelled",
+              cancelledAt: new Date(),
+              cancelReason: `Double no-show at match ${String(match?.id || "")}`,
+              updatedAt: new Date(),
+            });
+
+            this.rankedGateway.emitTournamentRoundUpdate({
+              tournamentId,
+              status: "cancelled",
+              rounds,
+            });
+            cancelledByNoShow = true;
+            break;
+          }
+
+          if (moves.length === 1) {
+            await this.repo.updateGameById(gameId, {
+              state: "Saved",
+              status: "finished",
+              result: "white_win",
+              finishedAt: new Date(),
+              updatedAt: new Date(),
+              endReason: "no_show_forfeit",
+            });
+
+            await this.updateTournamentMatchResult(
+              {
+                userId: String(tournament.createdBy || "system"),
+                roles: ["admin"],
+              },
+              tournamentId,
+              String(match.id || ""),
+              { winnerSlot: TournamentWinnerSlot.PLAYER1, overwrite: true },
+            );
+          }
+        }
+
+        if (cancelledByNoShow) {
+          break;
+        }
+      }
     }
   }
 
@@ -782,6 +885,12 @@ export class SocialBotService {
       status: "pending",
     });
 
+    this.rankedGateway.emitTournamentPlayerRegistered({
+      tournamentId,
+      userId,
+      status: "pending",
+    });
+
     await this.repo.updateTournamentById(tournamentId, {
       status:
         maxParticipants > 0 && currentParticipants + 1 >= maxParticipants
@@ -817,6 +926,11 @@ export class SocialBotService {
         "User is not a participant of the tournament",
       );
     }
+
+    this.rankedGateway.emitTournamentPlayerWithdrawn({
+      tournamentId,
+      userId,
+    });
 
     await this.repo.updateTournamentById(tournamentId, {
       status: "registration",
@@ -934,6 +1048,33 @@ export class SocialBotService {
       updatedAt: new Date(),
     });
 
+    if (updated) {
+      this.rankedGateway.emitTournamentStarted({
+        tournamentId,
+        status: String(updated.status || "ongoing"),
+        rounds,
+      });
+      this.rankedGateway.emitTournamentRoundUpdate({
+        tournamentId,
+        roundIndex: 0,
+        status: String(updated.status || "ongoing"),
+        rounds,
+      });
+      const firstRound = Array.isArray(rounds) ? (rounds[0] as any) : null;
+      if (Array.isArray(firstRound?.matches)) {
+        for (const match of firstRound.matches as Array<any>) {
+          if (String(match?.gameId || "").length > 0) {
+            this.rankedGateway.emitTournamentMatchReady({
+              tournamentId,
+              matchId: String(match.id || ""),
+              gameId: String(match.gameId),
+              roundIndex: 0,
+            });
+          }
+        }
+      }
+    }
+
     return {
       started: true,
       tournamentId,
@@ -1025,6 +1166,12 @@ export class SocialBotService {
       updatedAt: new Date(),
     });
 
+    this.rankedGateway.emitTournamentPlayerRegistered({
+      tournamentId,
+      userId: participantUserId,
+      status: "active",
+    });
+
     return {
       approved: true,
       tournamentId,
@@ -1068,6 +1215,11 @@ export class SocialBotService {
       normalizedId,
       participantUserId,
     );
+
+    this.rankedGateway.emitTournamentPlayerWithdrawn({
+      tournamentId,
+      userId: participantUserId,
+    });
 
     await this.repo.updateTournamentById(tournamentId, {
       status: "registration",
@@ -1191,6 +1343,27 @@ export class SocialBotService {
         : tournament.completedAt || null,
       updatedAt: new Date(),
     });
+
+    this.rankedGateway.emitTournamentRoundUpdate({
+      tournamentId,
+      roundIndex: found.roundIndex,
+      status: tournamentCompleted ? "completed" : "ongoing",
+      rounds,
+    });
+
+    const nextRound = rounds[found.roundIndex + 1] as any;
+    if (Array.isArray(nextRound?.matches)) {
+      for (const nextMatch of nextRound.matches as Array<any>) {
+        if (String(nextMatch?.gameId || "").length > 0) {
+          this.rankedGateway.emitTournamentMatchReady({
+            tournamentId,
+            matchId: String(nextMatch.id || ""),
+            gameId: String(nextMatch.gameId),
+            roundIndex: found.roundIndex + 1,
+          });
+        }
+      }
+    }
 
     return {
       tournamentId,

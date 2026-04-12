@@ -73,6 +73,62 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }, this.matchmakingTickMs);
   }
 
+  emitTournamentPlayerRegistered(payload: {
+    tournamentId: string;
+    userId: string;
+    status?: string;
+  }): void {
+    this.server.emit("tournament:playerRegistered", {
+      ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitTournamentPlayerWithdrawn(payload: {
+    tournamentId: string;
+    userId: string;
+  }): void {
+    this.server.emit("tournament:playerWithdrawn", {
+      ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitTournamentStarted(payload: {
+    tournamentId: string;
+    status?: string;
+    rounds?: unknown;
+  }): void {
+    this.server.emit("tournament:started", {
+      ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitTournamentRoundUpdate(payload: {
+    tournamentId: string;
+    roundIndex?: number;
+    status?: string;
+    rounds?: unknown;
+  }): void {
+    this.server.emit("tournament:roundUpdate", {
+      ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitTournamentMatchReady(payload: {
+    tournamentId: string;
+    matchId: string;
+    gameId?: string | null;
+    roundIndex?: number;
+  }): void {
+    this.server.emit("tournament:matchReady", {
+      ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
   async handleConnection(client: Socket): Promise<void> {
     try {
       const user = this.authenticateClient(client);

@@ -1468,12 +1468,7 @@ export class CompetitionService {
       description: payload.description || null,
       prize: payload.prize || null,
       format: payload.format,
-      formatLabel:
-        payload.format === "knockout"
-          ? "Single Elimination"
-          : payload.format === "round_robin"
-            ? "Round Robin"
-            : "Swiss",
+      formatLabel: "Single Elimination",
       timeControl: payload.timeControl || "10+0",
       startAt,
       endAt,

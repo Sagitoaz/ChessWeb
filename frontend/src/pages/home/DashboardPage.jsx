@@ -10,10 +10,11 @@
  * Protected route - Requires authentication
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import authService from '@/services/authService'
+import gameService from '@/services/gameService'
 import { THEME, STATUS_COLORS } from '@/styles/theme'
 import { Avatar } from '@/components/common'
 import {
@@ -158,8 +159,8 @@ export default function DashboardPage() {
   const { user, hasHydrated } = useAuthStore()
   const token = useAuthStore((state) => state.token)
   const setAuthLogin = useAuthStore((state) => state.login)
-  const recentGames = []
-  const upcomingTournaments = []
+  const [recentGames, setRecentGames] = useState([])
+  const [upcomingTournaments, setUpcomingTournaments] = useState([])
 
   useEffect(() => {
     if (!hasHydrated || !token) return
@@ -167,10 +168,57 @@ export default function DashboardPage() {
     let mounted = true
     const refresh = async () => {
       try {
-        const data = await authService.getCurrentUser()
-        const nextUser = data?.user ?? data
+        const [profileResponse, gamesResponse, tournamentsResponse] = await Promise.all([
+          authService.getCurrentUser(),
+          gameService.getUserGames({ page: 1, pageSize: 4 }),
+          gameService.getTournaments({ status: 'registration', page: 1, pageSize: 4 }),
+        ])
+
+        const profileData = profileResponse?.data ?? profileResponse
+        const nextUser = profileData?.user ?? profileData
         if (mounted && nextUser) {
           setAuthLogin(nextUser, token)
+        }
+
+        if (mounted) {
+          const gamesData = gamesResponse?.data ?? gamesResponse
+          const items = Array.isArray(gamesData?.items) ? gamesData.items : []
+          const games = Array.isArray(gamesData?.games) ? gamesData.games : []
+          const gameMap = new Map(games.map((game) => [String(game.id || game.gameId), game]))
+          const normalizedGames = items.map((item) => {
+            const game = gameMap.get(String(item.gameId))
+            const opponent =
+              item.playerSide === 'white'
+                ? game?.blackPlayer?.username || 'Đối thủ'
+                : game?.whitePlayer?.username || 'Đối thủ'
+
+            return {
+              id: item.gameId,
+              opponent,
+              result: item.result || 'draw',
+              eloChange: 0,
+              mode: item.mode || 'ranked',
+              time: item.finishedAt || item.createdAt || new Date().toISOString(),
+            }
+          })
+
+          const tournamentsData = tournamentsResponse?.data ?? tournamentsResponse
+          const tournaments = Array.isArray(tournamentsData?.tournaments)
+            ? tournamentsData.tournaments
+            : []
+          const normalizedTournaments = tournaments.map((tournament) => ({
+            id: tournament.id || tournament._id,
+            name: tournament.name || 'Giải đấu',
+            players: tournament.participants || tournament.currentPlayers || 0,
+            startTime:
+              tournament.startAt ||
+              tournament.startTime ||
+              tournament.start_date ||
+              new Date().toISOString(),
+          }))
+
+          setRecentGames(normalizedGames)
+          setUpcomingTournaments(normalizedTournaments)
         }
       } catch {
         // Keep dashboard usable with current store snapshot.

@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import authService from '@/services/authService'
+import gameService from '@/services/gameService'
 
 const StatCard = ({ label, value, color = 'blue' }) => {
   const colors = {
@@ -54,16 +55,43 @@ const ProfilePage = () => {
   const { user: authUser } = useAuthStore()
   const token = useAuthStore((state) => state.token)
   const setAuthLogin = useAuthStore((state) => state.login)
-  const recentGames = []
+  const [recentGames, setRecentGames] = useState([])
 
   useEffect(() => {
     let mounted = true
     const refresh = async () => {
       try {
-        const data = await authService.getCurrentUser()
-        const nextUser = data?.user ?? data
+        const [profileResponse, gamesResponse] = await Promise.all([
+          authService.getCurrentUser(),
+          gameService.getUserGames({ page: 1, pageSize: 5 }),
+        ])
+        const profileData = profileResponse?.data ?? profileResponse
+        const nextUser = profileData?.user ?? profileData
         if (mounted && nextUser && token) {
           setAuthLogin(nextUser, token)
+        }
+
+        if (mounted) {
+          const gamesData = gamesResponse?.data ?? gamesResponse
+          const items = Array.isArray(gamesData?.items) ? gamesData.items : []
+          const games = Array.isArray(gamesData?.games) ? gamesData.games : []
+          const gameMap = new Map(games.map((game) => [String(game.id || game.gameId), game]))
+          const normalizedGames = items.map((item) => {
+            const game = gameMap.get(String(item.gameId))
+            const opponentUsername =
+              item.playerSide === 'white'
+                ? game?.blackPlayer?.username || 'Đối thủ'
+                : game?.whitePlayer?.username || 'Đối thủ'
+
+            return {
+              opponent: opponentUsername,
+              result: item.result || 'draw',
+              eloChange: 0,
+              date: item.finishedAt || item.createdAt || new Date().toISOString(),
+            }
+          })
+
+          setRecentGames(normalizedGames)
         }
       } catch {
         // Keep page usable with current store snapshot.

@@ -87,8 +87,6 @@ export class TournamentQueryDto extends RankedPaginationQueryDto {
 }
 
 export enum TournamentFormat {
-  SWISS = "swiss",
-  ROUND_ROBIN = "round_robin",
   KNOCKOUT = "knockout",
 }
 

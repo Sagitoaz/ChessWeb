@@ -539,6 +539,11 @@ const gameService = {
     return normalizeRankedStats(response)
   },
 
+  getUserGames: async (filters = {}) => {
+    const response = await gameAPI.get('/users/games', { params: filters })
+    return unwrapApiEnvelope(response)
+  },
+
   getUserModeStats: async (mode) => {
     const response = await gameAPI.get('/users/stats/by-mode', {
       params: mode ? { mode } : {},

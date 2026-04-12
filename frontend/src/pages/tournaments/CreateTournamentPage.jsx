@@ -17,28 +17,10 @@ import {
 // Tournament format options
 const FORMATS = [
   {
-    value: 'single-elimination',
-    label: 'Single Elimination',
+    value: 'knockout',
+    label: 'Knockout',
     description: 'Thua 1 trận là bị loại',
     icon: '🏆',
-  },
-  {
-    value: 'double-elimination',
-    label: 'Double Elimination',
-    description: 'Thua 2 trận mới bị loại',
-    icon: '🎯',
-  },
-  {
-    value: 'round-robin',
-    label: 'Round Robin',
-    description: 'Mọi người đấu với nhau',
-    icon: '🔄',
-  },
-  {
-    value: 'swiss',
-    label: 'Swiss',
-    description: 'Đấu theo điểm tương đồng',
-    icon: '⚖️',
   },
 ]
 
@@ -66,7 +48,7 @@ export default function CreateTournamentPage() {
     prize: '',
 
     // Step 2: Settings
-    format: 'single-elimination',
+    format: 'knockout',
     maxParticipants: 8,
     timeControl: '10+0',
 
@@ -141,13 +123,6 @@ export default function CreateTournamentPage() {
     setIsCreating(true)
 
     try {
-      const formatMap = {
-        'single-elimination': 'knockout',
-        'double-elimination': 'knockout',
-        'round-robin': 'round_robin',
-        swiss: 'swiss',
-      }
-
       const startAt = new Date(`${formData.startDate}T${formData.startTime}:00`)
       const endAt = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
 
@@ -155,7 +130,7 @@ export default function CreateTournamentPage() {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         prize: formData.prize.trim() || undefined,
-        format: formatMap[formData.format] || 'knockout',
+        format: 'knockout',
         maxParticipants: Number(formData.maxParticipants),
         timeControl: formData.timeControl,
         startAt: startAt.toISOString(),
@@ -359,8 +334,7 @@ export default function CreateTournamentPage() {
                     ))}
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    {formData.format.includes('elimination') &&
-                      'Số người phải là lũy thừa của 2 (4, 8, 16, 32, 64)'}
+                    Giải knockout cần số người là lũy thừa của 2 (4, 8, 16, 32, 64).
                   </p>
                 </div>
 

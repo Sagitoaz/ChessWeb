@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Loader } from '@/components/common'
 import gameService from '@/services/gameService'
 import { useAuthStore } from '@/store'
+import { useTournamentSocket } from '@/hooks'
 import {
   ArrowLeft,
   Trophy,
@@ -57,7 +58,17 @@ export default function TournamentDetailPage() {
   const [tournament, setTournament] = useState(null)
   const [isRegistered, setIsRegistered] = useState(false)
   const [isOrganizer, setIsOrganizer] = useState(false)
+  const [participantStatus, setParticipantStatus] = useState(null)
   const [actionError, setActionError] = useState('')
+  const [liveNotice, setLiveNotice] = useState('')
+  const {
+    isConnected: isTournamentSocketConnected,
+    onPlayerRegistered,
+    onPlayerWithdrawn,
+    onTournamentStarted,
+    onRoundUpdate,
+    onMatchReady,
+  } = useTournamentSocket(tournamentId)
 
   const authRoles = Array.isArray(authUser?.roles)
     ? authUser.roles.filter((role) => typeof role === 'string')
@@ -81,15 +92,15 @@ export default function TournamentDetailPage() {
       setTournament(normalized)
 
       const participantRows = Array.isArray(normalized.participants) ? normalized.participants : []
-      setIsRegistered(
-        Boolean(
-          currentUserId &&
-          participantRows.some(
-            (participant) =>
-              participant.userId === currentUserId || participant.id === currentUserId
-          )
-        )
-      )
+      const currentParticipant =
+        currentUserId && participantRows.length > 0
+          ? participantRows.find(
+              (participant) =>
+                participant.userId === currentUserId || participant.id === currentUserId
+            )
+          : null
+      setIsRegistered(Boolean(currentParticipant))
+      setParticipantStatus(currentParticipant?.status || null)
       setIsOrganizer(
         Boolean(
           currentUserId &&
@@ -108,6 +119,35 @@ export default function TournamentDetailPage() {
   useEffect(() => {
     void loadTournament()
   }, [loadTournament])
+
+  useEffect(() => {
+    if (!isTournamentSocketConnected || !tournamentId) return undefined
+
+    const refreshIfRelevant = (payload) => {
+      if (String(payload?.tournamentId || '') !== String(tournamentId)) return
+      setLiveNotice('Giải đấu vừa được cập nhật. Đang tải lại...')
+      void loadTournament()
+    }
+
+    onPlayerRegistered(refreshIfRelevant)
+    onPlayerWithdrawn(refreshIfRelevant)
+    onTournamentStarted(refreshIfRelevant)
+    onRoundUpdate(refreshIfRelevant)
+    onMatchReady(refreshIfRelevant)
+
+    return () => {
+      setLiveNotice('')
+    }
+  }, [
+    isTournamentSocketConnected,
+    loadTournament,
+    onMatchReady,
+    onPlayerRegistered,
+    onPlayerWithdrawn,
+    onRoundUpdate,
+    onTournamentStarted,
+    tournamentId,
+  ])
 
   const handleRegister = async () => {
     if (!tournamentId) return
@@ -257,7 +297,16 @@ export default function TournamentDetailPage() {
   const canRegister =
     tournament.status === 'registration' &&
     tournament.participants.length < tournament.maxParticipants &&
-    !isRegistered
+    !participantStatus
+
+  const participantStateLabel =
+    participantStatus === 'pending'
+      ? 'Đã đăng ký, đang chờ duyệt'
+      : participantStatus === 'active'
+        ? 'Đã đăng ký, đã duyệt'
+        : participantStatus === 'rejected'
+          ? 'Đã bị từ chối'
+          : null
 
   return (
     <div className="min-h-screen bg-[#e1edff] p-4">
@@ -349,6 +398,11 @@ export default function TournamentDetailPage() {
                   Đăng ký tham gia
                 </Button>
               )}
+              {participantStateLabel && (
+                <div className="flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+                  {participantStateLabel}
+                </div>
+              )}
               {isRegistered && tournament.status === 'registration' && (
                 <Button variant="outline" onClick={handleWithdraw}>
                   <UserX size={18} />
@@ -389,6 +443,12 @@ export default function TournamentDetailPage() {
             {actionError && (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {actionError}
+              </div>
+            )}
+
+            {liveNotice && !actionError && (
+              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                {liveNotice}
               </div>
             )}
           </div>
@@ -587,12 +647,20 @@ export default function TournamentDetailPage() {
                                   size="sm"
                                   onClick={() =>
                                     match.gameId
-                                      ? navigate(`/replays/${match.gameId}`)
+                                      ? match.status === 'completed'
+                                        ? navigate(`/replays/${match.gameId}`)
+                                        : navigate(
+                                            `/tournaments/${tournamentId}/matches/${match.gameId}/play`
+                                          )
                                       : navigate(`/tournaments/${tournamentId}/bracket`)
                                   }
                                 >
                                   <Eye size={14} />
-                                  {match.gameId ? 'Xem ván' : 'Xem'}
+                                  {match.gameId
+                                    ? match.status === 'completed'
+                                      ? 'Xem ván'
+                                      : 'Vào trận'
+                                    : 'Xem'}
                                 </Button>
                               </div>
                             </div>

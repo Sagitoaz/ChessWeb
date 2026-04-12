@@ -66,6 +66,17 @@ export class SocialBotRepository {
       );
   }
 
+  async findTournamentsByStatus(statuses: string[]) {
+    if (!Array.isArray(statuses) || statuses.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .collection("tournaments")
+      .find({ status: { $in: statuses } })
+      .toArray();
+  }
+
   async findTournamentParticipants(tournamentId: ObjectId | string) {
     return this.db
       .collection("tournament_participants")

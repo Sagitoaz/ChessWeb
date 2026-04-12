@@ -39,6 +39,7 @@ const TournamentListPage = lazy(() => import('@pages/tournaments/TournamentListP
 const CreateTournamentPage = lazy(() => import('@pages/tournaments/CreateTournamentPage'))
 const TournamentDetailPage = lazy(() => import('@pages/tournaments/TournamentDetailPage'))
 const TournamentBracketPage = lazy(() => import('@pages/tournaments/TournamentBracketPage'))
+const TournamentMatchPlayPage = lazy(() => import('@pages/tournaments/TournamentMatchPlayPage'))
 
 // Bot
 const BotSelectPage = lazy(() => import('@pages/bot/BotSelectPage'))
@@ -167,6 +168,10 @@ function AppRoutes() {
           <Route path="/tournaments/create" element={<CreateTournamentPage />} />
           <Route path="/tournaments/:tournamentId" element={<TournamentDetailPage />} />
           <Route path="/tournaments/:tournamentId/bracket" element={<TournamentBracketPage />} />
+          <Route
+            path="/tournaments/:tournamentId/matches/:gameId/play"
+            element={<TournamentMatchPlayPage />}
+          />
 
           {/* Chơi với Bot */}
           <Route path="/bot" element={<BotSelectPage />} />
