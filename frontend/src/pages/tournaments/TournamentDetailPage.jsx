@@ -153,6 +153,26 @@ export default function TournamentDetailPage() {
     }
   }
 
+  const handleApproveParticipant = async (participantUserId) => {
+    if (!tournamentId) return
+    try {
+      await gameService.approveTournamentParticipant(tournamentId, participantUserId)
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể duyệt người chơi. Vui lòng thử lại.')
+    }
+  }
+
+  const handleRejectParticipant = async (participantUserId) => {
+    if (!tournamentId) return
+    try {
+      await gameService.rejectTournamentParticipant(tournamentId, participantUserId)
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể từ chối người chơi. Vui lòng thử lại.')
+    }
+  }
+
   const getStatusBadge = (status) => {
     const badges = {
       registration: { text: 'Đang mở đăng ký', color: 'bg-green-100 text-green-800' },
@@ -165,6 +185,21 @@ export default function TournamentDetailPage() {
       <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${badge.color}`}>
         {badge.text}
       </span>
+    )
+  }
+
+  const getParticipantBadge = (status) => {
+    const badges = {
+      pending: { text: 'Chờ duyệt', color: 'bg-amber-100 text-amber-800' },
+      active: { text: 'Đã duyệt', color: 'bg-green-100 text-green-800' },
+      rejected: { text: 'Bị từ chối', color: 'bg-red-100 text-red-800' },
+      withdrawn: { text: 'Đã rút lui', color: 'bg-gray-100 text-gray-800' },
+      eliminated: { text: 'Đã bị loại', color: 'bg-gray-100 text-gray-800' },
+    }
+
+    const badge = badges[status] || badges.pending
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-semibold ${badge.color}`}>{badge.text}</span>
     )
   }
 
@@ -455,21 +490,27 @@ export default function TournamentDetailPage() {
                         </div>
                       </div>
                       <div>
-                        {participant.status === 'active' && (
-                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
-                            Đang chơi
-                          </span>
-                        )}
-                        {participant.status === 'eliminated' && (
-                          <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded">
-                            Đã bị loại
-                          </span>
-                        )}
-                        {participant.status === 'withdrawn' && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">
-                            Đã rút lui
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                          {getParticipantBadge(participant.status)}
+                          {canManageTournament && participant.status === 'pending' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleApproveParticipant(participant.userId)}
+                              >
+                                Duyệt
+                              </Button>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => handleRejectParticipant(participant.userId)}
+                              >
+                                Từ chối
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

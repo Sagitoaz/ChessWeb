@@ -732,13 +732,9 @@ export class SocialBotService {
       throw new BadRequestException("Participant request is not pending");
     }
 
-    const currentParticipants = await this.repo.countTournamentParticipants(
-      normalizedId,
-    );
+    const currentParticipants =
+      await this.repo.countTournamentParticipants(normalizedId);
     const maxParticipants = Number(tournament.maxParticipants || 0);
-    if (maxParticipants > 0 && currentParticipants >= maxParticipants) {
-      throw new BadRequestException("Tournament is full");
-    }
 
     await this.repo.updateTournamentParticipantStatus(
       normalizedId,
@@ -793,7 +789,10 @@ export class SocialBotService {
       throw new BadRequestException("Active participant cannot be rejected");
     }
 
-    await this.repo.removeTournamentParticipant(normalizedId, participantUserId);
+    await this.repo.removeTournamentParticipant(
+      normalizedId,
+      participantUserId,
+    );
 
     await this.repo.updateTournamentById(tournamentId, {
       status: "registration",
