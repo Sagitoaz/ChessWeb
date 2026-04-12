@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { Chess } from "chess.js";
 import { ObjectId } from "mongodb";
 import { SocialBotRepository } from "./social-bot.repository";
 import { BotMoveDto } from "./dto/bot-move.dto";
@@ -13,6 +14,8 @@ import {
   UpdateTournamentMatchResultDto,
 } from "./dto/manage-tournament-result.dto";
 import { SaveBotGameDto } from "./dto/save-bot-game.dto";
+import { BotTacticalHintDto } from "./dto/bot-tactical-hint.dto";
+import { GroqService } from "./groq.service";
 import { StockfishService } from "./stockfish.service";
 
 interface TournamentPrincipal {
@@ -20,12 +23,118 @@ interface TournamentPrincipal {
   roles: string[];
 }
 
+type ReplayAiCacheEntry = {
+  aiCommentary: string;
+  analysis: {
+    fen: string;
+    userMove: string;
+    stockfishBestMove: string;
+    score: number;
+  };
+  expiresAt: number;
+};
+
 @Injectable()
 export class SocialBotService {
+  private readonly aiFallbackMessage =
+    "AI đang bận, vui lòng phân tích lại sau";
+  private readonly replayAiCache = new Map<string, ReplayAiCacheEntry>();
+  private readonly replayAiCacheTtlMs = 10 * 60 * 1000;
+  private readonly replayAiCacheMaxEntries = 1000;
+
   constructor(
     private readonly repo: SocialBotRepository,
     private readonly stockfishService: StockfishService,
+    private readonly groqService: GroqService,
   ) {}
+
+  private makeReplayAiCacheKey(
+    gameId: string,
+    fen: string,
+    userMove: string,
+  ): string {
+    return `${gameId}::${fen}::${userMove}`;
+  }
+
+  private getReplayAiCache(
+    key: string,
+  ): { aiCommentary: string; analysis: ReplayAiCacheEntry["analysis"] } | null {
+    const cached = this.replayAiCache.get(key);
+    if (!cached) return null;
+
+    if (cached.expiresAt < Date.now()) {
+      this.replayAiCache.delete(key);
+      return null;
+    }
+
+    return {
+      aiCommentary: cached.aiCommentary,
+      analysis: cached.analysis,
+    };
+  }
+
+  private setReplayAiCache(
+    key: string,
+    payload: { aiCommentary: string; analysis: ReplayAiCacheEntry["analysis"] },
+  ): void {
+    this.replayAiCache.set(key, {
+      ...payload,
+      expiresAt: Date.now() + this.replayAiCacheTtlMs,
+    });
+
+    if (this.replayAiCache.size > this.replayAiCacheMaxEntries) {
+      const oldestKey = this.replayAiCache.keys().next().value;
+      if (oldestKey) {
+        this.replayAiCache.delete(oldestKey);
+      }
+    }
+  }
+
+  private isLegalUciMove(fen: string, uci: string | undefined): boolean {
+    if (!uci || uci.length < 4) {
+      return false;
+    }
+
+    try {
+      const chess = new Chess(fen);
+      const from = uci.slice(0, 2);
+      const to = uci.slice(2, 4);
+      const promotion =
+        uci.length > 4 ? uci.slice(4, 5).toLowerCase() : undefined;
+      const legalMoves = chess.moves({ verbose: true });
+
+      return legalMoves.some(
+        (mv) =>
+          mv.from === from &&
+          mv.to === to &&
+          (promotion ? mv.promotion === promotion : true),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private getFallbackLegalMove(
+    fen: string,
+  ): { bestMoveUci: string; evaluation: number | null } | null {
+    try {
+      const chess = new Chess(fen);
+      const legalMoves = chess.moves({ verbose: true });
+      if (legalMoves.length === 0) {
+        return null;
+      }
+
+      const picked = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      const promotion = picked.promotion ? String(picked.promotion) : "";
+
+      return {
+        bestMoveUci: `${picked.from}${picked.to}${promotion}`,
+        evaluation: null,
+      };
+    } catch {
+      return null;
+    }
+  }
 
   private makeRoomCode(): string {
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -144,6 +253,7 @@ export class SocialBotService {
     matchIndex: number,
     winnerName: string,
     winnerSeed: number | null,
+    winnerUserId: string | null,
   ) {
     const currentRound = rounds[roundIndex] as any;
     const currentMatch = currentRound?.matches?.[matchIndex] as any;
@@ -173,6 +283,7 @@ export class SocialBotService {
     const nextPlayer = {
       name: winnerName,
       seed: winnerSeed,
+      userId: winnerUserId,
       score: null,
     };
 
@@ -191,7 +302,8 @@ export class SocialBotService {
         const player2Name = String(match?.player2?.name || "");
         if (
           match.status !== "completed" &&
-          (player1Name !== "TBD" || player2Name !== "TBD")
+          player1Name !== "TBD" &&
+          player2Name !== "TBD"
         ) {
           match.status = "scheduled";
         }
@@ -199,8 +311,151 @@ export class SocialBotService {
     }
   }
 
+  private isTournamentRegistrationOpen(
+    tournament: Record<string, unknown>,
+  ): boolean {
+    const status = this.normalizeTournamentStatus(tournament.status);
+    if (status !== "registration") {
+      return false;
+    }
+
+    const deadlineRaw =
+      tournament.registrationDeadline ||
+      tournament.startAt ||
+      tournament.createdAt;
+    const deadline = deadlineRaw ? new Date(String(deadlineRaw)) : null;
+    if (!deadline || Number.isNaN(deadline.getTime())) {
+      return true;
+    }
+
+    return deadline.getTime() > Date.now();
+  }
+
+  private buildTournamentStandings(
+    participants: Array<{
+      userId: string;
+      name: string;
+      seed: number;
+      rating: number;
+    }>,
+    rounds: Array<Record<string, unknown>>,
+  ) {
+    const table = new Map(
+      participants.map((p) => [
+        p.userId,
+        {
+          userId: p.userId,
+          name: p.name,
+          seed: p.seed,
+          rating: p.rating,
+          points: 0,
+          wins: 0,
+          losses: 0,
+          played: 0,
+          buchholz: 0,
+        },
+      ]),
+    );
+
+    for (const round of rounds) {
+      const matches = Array.isArray((round as any)?.matches)
+        ? ((round as any).matches as Array<any>)
+        : [];
+
+      for (const match of matches) {
+        if (this.normalizeMatchStatus(match?.status) !== "completed") continue;
+
+        const p1Id = String(match?.player1?.userId || "");
+        const p2Id = String(match?.player2?.userId || "");
+        if (!p1Id || !p2Id) continue;
+
+        const p1 = table.get(p1Id);
+        const p2 = table.get(p2Id);
+        if (!p1 || !p2) continue;
+
+        p1.played += 1;
+        p2.played += 1;
+
+        const result = String(match?.result || "");
+        if (result === "1-0") {
+          p1.points += 1;
+          p1.wins += 1;
+          p2.losses += 1;
+        } else if (result === "0-1") {
+          p2.points += 1;
+          p2.wins += 1;
+          p1.losses += 1;
+        } else if (result === "draw" || result === "1/2-1/2") {
+          p1.points += 0.5;
+          p2.points += 0.5;
+        }
+      }
+    }
+
+    // Simple tie-break: sum of opponents' points from played matches.
+    for (const round of rounds) {
+      const matches = Array.isArray((round as any)?.matches)
+        ? ((round as any).matches as Array<any>)
+        : [];
+      for (const match of matches) {
+        if (this.normalizeMatchStatus(match?.status) !== "completed") continue;
+        const p1Id = String(match?.player1?.userId || "");
+        const p2Id = String(match?.player2?.userId || "");
+        const p1 = table.get(p1Id);
+        const p2 = table.get(p2Id);
+        if (!p1 || !p2) continue;
+        p1.buchholz += p2.points;
+        p2.buchholz += p1.points;
+      }
+    }
+
+    return [...table.values()].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return a.seed - b.seed;
+    });
+  }
+
+  private async attachTournamentGamesForRound(
+    tournamentId: string,
+    rounds: Array<Record<string, unknown>>,
+    roundIndex: number,
+  ) {
+    const round = rounds[roundIndex] as any;
+    if (!round || !Array.isArray(round.matches)) return;
+
+    const now = new Date();
+    for (const match of round.matches as Array<any>) {
+      const status = this.normalizeMatchStatus(match?.status);
+      const p1Id = String(match?.player1?.userId || "");
+      const p2Id = String(match?.player2?.userId || "");
+
+      if (status !== "scheduled") continue;
+      if (!p1Id || !p2Id) continue;
+      if (String(match?.gameId || "").length > 0) continue;
+
+      const game = await this.repo.createGame({
+        mode: "tournament",
+        tournamentId,
+        tournamentMatchId: String(match.id || ""),
+        whitePlayerId: p1Id,
+        blackPlayerId: p2Id,
+        result: null,
+        state: "InGame",
+        status: "active",
+        initialFEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        createdAt: now,
+        updatedAt: now,
+        finishedAt: null,
+      });
+
+      match.gameId = String(game._id);
+    }
+  }
+
   private createTournamentRounds(
-    participants: Array<{ name: string; seed: number }>,
+    participants: Array<{ userId: string; name: string; seed: number }>,
   ) {
     const nextPowerOfTwo =
       participants.length <= 1
@@ -209,7 +464,7 @@ export class SocialBotService {
 
     const bracketPlayers = [...participants];
     while (bracketPlayers.length < nextPowerOfTwo) {
-      bracketPlayers.push({ name: "TBD", seed: 0 });
+      bracketPlayers.push({ userId: "", name: "TBD", seed: 0 });
     }
 
     const rounds: Array<Record<string, unknown>> = [];
@@ -237,11 +492,13 @@ export class SocialBotService {
         player1: {
           name: player1.name,
           seed: player1.seed || null,
+          userId: player1.userId || null,
           score: winner === player1.name ? 1 : winner ? 0 : null,
         },
         player2: {
           name: player2.name,
           seed: player2.seed || null,
+          userId: player2.userId || null,
           score: winner === player2.name ? 1 : winner ? 0 : null,
         },
       });
@@ -261,8 +518,8 @@ export class SocialBotService {
         status: "pending",
         winner: null,
         result: null,
-        player1: { name: "TBD", seed: null, score: null },
-        player2: { name: "TBD", seed: null, score: null },
+        player1: { name: "TBD", seed: null, userId: null, score: null },
+        player2: { name: "TBD", seed: null, userId: null, score: null },
       }));
 
       rounds.push({
@@ -487,8 +744,7 @@ export class SocialBotService {
       throw new NotFoundException("Tournament not found");
     }
 
-    const normalizedStatus = this.normalizeTournamentStatus(tournament.status);
-    if (normalizedStatus !== "registration") {
+    if (!this.isTournamentRegistrationOpen(tournament)) {
       throw new BadRequestException("Tournament is not open for registration");
     }
 
@@ -538,6 +794,17 @@ export class SocialBotService {
   }
 
   async withdrawTournament(userId: string, tournamentId: string) {
+    const tournament = await this.repo.findTournamentById(tournamentId);
+    if (!tournament) {
+      throw new NotFoundException("Tournament not found");
+    }
+
+    if (!this.isTournamentRegistrationOpen(tournament)) {
+      throw new BadRequestException(
+        "Cannot withdraw after registration closes",
+      );
+    }
+
     const normalizedId = ObjectId.isValid(tournamentId)
       ? new ObjectId(tournamentId)
       : tournamentId;
@@ -621,6 +888,7 @@ export class SocialBotService {
 
     const rounds = this.createTournamentRounds(
       activeParticipants.map((participant) => ({
+        userId: participant.userId,
         name: participant.name,
         seed: participant.seed,
       })),
@@ -647,9 +915,14 @@ export class SocialBotService {
           Number.isFinite(Number(winningPlayer?.seed))
             ? Number(winningPlayer?.seed)
             : null,
+          String(winningPlayer?.userId || "") || null,
         );
       }
     }
+
+    await this.attachTournamentGamesForRound(tournamentId, rounds, 0);
+
+    const standings = this.buildTournamentStandings(activeParticipants, rounds);
 
     const updated = await this.repo.updateTournamentById(tournamentId, {
       status: "ongoing",
@@ -657,6 +930,7 @@ export class SocialBotService {
       currentRound: 1,
       startedAt: new Date(),
       rounds,
+      standings,
       updatedAt: new Date(),
     });
 
@@ -665,6 +939,7 @@ export class SocialBotService {
       tournamentId,
       status: "ongoing",
       rounds: Array.isArray(updated?.rounds) ? updated.rounds : rounds,
+      standings,
     };
   }
 
@@ -867,7 +1142,33 @@ export class SocialBotService {
       Number.isFinite(Number(winnerPlayer.seed))
         ? Number(winnerPlayer.seed)
         : null,
+      String(winnerPlayer?.userId || "") || null,
     );
+
+    await this.attachTournamentGamesForRound(
+      tournamentId,
+      rounds,
+      found.roundIndex + 1,
+    );
+
+    const normalizedId = ObjectId.isValid(tournamentId)
+      ? new ObjectId(tournamentId)
+      : tournamentId;
+    const participantsRaw =
+      await this.repo.findTournamentParticipants(normalizedId);
+    const activeParticipants = participantsRaw
+      .filter((participant: any) => participant.status === "active")
+      .map((participant: any, idx: number) => ({
+        userId: String(participant.userId),
+        name:
+          typeof participant.username === "string" &&
+          participant.username.length > 0
+            ? participant.username
+            : `Player ${idx + 1}`,
+        rating: Number(participant.rating || 1200),
+        seed: Number(participant.seed || idx + 1),
+      }));
+    const standings = this.buildTournamentStandings(activeParticipants, rounds);
 
     const finalRound = rounds[rounds.length - 1];
     const finalMatch = Array.isArray(finalRound?.matches)
@@ -881,6 +1182,7 @@ export class SocialBotService {
       rounds,
       currentRound: tournamentCompleted ? rounds.length : found.roundIndex + 1,
       status: tournamentCompleted ? "completed" : "ongoing",
+      standings,
       winner: tournamentCompleted
         ? finalMatch?.winner || null
         : tournament.winner || null,
@@ -898,6 +1200,7 @@ export class SocialBotService {
       status:
         updated?.status || (tournamentCompleted ? "completed" : "ongoing"),
       rounds: Array.isArray(updated?.rounds) ? updated.rounds : rounds,
+      standings,
     };
   }
 
@@ -954,10 +1257,23 @@ export class SocialBotService {
       dto.fen,
       difficulty,
     );
-    const move = stockfishMove ?? {
-      bestMoveUci: "e2e4",
-      evaluation: 0.24,
-    };
+    const move =
+      stockfishMove && this.isLegalUciMove(dto.fen, stockfishMove.bestMoveUci)
+        ? stockfishMove
+        : this.getFallbackLegalMove(dto.fen);
+
+    if (!move) {
+      await this.repo.updateBotMoveRequestResponse(
+        requestLog._id as ObjectId,
+        {
+          error: "No legal moves available for current position",
+        },
+        "done",
+      );
+      throw new BadRequestException(
+        "No legal moves available for current position",
+      );
+    }
 
     await this.repo.updateBotMoveRequestResponse(
       requestLog._id as ObjectId,
@@ -971,12 +1287,107 @@ export class SocialBotService {
     };
   }
 
-  async getGameById(gameId: string) {
+  async getBotTacticalHint(userId: string, dto: BotTacticalHintDto) {
+    const pgn = String(dto.pgn || "").trim();
+    if (!pgn) {
+      throw new BadRequestException("PGN is required");
+    }
+
+    const detailLevel = dto.detailLevel === "quick" ? "quick" : "detailed";
+
+    const hint = await this.groqService.getTacticalCoachHint(pgn, detailLevel);
+
+    return {
+      userId,
+      hint,
+      detailLevel,
+      source: "groq",
+    };
+  }
+
+  async getGameById(
+    gameId: string,
+    options?: {
+      analyzeFen?: string;
+      userMove?: string;
+      score?: number;
+      refreshAi?: boolean;
+    },
+  ) {
     const game = await this.repo.findGameById(gameId);
     if (!game) {
       throw new NotFoundException("Game not found");
     }
-    return game;
+
+    const fen = options?.analyzeFen;
+    const userMove = options?.userMove;
+    const parsedScore = Number(options?.score ?? 0);
+
+    if (!fen || !userMove) {
+      return {
+        ...game,
+        aiCommentary: null,
+      };
+    }
+
+    const cacheKey = this.makeReplayAiCacheKey(gameId, fen, userMove);
+    const shouldBypassCache = options?.refreshAi === true;
+    if (!shouldBypassCache) {
+      const cached = this.getReplayAiCache(cacheKey);
+      if (cached) {
+        return {
+          ...game,
+          aiCommentary: cached.aiCommentary,
+          analysis: cached.analysis,
+        };
+      }
+    }
+
+    let stockfishMove: {
+      bestMoveUci?: string;
+      evaluation?: number | null;
+    } | null = null;
+    try {
+      stockfishMove = await this.stockfishService.getBestMove(fen, "expert");
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[SocialBotService] replay stockfish analyze failed: ${reason}`,
+      );
+    }
+
+    const stockfishBestMove = stockfishMove?.bestMoveUci || "N/A";
+    const score =
+      Number.isFinite(parsedScore) && parsedScore !== 0
+        ? parsedScore
+        : Number(stockfishMove?.evaluation ?? 0);
+
+    const aiCommentary = await this.groqService.analyzeMoveWithAI(
+      fen,
+      userMove,
+      stockfishBestMove,
+      score,
+    );
+
+    const analysis = {
+      fen,
+      userMove,
+      stockfishBestMove,
+      score,
+    };
+
+    if (aiCommentary !== this.aiFallbackMessage) {
+      this.setReplayAiCache(cacheKey, {
+        aiCommentary,
+        analysis,
+      });
+    }
+
+    return {
+      ...game,
+      aiCommentary,
+      analysis,
+    };
   }
 
   async saveGame(userId: string, gameId: string, payload: SaveBotGameDto) {

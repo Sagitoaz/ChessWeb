@@ -618,18 +618,44 @@ export const botGameAPI = {
       4: 'expert',
     }
 
+    const difficultyLabelMap = {
+      beginner: 'Easy',
+      intermediate: 'Medium',
+      advanced: 'Hard',
+      expert: 'Expert',
+    }
+
+    const difficultyRatingMap = {
+      beginner: 700,
+      intermediate: 1100,
+      advanced: 1750,
+      expert: 2350,
+    }
+
+    const requestedDifficulty = difficultyMap[level] || 'intermediate'
+
     const response = await gameAPI.post('/bot/games', {
-      difficulty: difficultyMap[level] || 'intermediate',
+      difficulty: requestedDifficulty,
       preferredColor: 'white',
     })
 
     const data = response?.data ?? response
+    const effectiveDifficulty = data?.difficulty || requestedDifficulty
+
     return {
       ...data,
       initialFEN: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
       playerColor: 'White',
+      botPlayer: data?.botPlayer || {
+        username: `Bot ${difficultyLabelMap[effectiveDifficulty] || 'Medium'}`,
+        rating: difficultyRatingMap[effectiveDifficulty] || 1100,
+        isBot: true,
+      },
       config: {
-        timeLimitMs: 500,
+        ...(data?.config || {}),
+        difficulty: difficultyLabelMap[effectiveDifficulty] || 'Medium',
+        difficultyCode: effectiveDifficulty,
+        timeLimitMs: data?.config?.timeLimitMs ?? 500,
       },
       status: 'InGame',
     }
@@ -645,6 +671,11 @@ export const botGameAPI = {
 
   getBotMove: async (sessionId, fen) => {
     const response = await gameAPI.post('/bot/move', { sessionId, fen })
+    return response?.data ?? response
+  },
+
+  getTacticalHint: async (pgn, detailLevel = 'detailed') => {
+    const response = await gameAPI.post('/bot/tactical-hint', { pgn, detailLevel })
     return response?.data ?? response
   },
 
@@ -667,8 +698,16 @@ export const replayAPI = {
    * Kiểm tra state === 'Saved' trước khi cho replay
    * Errors: 400, 401, 403, 404, 429, 503, 504
    */
-  getGame: async (gameId) => {
-    const response = await gameAPI.get(`/games/${gameId}`)
+  getGame: async (gameId, analysisParams = null) => {
+    const params = analysisParams
+      ? {
+          analyzeFen: analysisParams.fen,
+          userMove: analysisParams.userMove,
+          score: analysisParams.score,
+          refreshAi: analysisParams.refreshAi ? 1 : undefined,
+        }
+      : undefined
+    const response = await gameAPI.get(`/games/${gameId}`, { params })
     return unwrapApiEnvelope(response)
   },
 

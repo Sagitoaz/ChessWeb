@@ -6,7 +6,7 @@ import { useNotification } from '@hooks'
 import { botGameAPI } from '@services/gameService'
 import { Loader, Avatar } from '@components/common'
 import { MainLayout } from '@components/layout'
-import { Flag, List, ArrowLeft, Trophy } from 'lucide-react'
+import { Flag, List, ArrowLeft, Trophy, Lightbulb, RefreshCcw } from 'lucide-react'
 import { THEME } from '@/styles/theme'
 
 // ─── Inline MoveListPanel (same style as RankedGamePage) ───
@@ -84,6 +84,11 @@ export default function BotGamePage() {
   const [gameResult, setGameResult] = useState(null) // GameResult enum
   const [isBotThinking, setIsBotThinking] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
+  const [tacticalHint, setTacticalHint] = useState(
+    'Gia sư chiến thuật sẽ đưa gợi ý khi ván đấu có đủ dữ liệu.'
+  )
+  const [isHintLoading, setIsHintLoading] = useState(false)
+  const [hintError, setHintError] = useState('')
 
   const buildReplayMoves = useCallback(() => {
     try {
@@ -109,6 +114,33 @@ export default function BotGamePage() {
 
   const playerColor = gameData?.playerColor ?? 'White'
   const playerColorCode = playerColor === 'White' ? 'w' : 'b'
+
+  const difficultyRaw = String(
+    gameData?.config?.difficultyCode || gameData?.difficulty || gameData?.config?.difficulty || ''
+  ).toLowerCase()
+
+  const difficultyCode =
+    difficultyRaw === 'expert' || difficultyRaw === 'hard' || difficultyRaw === 'advanced'
+      ? difficultyRaw === 'expert'
+        ? 'expert'
+        : 'advanced'
+      : difficultyRaw === 'medium' || difficultyRaw === 'intermediate'
+        ? 'intermediate'
+        : 'beginner'
+
+  const difficultyLabel = {
+    beginner: 'Easy',
+    intermediate: 'Medium',
+    advanced: 'Hard',
+    expert: 'Expert',
+  }[difficultyCode]
+
+  const difficultyBadgeClass = {
+    beginner: 'bg-green-100 text-green-700 border-green-200',
+    intermediate: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    advanced: 'bg-orange-100 text-orange-700 border-orange-200',
+    expert: 'bg-red-100 text-red-700 border-red-200',
+  }[difficultyCode]
 
   // Redirect nếu không có gameData
   useEffect(() => {
@@ -184,7 +216,18 @@ export default function BotGamePage() {
         })
         .catch(() => showError('Không thể lưu ván đấu'))
     }
-  }, [gameState, gameResult, isSaved, buildReplayMoves, moveHistory, gameId, gameData, playerColor, showSuccess, showError])
+  }, [
+    gameState,
+    gameResult,
+    isSaved,
+    buildReplayMoves,
+    moveHistory,
+    gameId,
+    gameData,
+    playerColor,
+    showSuccess,
+    showError,
+  ])
 
   // =============================================
   // BOT MOVE
@@ -310,6 +353,34 @@ export default function BotGamePage() {
     setGameState('Finished')
   }
 
+  const handleRefreshHint = async () => {
+    if (gameState !== 'InGame' && gameState !== 'Paused') return
+
+    const pgn = chess.pgn()
+    if (!pgn || pgn.trim().length < 8) {
+      setTacticalHint('Cần thêm vài nước đi nữa để đưa gợi ý chi tiết.')
+      setHintError('')
+      setIsHintLoading(false)
+      return
+    }
+
+    setIsHintLoading(true)
+    setHintError('')
+
+    try {
+      const data = await botGameAPI.getTacticalHint(pgn, 'detailed')
+      const hint = String(data?.hint || '').trim()
+      if (!hint) {
+        throw new Error('empty hint')
+      }
+      setTacticalHint(hint)
+    } catch {
+      setHintError('Gia sư đang bận, thử lại sau.')
+    } finally {
+      setIsHintLoading(false)
+    }
+  }
+
   // ── Navigate-away forfeit: block browser tab close/refresh ──
   const gameActive = gameState === 'InGame' || gameState === 'Paused'
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
@@ -331,38 +402,8 @@ export default function BotGamePage() {
     }
   }
 
-  const handleForfeitAndLeave = async () => {
-    const forfeitResult = playerColor === 'White' ? 'BlackWin' : 'WhiteWin'
-    setGameResult(forfeitResult)
-    setGameState('Finished')
-    try {
-      const derivedMoves = buildReplayMoves()
-      const finalMoves = derivedMoves.length >= moveHistory.length ? derivedMoves : moveHistory
-      const fallbackHuman = { username: 'You', isBot: false }
-      const fallbackBot = { username: 'Bot', isBot: true }
-
-      await botGameAPI.saveBotGame(gameId, {
-        result: forfeitResult,
-        state: 'Saved',
-        moves: finalMoves,
-        mode: 'bot',
-        initialFEN:
-          gameData?.initialFEN || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-        whitePlayer:
-          playerColor === 'White'
-            ? gameData?.humanPlayer || fallbackHuman
-            : gameData?.botPlayer || fallbackBot,
-        blackPlayer:
-          playerColor === 'White'
-            ? gameData?.botPlayer || fallbackBot
-            : gameData?.humanPlayer || fallbackHuman,
-        metadata: {
-          totalMoves: finalMoves.length,
-        },
-      })
-    } catch {
-      /* silent */
-    }
+  const handleForfeitAndLeave = () => {
+    // User requested: exiting an unfinished bot game should not be saved to history.
     setShowLeaveConfirm(false)
     navigate('/bot')
   }
@@ -414,7 +455,7 @@ export default function BotGamePage() {
           <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
             <h3 className="text-lg font-bold text-gray-900 mb-2">Bỏ trận?</h3>
             <p className="text-sm text-gray-600 mb-5">
-              Rời trang trong khi đang đấu sẽ bị tính là thua.
+              Rời trang khi chưa kết thúc trận sẽ không lưu vào lịch sử.
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -427,7 +468,7 @@ export default function BotGamePage() {
                 onClick={handleForfeitAndLeave}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
               >
-                Rời và thua
+                Rời không lưu
               </button>
             </div>
           </div>
@@ -482,18 +523,23 @@ export default function BotGamePage() {
               <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-green-600" />
                 Đấu với Bot
+                <span
+                  className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border font-semibold ${difficultyBadgeClass}`}
+                >
+                  {difficultyLabel}
+                </span>
               </h1>
               <p className="text-xs text-gray-500 font-mono">
-                {gameData.botPlayer?.username} · {gameData.config?.difficulty ?? 'Easy'}
+                {gameData.botPlayer?.username} · {difficultyLabel}
               </p>
             </div>
           </div>
         </div>
 
         {/* Main area */}
-        <div className="flex flex-col lg:flex-row gap-4 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
           {/* LEFT: Board column */}
-          <div className="w-full lg:w-[60%] flex-shrink-0">
+          <div className="w-full flex-shrink-0">
             {/* Bot bar (top) */}
             <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-gray-200 mb-1">
               <span className="text-2xl leading-none">🤖</span>
@@ -554,14 +600,42 @@ export default function BotGamePage() {
 
           {/* RIGHT: Side panel */}
           <div
-            className="w-full lg:flex-1 lg:min-w-[280px] flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
-            style={{ maxHeight: 'calc(100vh - 120px)' }}
+            className="w-full xl:w-[360px] flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden xl:sticky xl:top-3"
+            style={{ height: 'calc(100vh - 120px)', maxHeight: '820px' }}
           >
             {/* Status strip */}
             <div
               className={`px-4 py-2 text-sm font-semibold text-center border-b border-gray-200 ${statusColor}`}
             >
               {statusText}
+            </div>
+
+            {/* Tactical coach */}
+            <div className="px-3 py-3 border-b border-gray-100 bg-amber-50/40">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Lightbulb className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
+                    Gia sư chiến thuật
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRefreshHint}
+                  disabled={isHintLoading}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-amber-200 bg-white text-amber-700 hover:bg-amber-100"
+                >
+                  <RefreshCcw className="w-3 h-3" />
+                  {isHintLoading ? 'Đang phân tích...' : 'Xin gợi ý chi tiết'}
+                </button>
+              </div>
+              <div className="mt-2 rounded-lg border border-amber-100 bg-white p-2.5 text-sm text-gray-700 max-h-32 overflow-y-auto">
+                {isHintLoading ? 'Đang tổng hợp gợi ý chiến thuật...' : hintError || tacticalHint}
+              </div>
+              <p className="mt-1 text-[11px] text-amber-700">
+                Gợi ý theo yêu cầu, tập trung lưu ý chiến thuật và cạm bẫy, không đưa nước đi cụ
+                thể.
+              </p>
             </div>
 
             {/* Moves header */}
@@ -574,7 +648,9 @@ export default function BotGamePage() {
             </div>
 
             {/* Move list */}
-            <MoveListPanel moves={moveHistory} />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <MoveListPanel moves={moveHistory} />
+            </div>
 
             {/* Controls */}
             <div className="px-3 py-2 border-t border-gray-200 flex gap-2">

@@ -45,6 +45,7 @@ const normalizeTournament = (tournament, tournamentId) => ({
   description: tournament?.description || '',
   currentRound: tournament?.currentRound || null,
   rounds: Array.isArray(tournament?.rounds) ? tournament.rounds : [],
+  standings: Array.isArray(tournament?.standings) ? tournament.standings : [],
 })
 
 export default function TournamentDetailPage() {
@@ -64,6 +65,8 @@ export default function TournamentDetailPage() {
       ? [authUser.role]
       : []
 
+  const currentUserId = authUser?.id || authUser?.userId || authUser?._id || authUser?.sub || null
+
   const canManageTournament =
     isOrganizer || authRoles.includes('admin') || authRoles.includes('mod')
 
@@ -77,7 +80,6 @@ export default function TournamentDetailPage() {
       const normalized = normalizeTournament(payload, tournamentId)
       setTournament(normalized)
 
-      const currentUserId = authUser?.id
       const participantRows = Array.isArray(normalized.participants) ? normalized.participants : []
       setIsRegistered(
         Boolean(
@@ -88,13 +90,20 @@ export default function TournamentDetailPage() {
           )
         )
       )
-      setIsOrganizer(Boolean(currentUserId && payload?.createdBy === currentUserId))
+      setIsOrganizer(
+        Boolean(
+          currentUserId &&
+          [payload?.createdBy, payload?.organizerId, payload?.ownerUserId]
+            .filter((value) => typeof value === 'string' && value.length > 0)
+            .includes(currentUserId)
+        )
+      )
     } catch (_error) {
       setTournament(null)
     } finally {
       setLoading(false)
     }
-  }, [authUser?.id, tournamentId])
+  }, [currentUserId, tournamentId])
 
   useEffect(() => {
     void loadTournament()
@@ -401,6 +410,7 @@ export default function TournamentDetailPage() {
                   icon: Users,
                 },
                 { key: 'matches', label: 'Kết quả', icon: Target },
+                { key: 'standings', label: 'Bảng điểm', icon: Award },
                 { key: 'bracket', label: 'Bracket', icon: MapPin },
               ].map((tab) => {
                 const Icon = tab.icon
@@ -546,6 +556,11 @@ export default function TournamentDetailPage() {
                                   <span className="font-medium text-gray-900">{player2Name}</span>
                                 </div>
                                 <p className="mt-1 text-xs text-gray-500">#{match.id}</p>
+                                {match.gameId && (
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    Game ID: {match.gameId}
+                                  </p>
+                                )}
                               </div>
                               <div className="flex items-center gap-3 flex-wrap justify-end">
                                 <span className="font-bold text-blue-600">{resultLabel}</span>
@@ -567,9 +582,17 @@ export default function TournamentDetailPage() {
                                     </Button>
                                   </>
                                 )}
-                                <Button variant="outline" size="sm">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    match.gameId
+                                      ? navigate(`/replays/${match.gameId}`)
+                                      : navigate(`/tournaments/${tournamentId}/bracket`)
+                                  }
+                                >
                                   <Eye size={14} />
-                                  Xem
+                                  {match.gameId ? 'Xem ván' : 'Xem'}
                                 </Button>
                               </div>
                             </div>
@@ -579,6 +602,52 @@ export default function TournamentDetailPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {activeTab === 'standings' && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Bảng điểm giải đấu</h3>
+                {tournament.standings.length === 0 ? (
+                  <div className="rounded-lg border border-gray-200 p-4 text-sm text-gray-600">
+                    Chưa có dữ liệu bảng điểm. Bảng điểm sẽ xuất hiện khi giải đấu bắt đầu và có kết
+                    quả.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 text-gray-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left">#</th>
+                          <th className="px-3 py-2 text-left">Người chơi</th>
+                          <th className="px-3 py-2 text-right">Điểm</th>
+                          <th className="px-3 py-2 text-right">Thắng</th>
+                          <th className="px-3 py-2 text-right">Thua</th>
+                          <th className="px-3 py-2 text-right">Đã đấu</th>
+                          <th className="px-3 py-2 text-right">Tie-break</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tournament.standings.map((row, idx) => (
+                          <tr
+                            key={row.userId || `${row.name}-${idx}`}
+                            className="border-t border-gray-100"
+                          >
+                            <td className="px-3 py-2 font-semibold text-gray-900">{idx + 1}</td>
+                            <td className="px-3 py-2 text-gray-900">{row.name || 'Unknown'}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-blue-700">
+                              {typeof row.points === 'number' ? row.points : 0}
+                            </td>
+                            <td className="px-3 py-2 text-right">{row.wins ?? 0}</td>
+                            <td className="px-3 py-2 text-right">{row.losses ?? 0}</td>
+                            <td className="px-3 py-2 text-right">{row.played ?? 0}</td>
+                            <td className="px-3 py-2 text-right">{row.buchholz ?? 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 

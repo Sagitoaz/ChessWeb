@@ -1,21 +1,26 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Chess } from 'chess.js'
 import { ChessBoard, MoveHistory } from '@components/game'
 import { useReplayControls } from '@hooks'
 import { replayAPI } from '@services/gameService'
-import { useNotification } from '@hooks'
 import { Loader } from '@components/common'
 import { THEME } from '@/styles/theme'
 
 export default function ReplayViewerPage() {
   const navigate = useNavigate()
   const { gameId } = useParams()
-  const { error: showError } = useNotification()
 
   const [gameData, setGameData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [aiCommentary, setAiCommentary] = useState('')
+  const [aiAnalysis, setAiAnalysis] = useState(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [aiRetryTick, setAiRetryTick] = useState(0)
+  const aiCommentaryCacheRef = useRef(new Map())
+  const forceAiRefreshRef = useRef(false)
+  const aiFallback = 'AI đang bận, vui lòng phân tích lại sau'
 
   // S2_LoadReplay.puml: GET /games/{gameId} với full error handling
   useEffect(() => {
@@ -68,7 +73,6 @@ export default function ReplayViewerPage() {
     currentMove,
     moves,
     progress,
-    error: replayError,
     stepForward,
     stepBackward,
     jumpTo,
@@ -102,6 +106,74 @@ export default function ReplayViewerPage() {
 
   // A2: "Exit → return to History"
   const handleExit = () => navigate('/replays')
+
+  const handleRetryAi = () => {
+    forceAiRefreshRef.current = true
+    setAiRetryTick((prev) => prev + 1)
+  }
+
+  useEffect(() => {
+    if (!gameId || !currentMove || !currentFEN) {
+      setAiCommentary('')
+      setAiAnalysis(null)
+      setIsAnalyzing(false)
+      return
+    }
+
+    const cacheKey = `${gameId}::${currentFEN}::${currentMove.san || `${currentMove.from}-${currentMove.to}`}`
+    const forceRefresh = forceAiRefreshRef.current
+    forceAiRefreshRef.current = false
+
+    if (!forceRefresh) {
+      const cached = aiCommentaryCacheRef.current.get(cacheKey)
+      if (cached) {
+        setAiCommentary(cached.commentary)
+        setAiAnalysis(cached.analysis || null)
+        setIsAnalyzing(false)
+        return
+      }
+    }
+
+    let active = true
+    setIsAnalyzing(true)
+
+    const timer = setTimeout(() => {
+      replayAPI
+        .getGame(gameId, {
+          fen: currentFEN,
+          userMove: currentMove.san || `${currentMove.from}-${currentMove.to}`,
+          score: 0,
+          refreshAi: forceRefresh,
+        })
+        .then((data) => {
+          if (!active) return
+          const commentary = data?.aiCommentary || aiFallback
+          const analysis = data?.analysis || null
+          if (commentary !== aiFallback) {
+            aiCommentaryCacheRef.current.set(cacheKey, {
+              commentary,
+              analysis,
+            })
+          }
+          setAiCommentary(commentary)
+          setAiAnalysis(analysis)
+        })
+        .catch(() => {
+          if (!active) return
+          setAiCommentary(aiFallback)
+          setAiAnalysis(null)
+        })
+        .finally(() => {
+          if (!active) return
+          setIsAnalyzing(false)
+        })
+    }, 220)
+
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [gameId, currentFEN, currentMove, aiRetryTick])
 
   if (isLoading)
     return (
@@ -236,6 +308,32 @@ export default function ReplayViewerPage() {
                 Nước {currentMove.ply}: <strong>{currentMove.san}</strong>
                 {currentMove.isCheck && !currentMove.isCheckmate && ' +'}
                 {currentMove.isCheckmate && ' # (Chiếu hết)'}
+              </div>
+            )}
+            {currentMove && (
+              <div
+                className={`mt-3 p-3 rounded-lg border ${THEME.border.DEFAULT} ${THEME.background.card}`}
+              >
+                <p className={`text-xs uppercase tracking-wider mb-1 ${THEME.text.muted}`}>
+                  Đại kiện tướng AI phân tích
+                </p>
+                <p className={`text-sm ${THEME.text.primary}`}>
+                  {isAnalyzing ? 'Đang phân tích nước đi...' : aiCommentary || aiFallback}
+                </p>
+                {aiAnalysis?.stockfishBestMove && aiAnalysis.stockfishBestMove !== 'N/A' && (
+                  <p className={`mt-2 text-xs ${THEME.text.secondary}`}>
+                    Stockfish gợi ý: <strong>{aiAnalysis.stockfishBestMove}</strong>
+                  </p>
+                )}
+                {!isAnalyzing && (aiCommentary || aiFallback) === aiFallback && (
+                  <button
+                    type="button"
+                    onClick={handleRetryAi}
+                    className="mt-2 text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                  >
+                    Thử lại AI
+                  </button>
+                )}
               </div>
             )}
             <p className={`text-center text-xs ${THEME.text.muted} mt-2`}>Phím ← → để điều hướng</p>

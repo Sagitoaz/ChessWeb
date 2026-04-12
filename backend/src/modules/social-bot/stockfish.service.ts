@@ -37,18 +37,21 @@ export class StockfishService {
   ): Promise<StockfishMoveResult> {
     return new Promise((resolve, reject) => {
       const depth = this.difficultyToDepth(difficulty);
+      const thinkTimeMs = this.thinkTimeForDifficulty(difficulty);
+      const timeoutMs = Math.max(
+        this.timeoutForDifficulty(difficulty),
+        thinkTimeMs + 1500,
+      );
       this.log(
-        `Spawning stockfish path=${this.stockfishPath} depth=${depth} timeoutMs=${env.stockfishTimeoutMs}`,
+        `Spawning stockfish path=${this.stockfishPath} depth=${depth} thinkTimeMs=${thinkTimeMs} timeoutMs=${timeoutMs}`,
       );
 
       const childProcess = spawn(this.stockfishPath);
       let lineBuffer = "";
       const timeout = setTimeout(() => {
         childProcess.kill();
-        reject(
-          new Error(`Stockfish timeout after ${env.stockfishTimeoutMs}ms`),
-        );
-      }, env.stockfishTimeoutMs);
+        reject(new Error(`Stockfish timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
 
       let bestMove = "";
       let evaluation: number | null = null;
@@ -106,7 +109,7 @@ export class StockfishService {
       childProcess.stdin!.write("uci\n");
       childProcess.stdin!.write("isready\n");
       childProcess.stdin!.write(`position fen ${fen}\n`);
-      childProcess.stdin!.write(`go depth ${depth}\n`);
+      childProcess.stdin!.write(`go movetime ${thinkTimeMs}\n`);
     });
   }
 
@@ -154,5 +157,24 @@ export class StockfishService {
       expert: 25,
     };
     return depthMap[difficulty.toLowerCase()] || 15;
+  }
+
+  private timeoutForDifficulty(difficulty: string): number {
+    const base = env.stockfishTimeoutMs;
+    const value = (difficulty || "").toLowerCase();
+
+    if (value === "expert") return Math.max(base, 5000);
+    if (value === "advanced") return Math.max(base, 4000);
+    if (value === "intermediate") return Math.max(base, 3000);
+    return base;
+  }
+
+  private thinkTimeForDifficulty(difficulty: string): number {
+    const value = (difficulty || "").toLowerCase();
+
+    if (value === "expert") return 2500;
+    if (value === "advanced") return 1600;
+    if (value === "intermediate") return 900;
+    return 450;
   }
 }

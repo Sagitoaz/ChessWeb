@@ -4,8 +4,8 @@
  */
 
 // API Configuration - Vite env variables
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8080'
 
 // Mock mode is force-disabled: frontend always uses real backend APIs.
 const USE_MOCK = false

@@ -5,6 +5,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -17,6 +18,7 @@ import { CreateBotGameDto } from "./dto/create-bot-game.dto";
 import { CreateRoomDto } from "./dto/create-room.dto";
 import { UpdateTournamentMatchResultDto } from "./dto/manage-tournament-result.dto";
 import { SaveBotGameDto } from "./dto/save-bot-game.dto";
+import { BotTacticalHintDto } from "./dto/bot-tactical-hint.dto";
 
 type AuthRequest = {
   user?: { sub?: string; userId?: string; roles?: string[] };
@@ -205,12 +207,40 @@ export class SocialBotController {
     return successResponse(data, requestId || null);
   }
 
+  @Post("bot/tactical-hint")
+  async getBotTacticalHint(
+    @Req() req: AuthRequest,
+    @Body() body: BotTacticalHintDto,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.getBotTacticalHint(
+      this.getUserId(req),
+      body,
+    );
+    return successResponse(data, requestId || null);
+  }
+
   @Get("games/:id")
   async getGameById(
     @Param("id") id: string,
+    @Query("analyzeFen") analyzeFen?: string,
+    @Query("userMove") userMove?: string,
+    @Query("score") score?: string,
+    @Query("refreshAi") refreshAi?: string,
     @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<unknown>> {
-    const data = await this.service.getGameById(id);
+    const data = await this.service.getGameById(id, {
+      analyzeFen,
+      userMove,
+      score:
+        typeof score === "string" && score.trim().length > 0
+          ? Number(score)
+          : undefined,
+      refreshAi:
+        typeof refreshAi === "string"
+          ? ["1", "true", "yes"].includes(refreshAi.toLowerCase())
+          : false,
+    });
     return successResponse(data, requestId || null);
   }
 

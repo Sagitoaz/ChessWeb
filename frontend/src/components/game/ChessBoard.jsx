@@ -17,6 +17,17 @@ const ChessBoard = ({
   const [optionSquares, setOptionSquares] = useState({})
   const [rightClickedSquares, setRightClickedSquares] = useState({})
 
+  const safeMove = useCallback(
+    (move) => {
+      try {
+        return gameState.move(move)
+      } catch {
+        return null
+      }
+    },
+    [gameState]
+  )
+
   // Note: chess.js instances mutate in place, so we read fen() directly (no useMemo)
   // to always get the latest position on each render.
   const position = gameState?.fen() || 'start'
@@ -87,7 +98,7 @@ const ChessBoard = ({
         return
       }
 
-      const result = gameState.move({
+      const result = safeMove({
         from: moveFrom,
         to: square,
         promotion: 'q',
@@ -101,14 +112,14 @@ const ChessBoard = ({
       setMoveFrom('')
       setOptionSquares({})
     },
-    [moveFrom, gameState, disabled, getMoveOptions, onMove, playSound]
+    [moveFrom, disabled, getMoveOptions, onMove, playSound, safeMove]
   )
 
   const onPieceDrop = useCallback(
     (sourceSquare, targetSquare) => {
       if (disabled || !gameState) return false
 
-      const move = gameState.move({
+      const move = safeMove({
         from: sourceSquare,
         to: targetSquare,
         promotion: 'q',
@@ -123,7 +134,7 @@ const ChessBoard = ({
       setOptionSquares({})
       return true
     },
-    [gameState, disabled, onMove, playSound]
+    [disabled, onMove, playSound, safeMove]
   )
 
   const onSquareRightClick = useCallback((square) => {
