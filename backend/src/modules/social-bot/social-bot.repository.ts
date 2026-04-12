@@ -21,14 +21,16 @@ export class SocialBotRepository {
   }
 
   async findRoomByCode(roomCode: string) {
-    return this.db.collection("rooms").findOne({ code: roomCode });
+    return this.db.collection("rooms").findOne({
+      $or: [{ roomCode }, { code: roomCode }],
+    });
   }
 
   async updateRoomByCode(roomCode: string, update: Record<string, unknown>) {
     return this.db
       .collection("rooms")
       .findOneAndUpdate(
-        { code: roomCode },
+        { $or: [{ roomCode }, { code: roomCode }] },
         { $set: update },
         { returnDocument: "after" },
       );
@@ -48,6 +50,56 @@ export class SocialBotRepository {
     }
     const objectId = new ObjectId(id);
     return this.db.collection("tournaments").findOne({ _id: objectId });
+  }
+
+  async updateTournamentById(id: string, update: Record<string, unknown>) {
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
+    const objectId = new ObjectId(id);
+    return this.db
+      .collection("tournaments")
+      .findOneAndUpdate(
+        { _id: objectId },
+        { $set: update },
+        { returnDocument: "after" },
+      );
+  }
+
+  async findTournamentParticipants(tournamentId: ObjectId | string) {
+    return this.db
+      .collection("tournament_participants")
+      .find({ tournamentId })
+      .sort({ joinedAt: 1 })
+      .toArray();
+  }
+
+  async findTournamentParticipant(
+    tournamentId: ObjectId | string,
+    userId: string,
+  ) {
+    return this.db
+      .collection("tournament_participants")
+      .findOne({ tournamentId, userId });
+  }
+
+  async countTournamentParticipants(tournamentId: ObjectId | string) {
+    return this.db
+      .collection("tournament_participants")
+      .countDocuments({ tournamentId, status: { $ne: "withdrawn" } });
+  }
+
+  async findUserProfilesByIds(userIds: string[]) {
+    if (userIds.length === 0) return [];
+    return this.db
+      .collection<{ _id: string; username?: string; rating?: number }>(
+        "user_profiles",
+      )
+      .find(
+        { _id: { $in: userIds } },
+        { projection: { _id: 1, username: 1, rating: 1 } },
+      )
+      .toArray();
   }
 
   async addTournamentParticipant(doc: Record<string, unknown>) {
@@ -128,5 +180,44 @@ export class SocialBotRepository {
       );
 
     return result;
+  }
+
+  async updateGameIfNotSaved(id: string, update: Record<string, unknown>) {
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
+
+    const objectId = new ObjectId(id);
+    return this.db
+      .collection("games")
+      .findOneAndUpdate(
+        { _id: objectId, state: { $ne: "Saved" } },
+        { $set: update },
+        { returnDocument: "after" },
+      );
+  }
+
+  async updateUserStatsByOutcome(
+    userId: string,
+    outcome: "win" | "lose" | "draw",
+    now: Date,
+  ) {
+    const inc = {
+      gamesPlayed: 1,
+      totalGames: 1,
+      wins: outcome === "win" ? 1 : 0,
+      losses: outcome === "lose" ? 1 : 0,
+      draws: outcome === "draw" ? 1 : 0,
+    };
+
+    await this.db.collection("user_stats").updateOne(
+      { userId },
+      {
+        $inc: inc,
+        $set: { updatedAt: now },
+        $setOnInsert: { userId, createdAt: now },
+      },
+      { upsert: true },
+    );
   }
 }

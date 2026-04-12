@@ -26,8 +26,9 @@ export default function ReplayViewerPage() {
     replayAPI
       .getGame(gameId)
       .then((data) => {
-        // S2: validate state === 'Saved'
-        if (data.state !== 'Saved') {
+        // Accept both Saved and Finished snapshots.
+        const state = String(data.state || '').toLowerCase()
+        if (state !== 'saved' && state !== 'finished') {
           setLoadError('Replay không khả dụng cho ván đấu này')
           return
         }
@@ -37,7 +38,7 @@ export default function ReplayViewerPage() {
           return
         }
         // S2: validate moves
-        if (!data.moves || data.moves.length === 0) {
+        if (!Array.isArray(data.moves) || data.moves.length === 0) {
           setLoadError('Không có nước đi để replay')
           return
         }
@@ -253,7 +254,9 @@ export default function ReplayViewerPage() {
             />
 
             {gameData?.result && gameData.result !== 'Ongoing' && (
-              <div className={`mt-4 p-3 ${THEME.background.card} rounded-lg text-center border ${THEME.border.DEFAULT}`}>
+              <div
+                className={`mt-4 p-3 ${THEME.background.card} rounded-lg text-center border ${THEME.border.DEFAULT}`}
+              >
                 <p className={`text-sm ${THEME.text.secondary} mb-1`}>Kết quả</p>
                 <p className={`font-bold ${THEME.text.primary}`}>
                   {gameData.result === 'WhiteWin' && '⬜ Trắng thắng'}

@@ -1152,6 +1152,7 @@ const RankedGamePage = () => {
                 playerColor={playerColor}
                 disabled={gamePhase !== GAME_PHASE.PLAYING || endedRef.current || !isMyTurn}
                 customSquareStyles={squareStyles}
+                showMoveHints={false}
                 showCoordinates={true}
                 highlightCheck={true}
                 soundEnabled={false}

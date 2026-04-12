@@ -30,9 +30,19 @@ const normalizeTournament = (tournament = {}) => ({
     ? tournament.participants.length
     : tournament.participants || 0,
   maxParticipants: tournament.maxParticipants || tournament.max_players || 0,
-  format: tournament.format || 'Unknown',
+  format:
+    tournament.format === 'knockout'
+      ? 'Single Elimination'
+      : tournament.format === 'round_robin'
+        ? 'Round Robin'
+        : tournament.format === 'swiss'
+          ? 'Swiss'
+          : tournament.format || 'Unknown',
   timeControl: tournament.timeControl || tournament.time_control || '10+0',
-  status: tournament.status || 'registration',
+  status:
+    tournament.status === 'draft' || tournament.status === 'open'
+      ? 'registration'
+      : tournament.status || 'registration',
 })
 
 const groupTournamentsByStatus = (items = []) =>

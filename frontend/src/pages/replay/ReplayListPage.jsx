@@ -8,22 +8,23 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { replayAPI } from '@services/gameService'
 import { useNotification } from '@hooks'
+import { useAuthStore } from '@store'
 import { THEME, STATUS_COLORS } from '@/styles/theme'
 import { Loader, Button } from '@components/common'
 import { PlayCircle } from 'lucide-react'
 
 function ResultBadge({ result }) {
   const cfg = {
-    WhiteWin: {
-      label: '⬜ Trắng thắng',
+    win: {
+      label: '✅ Thắng',
       bg: STATUS_COLORS.playing.bg,
       text: STATUS_COLORS.playing.text,
     },
-    BlackWin: { label: '⬛ Đen thắng', bg: STATUS_COLORS.draw.bg, text: STATUS_COLORS.draw.text },
-    Draw: { label: '🤝 Hòa', bg: STATUS_COLORS.waiting.bg, text: STATUS_COLORS.waiting.text },
+    lose: { label: '❌ Thua', bg: STATUS_COLORS.draw.bg, text: STATUS_COLORS.draw.text },
+    draw: { label: '🤝 Hòa', bg: STATUS_COLORS.waiting.bg, text: STATUS_COLORS.waiting.text },
   }
   const { label, bg, text } = cfg[result] ?? {
-    label: result,
+    label: 'Chưa có kết quả',
     bg: STATUS_COLORS.draw.bg,
     text: STATUS_COLORS.draw.text,
   }
@@ -47,6 +48,7 @@ function ModeBadge({ mode }) {
 export default function ReplayListPage() {
   const navigate = useNavigate()
   const { error: showError } = useNotification()
+  const authUser = useAuthStore((state) => state.user)
 
   const [games, setGames] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -60,12 +62,53 @@ export default function ReplayListPage() {
     if (resultFilter) filters.result = resultFilter
 
     const normalizeGames = (payload) => {
-      if (Array.isArray(payload?.games)) return payload.games
+      const normalizePerspectiveResult = (rawResult, playerSide) => {
+        const v = typeof rawResult === 'string' ? rawResult.toLowerCase() : ''
+        if (v === 'win' || v === 'lose' || v === 'draw') return v
+        if (v === 'whitewin' || v === '1-0') {
+          return playerSide === 'white' ? 'win' : playerSide === 'black' ? 'lose' : null
+        }
+        if (v === 'blackwin' || v === '0-1') {
+          return playerSide === 'black' ? 'win' : playerSide === 'white' ? 'lose' : null
+        }
+        return null
+      }
+
+      const itemById = new Map(
+        Array.isArray(payload?.items)
+          ? payload.items.map((item) => [String(item.gameId || item.id), item])
+          : []
+      )
+
+      if (Array.isArray(payload?.games)) {
+        return payload.games.map((game) => {
+          const gameId = String(game.id || game.gameId)
+          const item = itemById.get(gameId)
+
+          let playerSide = item?.playerSide || null
+          if (!playerSide && authUser?.username) {
+            if (game?.whitePlayer?.username === authUser.username) playerSide = 'white'
+            if (game?.blackPlayer?.username === authUser.username) playerSide = 'black'
+          }
+
+          const result =
+            normalizePerspectiveResult(item?.result, playerSide) ||
+            normalizePerspectiveResult(game?.result, playerSide) ||
+            'draw'
+
+          return {
+            ...game,
+            id: gameId,
+            result,
+          }
+        })
+      }
+
       if (Array.isArray(payload?.items)) {
         return payload.items.map((item) => ({
           id: item.gameId || item.id,
           mode: item.mode === 'bot' ? 'HumanVsBot' : 'HumanVsHuman',
-          result: item.result,
+          result: normalizePerspectiveResult(item.result, item.playerSide) || 'draw',
           createdAt: item.createdAt,
           whitePlayer: { username: item.whitePlayerId || 'White' },
           blackPlayer: { username: item.blackPlayerId || 'Black' },
@@ -80,7 +123,7 @@ export default function ReplayListPage() {
       .then((data) => setGames(normalizeGames(data)))
       .catch(() => showError('Không thể tải lịch sử'))
       .finally(() => setIsLoading(false))
-  }, [modeFilter, resultFilter, showError])
+  }, [authUser?.username, modeFilter, resultFilter, showError])
 
   const handleSelect = (gameId) => navigate(`/replays/${gameId}`)
 
@@ -115,9 +158,9 @@ export default function ReplayListPage() {
               className={`${THEME.background.card} ${THEME.text.primary} border ${THEME.border.DEFAULT} ${THEME.rounded.DEFAULT} px-4 py-2 text-sm`}
             >
               <option value="">Tất cả kết quả</option>
-              <option value="WhiteWin">Trắng thắng</option>
-              <option value="BlackWin">Đen thắng</option>
-              <option value="Draw">Hòa</option>
+              <option value="win">Thắng</option>
+              <option value="lose">Thua</option>
+              <option value="draw">Hòa</option>
             </select>
           </div>
         </div>

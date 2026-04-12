@@ -101,6 +101,16 @@ export class SocialBotController {
     return successResponse(data, requestId || null);
   }
 
+  @Post("tournaments/:id/start")
+  async startTournament(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.startTournament(this.getUserId(req), id);
+    return successResponse(data, requestId || null);
+  }
+
   @Post("bot/games")
   async createBotGame(
     @Req() req: AuthRequest,

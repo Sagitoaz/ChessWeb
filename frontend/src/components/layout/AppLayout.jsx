@@ -1,4 +1,4 @@
-import { Outlet, Navigate } from 'react-router-dom'
+import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import MainLayout from './MainLayout'
 import { Loader } from '@/components/common'
@@ -27,6 +27,8 @@ import { Loader } from '@/components/common'
 
 const AppLayout = () => {
   const { isAuthenticated, hasHydrated } = useAuthStore()
+  const location = useLocation()
+  const isRoomGameRoute = /^\/rooms\/[A-Za-z0-9]+$/.test(location.pathname)
 
   if (!hasHydrated) {
     return (
@@ -43,7 +45,7 @@ const AppLayout = () => {
 
   // Render layout bình thường — trang con sẽ hiển thị qua <Outlet />
   return (
-    <MainLayout>
+    <MainLayout hideSidebar={isRoomGameRoute} hideFooter={isRoomGameRoute}>
       <Outlet />
     </MainLayout>
   )

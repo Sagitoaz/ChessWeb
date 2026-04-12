@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store'
+import authService from '@/services/authService'
 
 const StatCard = ({ label, value, color = 'blue' }) => {
   const colors = {
@@ -50,7 +52,28 @@ const RecentGameRow = ({ opponent, result, eloChange, date }) => {
 
 const ProfilePage = () => {
   const { user: authUser } = useAuthStore()
+  const token = useAuthStore((state) => state.token)
+  const setAuthLogin = useAuthStore((state) => state.login)
   const recentGames = []
+
+  useEffect(() => {
+    let mounted = true
+    const refresh = async () => {
+      try {
+        const data = await authService.getCurrentUser()
+        const nextUser = data?.user ?? data
+        if (mounted && nextUser && token) {
+          setAuthLogin(nextUser, token)
+        }
+      } catch {
+        // Keep page usable with current store snapshot.
+      }
+    }
+    void refresh()
+    return () => {
+      mounted = false
+    }
+  }, [setAuthLogin, token])
 
   // Render profile strictly from authenticated backend-backed session data.
   const user = {

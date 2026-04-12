@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Loader } from '@/components/common'
 import gameService from '@/services/gameService'
+import { useAuthStore } from '@/store'
 import {
   ArrowLeft,
   Trophy,
@@ -49,45 +50,75 @@ const normalizeTournament = (tournament, tournamentId) => ({
 export default function TournamentDetailPage() {
   const { tournamentId } = useParams()
   const navigate = useNavigate()
+  const authUser = useAuthStore((state) => state.user)
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [tournament, setTournament] = useState(null)
   const [isRegistered, setIsRegistered] = useState(false)
   const [isOrganizer, setIsOrganizer] = useState(false)
+  const [actionError, setActionError] = useState('')
+
+  const loadTournament = useCallback(async () => {
+    if (!tournamentId) return
+    setLoading(true)
+    setActionError('')
+    try {
+      const response = await gameService.getTournament(tournamentId)
+      const payload = response?.data ?? response
+      const normalized = normalizeTournament(payload, tournamentId)
+      setTournament(normalized)
+
+      const currentUserId = authUser?.id
+      const participantRows = Array.isArray(normalized.participants) ? normalized.participants : []
+      setIsRegistered(
+        Boolean(
+          currentUserId &&
+          participantRows.some(
+            (participant) =>
+              participant.userId === currentUserId || participant.id === currentUserId
+          )
+        )
+      )
+      setIsOrganizer(Boolean(currentUserId && payload?.createdBy === currentUserId))
+    } catch (_error) {
+      setTournament(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [authUser?.id, tournamentId])
 
   useEffect(() => {
-    const loadTournament = async () => {
-      setLoading(true)
-      try {
-        const response = await gameService.getTournament(tournamentId)
-        const payload = response?.data ?? response
-        const normalized = normalizeTournament(payload, tournamentId)
-        setTournament(normalized)
-      } catch (_error) {
-        setTournament(null)
-      } finally {
-        setLoading(false)
-      }
+    void loadTournament()
+  }, [loadTournament])
+
+  const handleRegister = async () => {
+    if (!tournamentId) return
+    try {
+      await gameService.joinTournament(tournamentId)
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể đăng ký giải đấu. Vui lòng thử lại.')
     }
-
-    loadTournament()
-  }, [tournamentId])
-
-  const handleRegister = () => {
-    setIsRegistered(true)
-    // TODO: Real implementation
-    // await registerTournament(tournamentId)
   }
 
-  const handleWithdraw = () => {
-    setIsRegistered(false)
-    // TODO: Real implementation
-    // await withdrawTournament(tournamentId)
+  const handleWithdraw = async () => {
+    if (!tournamentId) return
+    try {
+      await gameService.withdrawTournament(tournamentId)
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể rút lui khỏi giải đấu. Vui lòng thử lại.')
+    }
   }
 
-  const handleStartTournament = () => {
-    // TODO: Real implementation
-    alert('Bắt đầu giải đấu')
+  const handleStartTournament = async () => {
+    if (!tournamentId) return
+    try {
+      await gameService.startTournament(tournamentId)
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể bắt đầu giải đấu. Vui lòng kiểm tra số người chơi.')
+    }
   }
 
   const handleCancelTournament = () => {
@@ -285,6 +316,12 @@ export default function TournamentDetailPage() {
                 </>
               )}
             </div>
+
+            {actionError && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {actionError}
+              </div>
+            )}
           </div>
         </Card>
 

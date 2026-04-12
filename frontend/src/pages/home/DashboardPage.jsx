@@ -10,8 +10,10 @@
  * Protected route - Requires authentication
  */
 
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store'
+import authService from '@/services/authService'
 import { THEME, STATUS_COLORS } from '@/styles/theme'
 import { Avatar } from '@/components/common'
 import {
@@ -154,8 +156,32 @@ const TournamentCard = ({ tournament }) => (
 
 export default function DashboardPage() {
   const { user, hasHydrated } = useAuthStore()
+  const token = useAuthStore((state) => state.token)
+  const setAuthLogin = useAuthStore((state) => state.login)
   const recentGames = []
   const upcomingTournaments = []
+
+  useEffect(() => {
+    if (!hasHydrated || !token) return
+
+    let mounted = true
+    const refresh = async () => {
+      try {
+        const data = await authService.getCurrentUser()
+        const nextUser = data?.user ?? data
+        if (mounted && nextUser) {
+          setAuthLogin(nextUser, token)
+        }
+      } catch {
+        // Keep dashboard usable with current store snapshot.
+      }
+    }
+    void refresh()
+
+    return () => {
+      mounted = false
+    }
+  }, [hasHydrated, setAuthLogin, token])
 
   if (!hasHydrated) {
     return (

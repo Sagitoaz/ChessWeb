@@ -566,6 +566,13 @@ const gameService = {
 
   startRoomGame: (roomCode) => gameAPI.post(`/rooms/${roomCode}/start`),
 
+  saveGame: (gameId, data) => gameAPI.post(`/games/${gameId}/save`, data),
+
+  getGameById: async (gameId) => {
+    const response = await gameAPI.get(`/games/${gameId}`)
+    return unwrapApiEnvelope(response)
+  },
+
   // Tournament APIs
   getTournaments: (filters = {}) => gameAPI.get('/tournaments', { params: filters }),
 
@@ -574,6 +581,8 @@ const gameService = {
   joinTournament: (tournamentId) => gameAPI.post(`/tournaments/${tournamentId}/join`),
 
   withdrawTournament: (tournamentId) => gameAPI.post(`/tournaments/${tournamentId}/withdraw`),
+
+  startTournament: (tournamentId) => gameAPI.post(`/tournaments/${tournamentId}/start`),
 
   createTournament: (data) => gameAPI.post('/tournaments', data),
 }

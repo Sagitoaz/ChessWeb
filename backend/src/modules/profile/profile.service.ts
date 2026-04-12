@@ -664,7 +664,16 @@ export class ProfileService {
       const mode = game.mode === "bot" ? "HumanVsBot" : "HumanVsHuman";
 
       let replayResult: string | null = null;
-      if (game.result === "draw") {
+      const rawResult =
+        typeof game.rawResult === "string" ? game.rawResult.toLowerCase() : "";
+
+      if (rawResult === "draw") {
+        replayResult = "Draw";
+      } else if (rawResult === "whitewin" || rawResult === "1-0") {
+        replayResult = "WhiteWin";
+      } else if (rawResult === "blackwin" || rawResult === "0-1") {
+        replayResult = "BlackWin";
+      } else if (game.result === "draw") {
         replayResult = "Draw";
       } else if (game.result === "win") {
         replayResult = game.whitePlayerId === userId ? "WhiteWin" : "BlackWin";
@@ -684,7 +693,7 @@ export class ProfileService {
           username: game.blackUsername || game.blackPlayerId || "Unknown",
         },
         metadata: {
-          totalMoves: null,
+          totalMoves: Number(game.totalMoves ?? 0),
         },
       };
     });

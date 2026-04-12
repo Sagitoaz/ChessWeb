@@ -1116,6 +1116,10 @@ export class CompetitionService {
   ): Promise<Record<string, unknown>> {
     const db = this.mongoService.getDb();
     const games = db.collection("games");
+    const rankedMatches = db.collection("ranked_matches");
+    const profiles = db.collection<{ _id: string; username?: string | null }>(
+      "user_profiles",
+    );
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 10;
@@ -1134,11 +1138,175 @@ export class CompetitionService {
       games.countDocuments(filter),
     ]);
 
+    const playerIds = Array.from(
+      new Set(
+        items
+          .flatMap((item) => [item.whitePlayerId, item.blackPlayerId])
+          .filter(
+            (id): id is string => typeof id === "string" && id.length > 0,
+          ),
+      ),
+    );
+
+    const usernames =
+      playerIds.length > 0
+        ? await profiles
+            .find(
+              { _id: { $in: playerIds } },
+              { projection: { _id: 1, username: 1 } },
+            )
+            .toArray()
+        : [];
+
+    const usernameMap = new Map<string, string>();
+    for (const profile of usernames) {
+      if (profile?._id && typeof profile.username === "string") {
+        usernameMap.set(profile._id, profile.username);
+      }
+    }
+
+    const gameObjectIds = items
+      .map((item) => item._id)
+      .filter((id): id is ObjectId => id instanceof ObjectId);
+
+    const gameHexIds = items
+      .map((item) => {
+        const rawId = item._id;
+        if (rawId instanceof ObjectId) return rawId.toHexString();
+        if (typeof rawId === "string") return rawId;
+        return null;
+      })
+      .filter((id): id is string => typeof id === "string");
+
+    const rankedMatchDocs =
+      gameObjectIds.length > 0 || gameHexIds.length > 0
+        ? await rankedMatches
+            .find(
+              {
+                $or: [
+                  gameObjectIds.length > 0
+                    ? { gameId: { $in: gameObjectIds } }
+                    : { _id: { $exists: false } },
+                  gameHexIds.length > 0
+                    ? { matchId: { $in: gameHexIds } }
+                    : { _id: { $exists: false } },
+                ],
+              },
+              {
+                projection: {
+                  gameId: 1,
+                  matchId: 1,
+                  whiteRatingBefore: 1,
+                  blackRatingBefore: 1,
+                  whiteRatingAfter: 1,
+                  blackRatingAfter: 1,
+                  whiteRating: 1,
+                  blackRating: 1,
+                },
+              },
+            )
+            .toArray()
+        : [];
+
+    const ratingByGameId = new Map<string, Record<string, unknown>>();
+    for (const doc of rankedMatchDocs) {
+      const gameIdKey =
+        doc?.gameId instanceof ObjectId
+          ? doc.gameId.toHexString()
+          : typeof doc?.gameId === "string"
+            ? doc.gameId
+            : typeof doc?.matchId === "string"
+              ? doc.matchId
+              : null;
+
+      if (gameIdKey) {
+        ratingByGameId.set(gameIdKey, doc as Record<string, unknown>);
+      }
+    }
+
     return {
-      items: items.map((item) => ({
-        ...item,
-        _id: item._id?.toString?.() || item._id,
-      })),
+      items: items.map((item) => {
+        const normalizedResult =
+          typeof item.result === "string" ? item.result.toLowerCase() : "";
+
+        const persistedResult: "1-0" | "0-1" | "draw" =
+          normalizedResult === "1-0" ||
+          normalizedResult === "white_win" ||
+          normalizedResult === "white"
+            ? "1-0"
+            : normalizedResult === "0-1" ||
+                normalizedResult === "black_win" ||
+                normalizedResult === "black"
+              ? "0-1"
+              : "draw";
+
+        const playerColor =
+          item.whitePlayerId === user.userId
+            ? "white"
+            : item.blackPlayerId === user.userId
+              ? "black"
+              : "white";
+
+        const opponentId =
+          playerColor === "white" ? item.blackPlayerId : item.whitePlayerId;
+
+        const outcome = this.resolveOutcomeForUser(
+          persistedResult,
+          user.userId,
+          item.whitePlayerId,
+          item.blackPlayerId,
+        );
+
+        const gameKey =
+          item._id instanceof ObjectId
+            ? item._id.toHexString()
+            : typeof item._id === "string"
+              ? item._id
+              : String(item._id);
+        const ratingDoc = ratingByGameId.get(gameKey);
+        const whiteBefore = Number(
+          ratingDoc?.whiteRatingBefore ?? ratingDoc?.whiteRating ?? 0,
+        );
+        const blackBefore = Number(
+          ratingDoc?.blackRatingBefore ?? ratingDoc?.blackRating ?? 0,
+        );
+        const whiteAfter = Number(
+          ratingDoc?.whiteRatingAfter ?? ratingDoc?.whiteRating ?? whiteBefore,
+        );
+        const blackAfter = Number(
+          ratingDoc?.blackRatingAfter ?? ratingDoc?.blackRating ?? blackBefore,
+        );
+        const ratingChange =
+          playerColor === "white"
+            ? whiteAfter - whiteBefore
+            : blackAfter - blackBefore;
+
+        return {
+          id: item._id?.toString?.() || item._id,
+          gameId: item._id?.toString?.() || item._id,
+          result: outcome,
+          absoluteResult: persistedResult,
+          playerColor,
+          whitePlayerId: item.whitePlayerId,
+          blackPlayerId: item.blackPlayerId,
+          whiteUsername: usernameMap.get(item.whitePlayerId) || null,
+          blackUsername: usernameMap.get(item.blackPlayerId) || null,
+          opponentId,
+          opponentUsername: usernameMap.get(opponentId) || "Unknown",
+          createdAt: item.createdAt,
+          finishedAt: item.finishedAt || null,
+          ratingChange,
+          totalMoves: Array.isArray(item.moves)
+            ? item.moves.length
+            : Number(item?.metadata?.totalMoves ?? 0),
+          endReason:
+            typeof item?.endReason === "string"
+              ? item.endReason
+              : typeof item?.metadata?.endReason === "string"
+                ? item.metadata.endReason
+                : "draw",
+        };
+      }),
       pagination: {
         page,
         pageSize,
@@ -1207,6 +1375,7 @@ export class CompetitionService {
   ): Promise<Record<string, unknown>> {
     const db = this.mongoService.getDb();
     const tournaments = db.collection("tournaments");
+    const tournamentParticipants = db.collection("tournament_participants");
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 10;
@@ -1225,10 +1394,51 @@ export class CompetitionService {
       tournaments.countDocuments(filter),
     ]);
 
+    const tournamentIds = items
+      .map((item) => item._id)
+      .filter((id): id is ObjectId => id instanceof ObjectId);
+
+    const participantCounts =
+      tournamentIds.length > 0
+        ? await tournamentParticipants
+            .aggregate<{ _id: ObjectId; count: number }>([
+              {
+                $match: {
+                  tournamentId: { $in: tournamentIds },
+                  status: { $ne: "withdrawn" },
+                },
+              },
+              {
+                $group: {
+                  _id: "$tournamentId",
+                  count: { $sum: 1 },
+                },
+              },
+            ])
+            .toArray()
+        : [];
+
+    const participantsByTournamentId = new Map<string, number>();
+    for (const row of participantCounts) {
+      participantsByTournamentId.set(row._id.toHexString(), Number(row.count));
+    }
+
     return {
       items: items.map((item) => ({
         ...item,
+        id: item._id?.toString?.() || item._id,
         _id: item._id?.toString?.() || item._id,
+        format: item.formatLabel || item.format,
+        startDate: item.startAt,
+        registrationDeadline: item.registrationDeadline || item.startAt,
+        status:
+          item.status === "draft" || item.status === "open"
+            ? "registration"
+            : item.status === "full"
+              ? "full"
+              : item.status,
+        participants:
+          participantsByTournamentId.get(item._id.toHexString()) || 0,
       })),
       pagination: {
         page,
@@ -1256,11 +1466,20 @@ export class CompetitionService {
     const document = {
       name: payload.name,
       format: payload.format,
+      formatLabel:
+        payload.format === "knockout"
+          ? "Single Elimination"
+          : payload.format === "round_robin"
+            ? "Round Robin"
+            : "Swiss",
       startAt,
       endAt,
+      registrationDeadline: startAt,
       maxParticipants: payload.maxParticipants,
       createdBy: user.userId,
-      status: "draft",
+      status: "registration",
+      participants: 0,
+      rounds: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -1282,6 +1501,12 @@ export class CompetitionService {
   ): Promise<Record<string, unknown>> {
     const db = this.mongoService.getDb();
     const tournaments = db.collection("tournaments");
+    const tournamentParticipants = db.collection("tournament_participants");
+    const userProfiles = db.collection<{
+      _id: string;
+      username?: string;
+      rating?: number;
+    }>("user_profiles");
 
     const query = ObjectId.isValid(tournamentId)
       ? { _id: new ObjectId(tournamentId) }
@@ -1292,9 +1517,66 @@ export class CompetitionService {
       throw new NotFoundException("Khong tim thay tournament");
     }
 
+    const participantsRaw = await tournamentParticipants
+      .find({ tournamentId: tournament._id, status: { $ne: "withdrawn" } })
+      .sort({ seed: 1, joinedAt: 1 })
+      .toArray();
+
+    const participantUserIds = participantsRaw
+      .map((participant) => participant.userId)
+      .filter((userId): userId is string => typeof userId === "string");
+
+    const profiles =
+      participantUserIds.length > 0
+        ? await userProfiles
+            .find(
+              { _id: { $in: participantUserIds } },
+              { projection: { _id: 1, username: 1, rating: 1 } },
+            )
+            .toArray()
+        : [];
+
+    const profileMap = new Map<
+      string,
+      { username?: string; rating?: number }
+    >();
+    for (const profile of profiles) {
+      profileMap.set(profile._id, {
+        username: profile.username,
+        rating: profile.rating,
+      });
+    }
+
+    const participants = participantsRaw.map((participant, index) => {
+      const userId = String(participant.userId || "");
+      const profile = profileMap.get(userId);
+      return {
+        id: userId || `participant-${index + 1}`,
+        userId,
+        username:
+          (typeof participant.username === "string" && participant.username) ||
+          profile?.username ||
+          `Player ${index + 1}`,
+        rating: Number(participant.rating ?? profile?.rating ?? 1200),
+        seed: Number(participant.seed ?? index + 1),
+        status: participant.status || "active",
+        joinedAt: participant.joinedAt || null,
+      };
+    });
+
     return {
       ...tournament,
+      id: tournament._id?.toString?.() || tournament._id,
       _id: tournament._id?.toString?.() || tournament._id,
+      format: tournament.formatLabel || tournament.format,
+      startDate: tournament.startAt,
+      registrationDeadline:
+        tournament.registrationDeadline || tournament.startAt,
+      participants,
+      status:
+        tournament.status === "draft" || tournament.status === "open"
+          ? "registration"
+          : tournament.status,
     };
   }
 

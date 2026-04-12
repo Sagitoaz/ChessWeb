@@ -6,6 +6,7 @@ const ChessBoard = ({
   onMove,
   playerColor = 'white',
   disabled = false,
+  showMoveHints = true,
   showCoordinates = true,
   highlightCheck = true,
   soundEnabled = true,
@@ -37,6 +38,11 @@ const ChessBoard = ({
         return []
       }
 
+      if (!showMoveHints) {
+        setOptionSquares({})
+        return moves
+      }
+
       const newSquares = {}
       moves.forEach((move) => {
         newSquares[move.to] = {
@@ -55,7 +61,7 @@ const ChessBoard = ({
       setOptionSquares(newSquares)
       return moves
     },
-    [gameState]
+    [gameState, showMoveHints]
   )
 
   const onSquareClick = useCallback(
@@ -195,6 +201,7 @@ ChessBoard.propTypes = {
   onMove: PropTypes.func,
   playerColor: PropTypes.oneOf(['white', 'black']),
   disabled: PropTypes.bool,
+  showMoveHints: PropTypes.bool,
   showCoordinates: PropTypes.bool,
   highlightCheck: PropTypes.bool,
   soundEnabled: PropTypes.bool,

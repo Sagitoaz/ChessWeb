@@ -73,6 +73,8 @@ export class RankedPaginationQueryDto {
 export enum TournamentStatus {
   DRAFT = "draft",
   OPEN = "open",
+  REGISTRATION = "registration",
+  FULL = "full",
   ONGOING = "ongoing",
   COMPLETED = "completed",
   CANCELLED = "cancelled",

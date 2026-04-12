@@ -22,6 +22,9 @@ interface GameDoc {
   whitePlayerId?: string | null;
   blackPlayerId?: string | null;
   result?: string | null;
+  rawResult?: string | null;
+  moves?: unknown[] | null;
+  metadata?: { totalMoves?: number | null } | null;
   createdAt?: Date | null;
   finishedAt?: Date | null;
 }
@@ -271,6 +274,9 @@ export class ProfileRepository implements ProfileRepositoryPort {
             whitePlayerId: 1,
             blackPlayerId: 1,
             result: 1,
+            rawResult: 1,
+            moves: 1,
+            metadata: 1,
             createdAt: 1,
             finishedAt: 1,
           },
@@ -337,6 +343,11 @@ export class ProfileRepository implements ProfileRepositoryPort {
           ? (usernameMap.get(game.blackPlayerId) ?? null)
           : null,
         result: game.result ?? null,
+        rawResult: game.rawResult ?? null,
+        totalMoves: Number(
+          game.metadata?.totalMoves ??
+            (Array.isArray(game.moves) ? game.moves.length : 0),
+        ),
         createdAt: game.createdAt ?? null,
         finishedAt: game.finishedAt ?? null,
       };
