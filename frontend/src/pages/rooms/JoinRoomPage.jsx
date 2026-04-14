@@ -4,22 +4,37 @@ import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
 import { Users, Clock, Lock, Globe, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
 
-const normalizeRoomInfo = (room, code) => ({
-  code: room?.code || code,
-  name: room?.name || `Phòng ${code}`,
-  host: room?.host || room?.owner || { username: 'Unknown', avatar: null },
-  settings: {
-    timeControl: room?.settings?.timeControl || room?.timeControl || '10+0',
-    increment: room?.settings?.increment || room?.increment || 0,
-    isPrivate: room?.settings?.isPrivate ?? room?.isPrivate ?? true,
-  },
-  playerCount: room?.playerCount || room?.members?.length || room?.players?.length || 0,
-  maxPlayers: room?.maxPlayers || 2,
-  status: room?.status || 'waiting',
-  activeGameId: room?.activeGameId || null,
-  whitePlayerId: room?.whitePlayerId || null,
-  blackPlayerId: room?.blackPlayerId || null,
-})
+const normalizeRoomInfo = (room, code) => {
+  const members = Array.isArray(room?.members) ? room.members : []
+  const ownerMember = members.find((member) => member?.role === 'owner')
+  const host =
+    room?.host ||
+    room?.owner ||
+    (ownerMember
+      ? {
+          username:
+            ownerMember.username || ownerMember.displayName || ownerMember.userId || 'Unknown',
+          avatar: ownerMember.avatarUrl || null,
+        }
+      : { username: 'Unknown', avatar: null })
+
+  return {
+    code: room?.code || code,
+    name: room?.name || `Phòng ${code}`,
+    host,
+    settings: {
+      timeControl: room?.settings?.timeControl || room?.timeControl || '10+0',
+      increment: room?.settings?.increment || room?.increment || 0,
+      isPrivate: room?.settings?.isPrivate ?? room?.isPrivate ?? true,
+    },
+    playerCount: room?.playerCount || room?.members?.length || room?.players?.length || 0,
+    maxPlayers: room?.maxPlayers || 2,
+    status: room?.status || 'waiting',
+    activeGameId: room?.activeGameId || null,
+    whitePlayerId: room?.whitePlayerId || null,
+    blackPlayerId: room?.blackPlayerId || null,
+  }
+}
 
 export default function JoinRoomPage() {
   const navigate = useNavigate()
@@ -57,6 +72,22 @@ export default function JoinRoomPage() {
     validateFromUrl()
   }, [searchParams])
 
+  useEffect(() => {
+    if (!roomInfo?.code) return
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await gameService.getRoom(roomInfo.code)
+        const room = response?.data ?? response
+        setRoomInfo(normalizeRoomInfo(room, roomInfo.code))
+      } catch {
+        // Keep previous room snapshot if transient fetch fails.
+      }
+    }, 2500)
+
+    return () => clearInterval(interval)
+  }, [roomInfo?.code])
+
   const handleValidateRoom = async (code = roomCode) => {
     if (!code.trim()) {
       setError('Vui lòng nhập mã phòng')
@@ -82,7 +113,10 @@ export default function JoinRoomPage() {
   const handleJoinRoom = async () => {
     setIsJoining(true)
     try {
-      await gameService.joinRoom(roomInfo.code)
+      const roomStarted = roomInfo?.status === 'playing' || Boolean(roomInfo?.activeGameId)
+      if (!roomStarted) {
+        await gameService.joinRoom(roomInfo.code)
+      }
       navigate(`/rooms/${roomInfo.code}`)
     } catch (err) {
       setError(err.message || 'Không thể tham gia phòng')
@@ -255,7 +289,7 @@ export default function JoinRoomPage() {
                     className="mt-4 bg-green-600 hover:bg-green-700 py-3"
                   >
                     <Users size={18} />
-                    Tham gia phòng
+                    {roomInfo.status === 'playing' ? 'Vào phòng đang chơi' : 'Tham gia phòng'}
                   </Button>
                 </div>
               )}

@@ -149,15 +149,9 @@ export default function TournamentMatchPlayPage() {
 
   const handleMove = useCallback(
     (move) => {
-      const applied = chessRef.current.move({
-        from: move.from,
-        to: move.to,
-        promotion: move.promotion || 'q',
-      })
-      if (!applied) return
-
+      // ChessBoard has already applied this move to chessRef.current.
       setMoveHistory(chessRef.current.history({ verbose: true }))
-      setLastMove({ from: applied.from, to: applied.to })
+      setLastMove({ from: move.from, to: move.to })
       sendMove({
         from: move.from,
         to: move.to,
@@ -170,7 +164,7 @@ export default function TournamentMatchPlayPage() {
 
   const boardDisabled = Boolean(resultText) || !myTurn
 
-  const turnLabel = useMemo(() => normalizeTurnLabel(chessRef.current.turn()), [moveHistory])
+  const turnLabel = normalizeTurnLabel(chessRef.current.turn())
   const myDisplayName = authUser?.displayName || authUser?.username || 'Bạn'
   const mySideLabel = playerColor === 'white' ? 'Trắng' : 'Đen'
   const myOpponentName = playerColor === 'white' ? blackName : whiteName

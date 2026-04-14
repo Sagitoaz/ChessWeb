@@ -67,26 +67,26 @@ export class GroqService {
     userMove: string,
     stockfishBestMove: string,
     score: number,
+    playerColor: string = "white",
   ): Promise<string> {
     if (!this.groq) {
       return this.fallback;
     }
 
-    const prompt = [
-      "Bạn là Đại kiện tướng cờ vua và huấn luyện viên chiến thuật.",
-      "Nhiệm vụ: phân tích vì sao nước đi của người chơi có vấn đề và vì sao nước đi Stockfish tốt hơn về mặt chiến thuật.",
-      "BẮT BUỘC trả lời bằng TIẾNG VIỆT CÓ DẤU, ngắn gọn, rõ ràng, tối đa 7 câu.",
-      "Bắt buộc có 4 phần với nhãn đề đúng nguyên văn:",
-      "1) Nhận xét: đánh giá nhanh nước đi của người chơi (Tốt/Lỗi/Sai lầm nghiêm trọng).",
-      "2) Vì sao nước đó chưa tốt: nêu rõ ý tưởng chiến thuật bị bỏ lỡ (ví dụ: mất kiểm soát trung tâm, lộ vua, yếu cột...).",
-      "3) Gợi ý cải thiện: đề xuất hướng chơi tổng quát và điều cần ưu tiên ở nước tiếp theo, KHÔNG đưa nước đi cụ thể.",
-      "4) Nước tốt hơn từ Stockfish: bắt buộc nêu lại CHÍNH XÁC nước Stockfish được cung cấp ở dưới và giải thích ngắn vì sao nó tốt hơn.",
-      "Không viết mã code, không trả lời ngoài chủ đề.",
-      `FEN: ${fen}`,
-      `Nước đi người chơi: ${userMove}`,
-      `Nước đi tốt nhất Stockfish: ${stockfishBestMove}`,
-      `Điểm số đánh giá (cp): ${score}`,
-    ].join("\n");
+    const perspectiveLabel = playerColor === "black" ? "Đen" : "Trắng";
+    const prompt = `Bạn là đại kiện tướng cờ vua.
+Phân tích từ góc nhìn bên ${perspectiveLabel} vừa đi quân; FEN là sau nước đi đó, nên nước Stockfish là phản đòn tốt nhất của bên còn lại.
+BẮT BUỘC trả lời bằng tiếng Việt có dấu, rất ngắn gọn: tối đa 4 dòng, mỗi dòng 1 câu.
+Dùng đúng 4 nhãn sau và không thêm nhãn khác:
+1) Nhận xét:
+2) Vì sao chưa tốt:
+3) Nên chơi gì tiếp:
+4) Stockfish:
+Không viết lan man, không giải thích dài, không nói ngoài chủ đề.
+FEN: ${fen}
+Nước đi người chơi: ${userMove}
+Nước đi tốt nhất Stockfish: ${stockfishBestMove}
+Điểm số đánh giá (cp): ${score}`;
 
     const candidates = this.activeModelName
       ? [
@@ -123,9 +123,12 @@ export class GroqService {
   async getTacticalCoachHint(
     pgn: string,
     detailLevel: "quick" | "detailed" = "detailed",
+    stockfishBestMove?: string,
   ): Promise<string> {
     if (!this.groq) {
-      return this.coachFallback;
+      return stockfishBestMove && stockfishBestMove !== "N/A"
+        ? `Nước hay nhất theo Stockfish: ${stockfishBestMove}. Ưu tiên giữ vua an toàn, kiểm soát trung tâm và tránh treo quân.`
+        : this.coachFallback;
     }
 
     const sanitizedPgn = String(pgn || "").trim();
@@ -134,25 +137,20 @@ export class GroqService {
     }
 
     const isDetailed = detailLevel === "detailed";
+    const hintLength = isDetailed ? "4-6 câu" : "2-4 câu";
+    const stockfishLine =
+      stockfishBestMove && stockfishBestMove !== "N/A"
+        ? `Nếu có Stockfish, nhắc ngắn gọn nước hay nhất là ${stockfishBestMove}.`
+        : "";
 
-    const prompt = [
-      "Bạn đóng vai Gia sư cờ vua giàu kinh nghiệm.",
-      "Đầu vào là lịch sử ván đấu (PGN).",
-      "BẮT BUỘC trả lời bằng tiếng Việt CÓ DẤU.",
-      "Không được tiết lộ nước đi cụ thể, không được viết dạng tọa độ (ví dụ: e4, Nf3).",
-      "Chỉ đưa định hướng chiến thuật tổng quát, dễ áp dụng ngay; phải nói rõ người chơi cần để ý điều gì trên bàn cờ và nên tìm kiểu nước đi nào, nhưng tuyệt đối không nói luôn nước đi.",
-      isDetailed
-        ? "Mức chi tiết: CHI TIẾT. Trả lời 6-10 câu, rõ ràng, có lưu ý rủi ro."
-        : "Mức chi tiết: NHANH. Trả lời 3-4 câu súc tích.",
-      "Định dạng bắt buộc:",
-      "1) Nhận xét tổng quan: ...",
-      "2) Điểm mạnh nên duy trì: ...",
-      "3) Lưu ý chiến thuật quan trọng: nêu tín hiệu cần quan sát và bẫy cần tránh.",
-      "4) Kế hoạch 2-3 lượt tới (ý tưởng): mô tả kiểu nước nên ưu tiên, ví dụ đổi quân, siết trung tâm, tăng áp lực, nhưng không được nêu nước đi cụ thể.",
-      "5) Cạm bẫy cần tránh: ...",
-      "Ưu tiên các chủ đề: kiểm soát trung tâm, an toàn vua, phối hợp quân, cột mở, ô yếu, quân treo.",
-      `PGN: ${sanitizedPgn}`,
-    ].join("\n");
+    const prompt = `Bạn là gia sư cờ vua.
+Đầu vào là PGN của ván đấu.
+BẮT BUỘC trả lời bằng tiếng Việt có dấu, ngắn gọn, không lan man.
+Không nêu nước đi cụ thể theo tọa độ nếu không cần thiết.
+Độ dài: ${hintLength}.
+${stockfishLine}
+Tập trung vào: trung tâm, an toàn vua, quân treo, cột mở, ô yếu, và ý tưởng chiến thuật ngắn gọn.
+PGN: ${sanitizedPgn}`;
 
     const candidates = this.activeModelName
       ? [
@@ -170,8 +168,8 @@ export class GroqService {
         const text = await this.generateWithModel(
           model,
           prompt,
-          isDetailed ? 420 : 220,
-          0.35,
+          isDetailed ? 260 : 160,
+          0.25,
         );
         this.activeModelName = model;
         return text || this.coachFallback;

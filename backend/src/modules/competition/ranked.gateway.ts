@@ -49,6 +49,10 @@ type GameResignPayload = {
   matchId?: string;
 };
 
+type GameDrawPayload = {
+  matchId?: string;
+};
+
 @WebSocketGateway({
   cors: {
     origin: true,
@@ -124,6 +128,18 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     roundIndex?: number;
   }): void {
     this.server.emit("tournament:matchReady", {
+      ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitTournamentCompleted(payload: {
+    tournamentId: string;
+    winner?: string | null;
+    status?: string;
+    rounds?: unknown;
+  }): void {
+    this.server.emit("tournament:completed", {
       ...payload,
       at: new Date().toISOString(),
     });
@@ -362,6 +378,125 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         at: new Date().toISOString(),
       });
     }
+  }
+
+  @SubscribeMessage("game:offerDraw")
+  async onGameOfferDraw(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: GameDrawPayload | undefined,
+  ): Promise<void> {
+    const user = this.getSocketUser(client);
+    const matchId = body?.matchId;
+
+    if (!matchId || typeof matchId !== "string") {
+      throw new UnauthorizedException("Missing matchId");
+    }
+
+    const allowed = await this.competitionService.isUserInMatch(
+      matchId,
+      user.userId,
+    );
+    if (!allowed) {
+      throw new UnauthorizedException(
+        "User is not a participant of this match",
+      );
+    }
+
+    this.server
+      .to(`match:${matchId}`)
+      .except(client.id)
+      .emit("game:drawOffer", {
+        matchId,
+        type: "offer",
+        fromUserId: user.userId,
+        at: new Date().toISOString(),
+      });
+  }
+
+  @SubscribeMessage("game:acceptDraw")
+  async onGameAcceptDraw(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: GameDrawPayload | undefined,
+  ): Promise<void> {
+    const user = this.getSocketUser(client);
+    const matchId = body?.matchId;
+
+    if (!matchId || typeof matchId !== "string") {
+      throw new UnauthorizedException("Missing matchId");
+    }
+
+    const allowed = await this.competitionService.isUserInMatch(
+      matchId,
+      user.userId,
+    );
+    if (!allowed) {
+      throw new UnauthorizedException(
+        "User is not a participant of this match",
+      );
+    }
+
+    this.server.to(`match:${matchId}`).emit("game:drawOffer", {
+      matchId,
+      type: "accepted",
+      byUserId: user.userId,
+      at: new Date().toISOString(),
+    });
+
+    try {
+      const completion = await this.competitionService.completeRankedMatch(
+        { userId: user.userId, roles: user.roles || [] },
+        matchId,
+        {
+          result: RankedMatchCompletionResult.DRAW,
+          reason: "draw_agreement",
+        },
+      );
+
+      this.server.to(`match:${matchId}`).emit("game:end", {
+        matchId,
+        reason: "draw_agreement",
+        result: completion.result,
+        at: new Date().toISOString(),
+      });
+      return;
+    } catch {
+      this.server.to(`match:${matchId}`).emit("game:end", {
+        matchId,
+        reason: "draw_agreement",
+        result: RankedMatchCompletionResult.DRAW,
+        at: new Date().toISOString(),
+      });
+    }
+  }
+
+  @SubscribeMessage("game:declineDraw")
+  async onGameDeclineDraw(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: GameDrawPayload | undefined,
+  ): Promise<void> {
+    const user = this.getSocketUser(client);
+    const matchId = body?.matchId;
+
+    if (!matchId || typeof matchId !== "string") {
+      throw new UnauthorizedException("Missing matchId");
+    }
+
+    const allowed = await this.competitionService.isUserInMatch(
+      matchId,
+      user.userId,
+    );
+    if (!allowed) {
+      throw new UnauthorizedException(
+        "User is not a participant of this match",
+      );
+    }
+
+    this.server.to(`match:${matchId}`).emit("game:drawOffer", {
+      matchId,
+      type: "declined",
+      byUserId: user.userId,
+      at: new Date().toISOString(),
+    });
   }
 
   private emitMatchFound(match: {

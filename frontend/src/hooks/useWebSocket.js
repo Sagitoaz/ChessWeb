@@ -340,6 +340,10 @@ export function useTournamentSocket(tournamentId) {
   const onTournamentStarted = useCallback((callback) => on('tournament:started', callback), [on])
   const onRoundUpdate = useCallback((callback) => on('tournament:roundUpdate', callback), [on])
   const onMatchReady = useCallback((callback) => on('tournament:matchReady', callback), [on])
+  const onTournamentCompleted = useCallback(
+    (callback) => on('tournament:completed', callback),
+    [on]
+  )
   const onTournamentUpdate = useCallback((callback) => on('tournament:update', callback), [on])
 
   return {
@@ -351,6 +355,7 @@ export function useTournamentSocket(tournamentId) {
     onTournamentStarted,
     onRoundUpdate,
     onMatchReady,
+    onTournamentCompleted,
     onTournamentUpdate,
   }
 }

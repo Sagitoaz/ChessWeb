@@ -31,6 +31,30 @@ import {
   Zap,
 } from 'lucide-react'
 
+const formatDuration = (seconds) => {
+  const safe = Math.max(0, Math.floor(Number(seconds) || 0))
+  const minutes = Math.floor(safe / 60)
+  const remaining = safe % 60
+  return `${minutes}:${String(remaining).padStart(2, '0')}`
+}
+
+const formatRelativeTime = (value) => {
+  if (!value) return 'vừa xong'
+  const ts = new Date(value).getTime()
+  if (Number.isNaN(ts)) return 'vừa xong'
+
+  const diffMs = Date.now() - ts
+  const diffMin = Math.floor(diffMs / 60_000)
+  if (diffMin < 1) return 'vừa xong'
+  if (diffMin < 60) return `${diffMin} phút trước`
+
+  const diffHour = Math.floor(diffMin / 60)
+  if (diffHour < 24) return `${diffHour} giờ trước`
+
+  const diffDay = Math.floor(diffHour / 24)
+  return `${diffDay} ngày trước`
+}
+
 // ==================== SUB-COMPONENTS ====================
 
 /**
@@ -94,7 +118,8 @@ const RecentGameRow = ({ game }) => {
     lose: { label: 'Thua', color: STATUS_COLORS.lose.icon },
     draw: { label: 'Hòa', color: STATUS_COLORS.draw.icon },
   }
-  const { label, color } = resultConfig[game.result]
+  const normalizedResult = game.result === 'loss' ? 'lose' : game.result
+  const { label, color } = resultConfig[normalizedResult] || resultConfig.draw
 
   return (
     <div
@@ -104,12 +129,12 @@ const RecentGameRow = ({ game }) => {
         <div
           className={`w-10 h-10 ${THEME.rounded.full} ${THEME.background.active} flex items-center justify-center font-bold ${THEME.text.secondary}`}
         >
-          {game.opponent[0]}
+          {(game.opponent || '?')[0]}
         </div>
         <div>
           <div className={`font-medium ${THEME.text.primary}`}>{game.opponent}</div>
           <div className={`text-xs ${THEME.text.muted}`}>
-            {game.mode} • {game.time}
+            {game.mode} • {formatDuration(game.duration)}
           </div>
         </div>
       </div>
@@ -123,6 +148,7 @@ const RecentGameRow = ({ game }) => {
             {game.eloChange} ELO
           </div>
         )}
+        <div className={`text-xs ${THEME.text.muted}`}>{formatRelativeTime(game.playedAt)}</div>
       </div>
     </div>
   )
@@ -161,67 +187,80 @@ export default function DashboardPage() {
   const setAuthLogin = useAuthStore((state) => state.login)
   const [recentGames, setRecentGames] = useState([])
   const [upcomingTournaments, setUpcomingTournaments] = useState([])
+  const [rankedStats, setRankedStats] = useState(null)
 
   useEffect(() => {
     if (!hasHydrated || !token) return
 
     let mounted = true
     const refresh = async () => {
-      try {
-        const [profileResponse, gamesResponse, tournamentsResponse] = await Promise.all([
+      const [profileResult, gamesResult, tournamentsResult, rankedStatsResult] =
+        await Promise.allSettled([
           authService.getCurrentUser(),
-          gameService.getUserGames({ page: 1, pageSize: 4 }),
+          gameService.getRankedHistory(1, 4),
           gameService.getTournaments({ status: 'registration', page: 1, pageSize: 4 }),
+          gameService.getRankedStats(),
         ])
 
-        const profileData = profileResponse?.data ?? profileResponse
+      if (!mounted) return
+
+      if (profileResult.status === 'fulfilled') {
+        const profileData = profileResult.value?.data ?? profileResult.value
         const nextUser = profileData?.user ?? profileData
-        if (mounted && nextUser) {
-          setAuthLogin(nextUser, token)
+        if (nextUser) {
+          const rankedStats =
+            rankedStatsResult.status === 'fulfilled' ? rankedStatsResult.value : null
+          const statsData = rankedStats?.data ?? rankedStats
+          setAuthLogin(
+            {
+              ...nextUser,
+              rating: Number(statsData?.currentRating ?? nextUser.rating ?? 1200),
+              gamesPlayed: Number(statsData?.gamesPlayed ?? nextUser.gamesPlayed ?? 0),
+              wins: Number(statsData?.wins ?? nextUser.wins ?? 0),
+              losses: Number(statsData?.losses ?? nextUser.losses ?? 0),
+              draws: Number(statsData?.draws ?? nextUser.draws ?? 0),
+            },
+            token
+          )
         }
+      }
 
-        if (mounted) {
-          const gamesData = gamesResponse?.data ?? gamesResponse
-          const items = Array.isArray(gamesData?.items) ? gamesData.items : []
-          const games = Array.isArray(gamesData?.games) ? gamesData.games : []
-          const gameMap = new Map(games.map((game) => [String(game.id || game.gameId), game]))
-          const normalizedGames = items.map((item) => {
-            const game = gameMap.get(String(item.gameId))
-            const opponent =
-              item.playerSide === 'white'
-                ? game?.blackPlayer?.username || 'Đối thủ'
-                : game?.whitePlayer?.username || 'Đối thủ'
+      if (gamesResult.status === 'fulfilled') {
+        const history = gamesResult.value
+        const matches = Array.isArray(history?.matches) ? history.matches : []
+        const normalizedGames = matches.map((item) => ({
+          id: item.id,
+          opponent: item.opponent?.username || 'Đối thủ',
+          result: item.result === 'loss' ? 'lose' : item.result || 'draw',
+          eloChange: Number(item.ratingChange || 0),
+          mode: 'ranked',
+          duration: Number(item.duration || 0),
+          playedAt: item.playedAt || null,
+        }))
+        setRecentGames(normalizedGames)
+      }
 
-            return {
-              id: item.gameId,
-              opponent,
-              result: item.result || 'draw',
-              eloChange: 0,
-              mode: item.mode || 'ranked',
-              time: item.finishedAt || item.createdAt || new Date().toISOString(),
-            }
-          })
+      if (tournamentsResult.status === 'fulfilled') {
+        const tournamentsData = tournamentsResult.value?.data ?? tournamentsResult.value
+        const tournaments = Array.isArray(tournamentsData?.tournaments)
+          ? tournamentsData.tournaments
+          : []
+        const normalizedTournaments = tournaments.map((tournament) => ({
+          id: tournament.id || tournament._id,
+          name: tournament.name || 'Giải đấu',
+          players: tournament.participants || tournament.currentPlayers || 0,
+          startTime:
+            tournament.startAt ||
+            tournament.startTime ||
+            tournament.start_date ||
+            new Date().toISOString(),
+        }))
+        setUpcomingTournaments(normalizedTournaments)
+      }
 
-          const tournamentsData = tournamentsResponse?.data ?? tournamentsResponse
-          const tournaments = Array.isArray(tournamentsData?.tournaments)
-            ? tournamentsData.tournaments
-            : []
-          const normalizedTournaments = tournaments.map((tournament) => ({
-            id: tournament.id || tournament._id,
-            name: tournament.name || 'Giải đấu',
-            players: tournament.participants || tournament.currentPlayers || 0,
-            startTime:
-              tournament.startAt ||
-              tournament.startTime ||
-              tournament.start_date ||
-              new Date().toISOString(),
-          }))
-
-          setRecentGames(normalizedGames)
-          setUpcomingTournaments(normalizedTournaments)
-        }
-      } catch {
-        // Keep dashboard usable with current store snapshot.
+      if (rankedStatsResult.status === 'fulfilled') {
+        const stats = rankedStatsResult.value?.data ?? rankedStatsResult.value
+        setRankedStats(stats)
       }
     }
     void refresh()
@@ -242,7 +281,7 @@ export default function DashboardPage() {
   const fallbackUser = {
     username: 'Kỳ thủ',
     displayName: 'Kỳ thủ',
-    avatarUrl: 'https://i.pravatar.cc/150?img=12',
+    avatarUrl: null,
     rating: 1200,
     gamesPlayed: 0,
     wins: 0,
@@ -250,8 +289,18 @@ export default function DashboardPage() {
     draws: 0,
   }
   const profile = user ?? fallbackUser
+  const displayedRating = Number(rankedStats?.currentRating ?? profile.rating ?? 1200)
+  const displayedWins = Number(rankedStats?.wins ?? profile.wins ?? 0)
+  const displayedGames = Number(rankedStats?.gamesPlayed ?? profile.gamesPlayed ?? 0)
   const winRate =
-    profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0
+    displayedGames > 0
+      ? Math.round(
+          Number(
+            rankedStats?.winRate ??
+              (Number(rankedStats?.wins ?? profile.wins ?? 0) / displayedGames) * 100
+          )
+        )
+      : 0
 
   return (
     <div className={`min-h-screen ${THEME.background.page} py-6`}>
@@ -271,15 +320,9 @@ export default function DashboardPage() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            icon={Star}
-            label="ELO Rating"
-            value={profile.rating || 1200}
-            change={24}
-            trend="up"
-          />
-          <StatCard icon={Trophy} label="Thắng" value={profile.wins || 0} />
-          <StatCard icon={Clock} label="Tổng Ván" value={profile.gamesPlayed || 0} />
+          <StatCard icon={Star} label="ELO Rating" value={displayedRating} />
+          <StatCard icon={Trophy} label="Thắng" value={displayedWins} />
+          <StatCard icon={Clock} label="Tổng Ván" value={displayedGames} />
           <StatCard icon={Target} label="Tỷ Lệ Thắng" value={`${winRate}%`} />
         </div>
 

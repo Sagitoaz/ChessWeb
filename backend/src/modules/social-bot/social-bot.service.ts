@@ -61,8 +61,9 @@ export class SocialBotService {
     gameId: string,
     fen: string,
     userMove: string,
+    playerColor: string = "white",
   ): string {
-    return `${gameId}::${fen}::${userMove}`;
+    return `${gameId}::${playerColor}::${fen}::${userMove}`;
   }
 
   private getReplayAiCache(
@@ -195,8 +196,28 @@ export class SocialBotService {
           (role): role is string => typeof role === "string",
         )
       : [];
+    const principalId = String(principal.userId || "");
+    const ownerCandidates = [
+      tournament.createdBy,
+      tournament.organizerId,
+      tournament.ownerUserId,
+    ]
+      .map((value) => {
+        if (typeof value === "string") return value;
+        if (
+          value &&
+          typeof value === "object" &&
+          "toString" in value &&
+          typeof (value as { toString?: unknown }).toString === "function"
+        ) {
+          return (value as { toString: () => string }).toString();
+        }
+        return "";
+      })
+      .filter((value) => value.length > 0);
+
     return (
-      tournament.createdBy === principal.userId ||
+      ownerCandidates.includes(principalId) ||
       roles.includes("admin") ||
       roles.includes("mod")
     );
@@ -208,6 +229,20 @@ export class SocialBotService {
     if (value === "ongoing") return "ongoing";
     if (value === "scheduled") return "scheduled";
     return "pending";
+  }
+
+  private extractFenFromPgn(pgn: string): string | null {
+    try {
+      const chess = new Chess();
+      if (typeof chess.loadPgn === "function") {
+        chess.loadPgn(pgn);
+        return chess.fen();
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
   }
 
   private cloneTournamentRounds(
@@ -463,6 +498,24 @@ export class SocialBotService {
       });
 
       match.gameId = String(game._id);
+    }
+  }
+
+  private async attachTournamentGamesForRounds(
+    tournamentId: string,
+    rounds: Array<Record<string, unknown>>,
+    startRoundIndex: number,
+  ) {
+    for (
+      let roundIndex = startRoundIndex;
+      roundIndex < rounds.length;
+      roundIndex += 1
+    ) {
+      await this.attachTournamentGamesForRound(
+        tournamentId,
+        rounds,
+        roundIndex,
+      );
     }
   }
 
@@ -971,6 +1024,19 @@ export class SocialBotService {
     const participantsRaw =
       await this.repo.findTournamentParticipants(normalizedId);
 
+    const participantIds = participantsRaw
+      .filter((participant: any) => participant.status === "active")
+      .map((participant: any) => String(participant.userId))
+      .filter((value: string) => value.length > 0);
+    const latestProfiles =
+      await this.repo.findUserProfilesByIds(participantIds);
+    const latestProfileMap = new Map(
+      latestProfiles.map((profile: any) => [
+        String(profile._id || profile.userId || ""),
+        profile,
+      ]),
+    );
+
     const activeParticipants = participantsRaw
       .filter((participant: any) => participant.status !== "withdrawn")
       .filter((participant: any) => participant.status === "active")
@@ -981,7 +1047,11 @@ export class SocialBotService {
           participant.username.length > 0
             ? participant.username
             : `Player ${idx + 1}`,
-        rating: Number(participant.rating || 1200),
+        rating: Number(
+          latestProfileMap.get(String(participant.userId))?.rating ||
+            participant.rating ||
+            1200,
+        ),
         seed: Number(participant.seed || idx + 1),
       }))
       .sort((a, b) => a.seed - b.seed);
@@ -1034,7 +1104,7 @@ export class SocialBotService {
       }
     }
 
-    await this.attachTournamentGamesForRound(tournamentId, rounds, 0);
+    await this.attachTournamentGamesForRounds(tournamentId, rounds, 0);
 
     const standings = this.buildTournamentStandings(activeParticipants, rounds);
 
@@ -1297,7 +1367,9 @@ export class SocialBotService {
       String(winnerPlayer?.userId || "") || null,
     );
 
-    await this.attachTournamentGamesForRound(
+    this.refreshBracketRoundStatuses(rounds);
+
+    await this.attachTournamentGamesForRounds(
       tournamentId,
       rounds,
       found.roundIndex + 1,
@@ -1308,6 +1380,18 @@ export class SocialBotService {
       : tournamentId;
     const participantsRaw =
       await this.repo.findTournamentParticipants(normalizedId);
+    const participantIds = participantsRaw
+      .filter((participant: any) => participant.status === "active")
+      .map((participant: any) => String(participant.userId))
+      .filter((value: string) => value.length > 0);
+    const latestProfiles =
+      await this.repo.findUserProfilesByIds(participantIds);
+    const latestProfileMap = new Map(
+      latestProfiles.map((profile: any) => [
+        String(profile._id || profile.userId || ""),
+        profile,
+      ]),
+    );
     const activeParticipants = participantsRaw
       .filter((participant: any) => participant.status === "active")
       .map((participant: any, idx: number) => ({
@@ -1317,7 +1401,11 @@ export class SocialBotService {
           participant.username.length > 0
             ? participant.username
             : `Player ${idx + 1}`,
-        rating: Number(participant.rating || 1200),
+        rating: Number(
+          latestProfileMap.get(String(participant.userId))?.rating ||
+            participant.rating ||
+            1200,
+        ),
         seed: Number(participant.seed || idx + 1),
       }));
     const standings = this.buildTournamentStandings(activeParticipants, rounds);
@@ -1350,6 +1438,15 @@ export class SocialBotService {
       status: tournamentCompleted ? "completed" : "ongoing",
       rounds,
     });
+
+    if (tournamentCompleted) {
+      this.rankedGateway.emitTournamentCompleted({
+        tournamentId,
+        winner: String(finalMatch?.winner || ""),
+        status: "completed",
+        rounds,
+      });
+    }
 
     const nextRound = rounds[found.roundIndex + 1] as any;
     if (Array.isArray(nextRound?.matches)) {
@@ -1467,14 +1564,29 @@ export class SocialBotService {
     }
 
     const detailLevel = dto.detailLevel === "quick" ? "quick" : "detailed";
+    const fen = this.extractFenFromPgn(pgn);
+    let stockfishBestMove = "N/A";
 
-    const hint = await this.groqService.getTacticalCoachHint(pgn, detailLevel);
+    if (fen) {
+      const stockfishMove = await this.stockfishService.getBestMove(
+        fen,
+        "advanced",
+      );
+      stockfishBestMove = stockfishMove?.bestMoveUci || "N/A";
+    }
+
+    const hint = await this.groqService.getTacticalCoachHint(
+      pgn,
+      detailLevel,
+      stockfishBestMove,
+    );
 
     return {
       userId,
       hint,
       detailLevel,
-      source: "groq",
+      stockfishBestMove,
+      source: "groq+stockfish",
     };
   }
 
@@ -1485,6 +1597,7 @@ export class SocialBotService {
       userMove?: string;
       score?: number;
       refreshAi?: boolean;
+      playerColor?: string;
     },
   ) {
     const game = await this.repo.findGameById(gameId);
@@ -1495,6 +1608,7 @@ export class SocialBotService {
     const fen = options?.analyzeFen;
     const userMove = options?.userMove;
     const parsedScore = Number(options?.score ?? 0);
+    const playerColor = options?.playerColor === "black" ? "black" : "white";
 
     if (!fen || !userMove) {
       return {
@@ -1503,7 +1617,12 @@ export class SocialBotService {
       };
     }
 
-    const cacheKey = this.makeReplayAiCacheKey(gameId, fen, userMove);
+    const cacheKey = this.makeReplayAiCacheKey(
+      gameId,
+      fen,
+      userMove,
+      playerColor,
+    );
     const shouldBypassCache = options?.refreshAi === true;
     if (!shouldBypassCache) {
       const cached = this.getReplayAiCache(cacheKey);
@@ -1540,6 +1659,7 @@ export class SocialBotService {
       userMove,
       stockfishBestMove,
       score,
+      playerColor,
     );
 
     const analysis = {

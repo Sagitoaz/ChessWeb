@@ -227,6 +227,7 @@ export class SocialBotController {
     @Query("userMove") userMove?: string,
     @Query("score") score?: string,
     @Query("refreshAi") refreshAi?: string,
+    @Query("playerColor") playerColor?: string,
     @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<unknown>> {
     const data = await this.service.getGameById(id, {
@@ -240,6 +241,7 @@ export class SocialBotController {
         typeof refreshAi === "string"
           ? ["1", "true", "yes"].includes(refreshAi.toLowerCase())
           : false,
+      playerColor,
     });
     return successResponse(data, requestId || null);
   }

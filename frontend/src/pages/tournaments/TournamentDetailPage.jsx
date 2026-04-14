@@ -47,6 +47,8 @@ const normalizeTournament = (tournament, tournamentId) => ({
   currentRound: tournament?.currentRound || null,
   rounds: Array.isArray(tournament?.rounds) ? tournament.rounds : [],
   standings: Array.isArray(tournament?.standings) ? tournament.standings : [],
+  winner: tournament?.winner || null,
+  completedAt: tournament?.completedAt || null,
 })
 
 export default function TournamentDetailPage() {
@@ -68,6 +70,7 @@ export default function TournamentDetailPage() {
     onTournamentStarted,
     onRoundUpdate,
     onMatchReady,
+    onTournamentCompleted,
   } = useTournamentSocket(tournamentId)
 
   const authRoles = Array.isArray(authUser?.roles)
@@ -101,14 +104,17 @@ export default function TournamentDetailPage() {
           : null
       setIsRegistered(Boolean(currentParticipant))
       setParticipantStatus(currentParticipant?.status || null)
-      setIsOrganizer(
-        Boolean(
-          currentUserId &&
-          [payload?.createdBy, payload?.organizerId, payload?.ownerUserId]
-            .filter((value) => typeof value === 'string' && value.length > 0)
-            .includes(currentUserId)
-        )
-      )
+      const ownerCandidates = [payload?.createdBy, payload?.organizerId, payload?.ownerUserId]
+        .map((value) => {
+          if (typeof value === 'string') return value
+          if (value && typeof value === 'object' && typeof value.toString === 'function') {
+            return value.toString()
+          }
+          return ''
+        })
+        .filter(Boolean)
+
+      setIsOrganizer(Boolean(currentUserId && ownerCandidates.includes(String(currentUserId))))
     } catch (_error) {
       setTournament(null)
     } finally {
@@ -134,6 +140,7 @@ export default function TournamentDetailPage() {
     onTournamentStarted(refreshIfRelevant)
     onRoundUpdate(refreshIfRelevant)
     onMatchReady(refreshIfRelevant)
+    onTournamentCompleted(refreshIfRelevant)
 
     return () => {
       setLiveNotice('')
@@ -146,6 +153,7 @@ export default function TournamentDetailPage() {
     onPlayerWithdrawn,
     onRoundUpdate,
     onTournamentStarted,
+    onTournamentCompleted,
     tournamentId,
   ])
 
@@ -308,6 +316,11 @@ export default function TournamentDetailPage() {
           ? 'Đã bị từ chối'
           : null
 
+  const tournamentWinnerLabel =
+    tournament.status === 'completed' && tournament.winner
+      ? `Nhà vô địch: ${tournament.winner}`
+      : null
+
   return (
     <div className="min-h-screen bg-[#e1edff] p-4">
       <div className="max-w-6xl mx-auto">
@@ -449,6 +462,12 @@ export default function TournamentDetailPage() {
             {liveNotice && !actionError && (
               <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
                 {liveNotice}
+              </div>
+            )}
+
+            {tournamentWinnerLabel && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                {tournamentWinnerLabel}
               </div>
             )}
           </div>

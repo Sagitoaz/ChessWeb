@@ -22,7 +22,6 @@ import { useAuthStore } from '@store'
 import { ChessGame } from '@utils/chessLogic'
 import { RANKS } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor } from '@utils/formatters'
-import { THEME } from '@/styles/theme'
 import gameService from '@services/gameService'
 
 // ─────────────────────────────────────────────────────
@@ -36,10 +35,6 @@ const GAME_PHASE = {
 
 const INITIAL_TIME_MS = 600_000 // 10 minutes per side
 const CLOCK_TICK_MS = 100
-const AI_DELAY_MIN = 1200
-const AI_DELAY_MAX = 3500
-const INACTIVITY_WARNING_SEC = 90 // warn at 90s
-const INACTIVITY_TIMEOUT_SEC = 120 // auto-resign at 120s
 
 /** Starting piece counts (per side) */
 const STARTING_MATERIAL = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 }
@@ -69,17 +64,6 @@ const fmtClock = (ms) => {
     return `${sec}.${tenths}`
   }
   return `${min}:${String(sec).padStart(2, '0')}`
-}
-
-/** Pick a random legal move (prefers captures 50 %) */
-const pickAIMove = (game) => {
-  const moves = game.moves({ verbose: true })
-  if (moves.length === 0) return null
-  const captures = moves.filter((m) => m.captured)
-  if (captures.length > 0 && Math.random() > 0.5) {
-    return captures[Math.floor(Math.random() * captures.length)]
-  }
-  return moves[Math.floor(Math.random() * moves.length)]
 }
 
 /** Elo formula mock: K × (S – E), K = 32 */
@@ -505,6 +489,7 @@ const RankedGamePage = () => {
   const storeUser = useAuthStore((s) => s.user)
   const setAuthLogin = useAuthStore((s) => s.login)
   const authToken = useAuthStore((s) => s.token)
+  const [rankedStats, setRankedStats] = useState(null)
 
   // ─── Nhận dữ liệu trận đấu từ Lobby (qua navigate state) ───
   const locationMatchData = location.state?.matchData
@@ -516,11 +501,11 @@ const RankedGamePage = () => {
         ? {
             id: storeUser.id,
             username: storeUser.username,
-            rating: storeUser.rating || DEFAULT_PLAYER.rating,
+            rating: Number(rankedStats?.currentRating ?? storeUser.rating ?? DEFAULT_PLAYER.rating),
             avatarUrl: storeUser.avatarUrl || DEFAULT_PLAYER.avatarUrl,
           }
         : DEFAULT_PLAYER,
-    [storeUser]
+    [rankedStats?.currentRating, storeUser]
   )
   const [opponent, setOpponent] = useState(
     locationMatchData?.opponent
@@ -554,6 +539,8 @@ const RankedGamePage = () => {
   const [showEndModal, setShowEndModal] = useState(false)
   const [persistedResultData, setPersistedResultData] = useState(null)
   const endedRef = useRef(false)
+  const currentUserId =
+    storeUser?.id || storeUser?.userId || storeUser?._id || storeUser?.sub || null
 
   // ─── Draw / Resign ───
   const [drawOffer, setDrawOffer] = useState(null) // null | 'sent' | 'received'
@@ -609,11 +596,6 @@ const RankedGamePage = () => {
     },
     [soundEnabled]
   )
-
-  // ─── Inactivity Timer ───
-  const [inactivityTime, setInactivityTime] = useState(0)
-  const [showAFKWarning, setShowAFKWarning] = useState(false)
-  const inactivityRef = useRef(null)
 
   // ─── Opponent disconnect ───
   const [opponentDisconnected, setOpponentDisconnected] = useState(false)
@@ -683,6 +665,21 @@ const RankedGamePage = () => {
       }))
     }
   }, [locationMatchData])
+
+  useEffect(() => {
+    let mounted = true
+    void gameService
+      .getRankedStats()
+      .then((stats) => {
+        if (!mounted) return
+        setRankedStats(stats)
+      })
+      .catch(() => {})
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // ─── Captured pieces & material ───
   const { capturedByWhite, capturedByBlack, matAdv } = useMemo(() => {
@@ -782,9 +779,7 @@ const RankedGamePage = () => {
       endedRef.current = true
       setGamePhase(GAME_PHASE.ENDED)
       if (clockRef.current) clearInterval(clockRef.current)
-      if (inactivityRef.current) clearInterval(inactivityRef.current)
       setEndResult({ result, reason })
-      setShowAFKWarning(false)
 
       const txt = result === 'win' ? 'You won' : result === 'lose' ? 'You lost' : 'Game drawn'
       setChatMessages((prev) => [
@@ -882,11 +877,53 @@ const RankedGamePage = () => {
       endGame(reason, result)
     }
 
+    const handleDrawOfferEvent = (payload) => {
+      const eventType = String(payload?.type || '').toLowerCase()
+      const actorId = String(payload?.fromUserId || payload?.byUserId || '')
+      const isFromMe = Boolean(currentUserId && actorId && String(currentUserId) === actorId)
+
+      if (eventType === 'offer') {
+        if (isFromMe) return
+        setDrawOffer('received')
+        setChatMessages((prev) => [
+          ...prev,
+          { text: `${opponent.username} đề nghị hòa. Chấp nhận hay từ chối?`, isSystem: true },
+        ])
+        return
+      }
+
+      if (eventType === 'accepted') {
+        setDrawOffer(null)
+        if (!endedRef.current) {
+          endGame('draw_agreement', 'draw')
+        }
+        return
+      }
+
+      if (eventType === 'declined') {
+        if (isFromMe) {
+          setChatMessages((prev) => [
+            ...prev,
+            { text: 'Đối thủ đã từ chối đề nghị hòa.', isSystem: true },
+          ])
+        }
+        setDrawOffer(null)
+      }
+    }
+
     gameSocket.onMoveUpdate(handleMoveUpdate)
     gameSocket.onGameEnd(handleGameEnd)
+    gameSocket.onDrawOffer(handleDrawOfferEvent)
     gameSocket.onOpponentDisconnected(handleOpponentDisconnect)
     gameSocket.onOpponentReconnected(handleOpponentReconnect)
-  }, [gameSocket, checkGameEnd, playSound, playerColor, endGame])
+    return () => {
+      gameSocket.off('game:moveUpdate', handleMoveUpdate)
+      gameSocket.off('game:end', handleGameEnd)
+      gameSocket.off('game:drawOffer', handleDrawOfferEvent)
+      gameSocket.off('game:opponentDisconnected', handleOpponentDisconnect)
+      gameSocket.off('game:opponentReconnected', handleOpponentReconnect)
+    }
+  }, [gameSocket, checkGameEnd, playSound, playerColor, endGame, currentUserId, opponent.username])
 
   // ═══════════════════════════════════════════
   // COMMIT MOVE  — shared by drag-drop & click
@@ -938,24 +975,39 @@ const RankedGamePage = () => {
 
   const handleOfferDraw = useCallback(() => {
     if (drawOffer) return
-    // Local 2P: đề nghị hòa → phía kia bấm Accept/Decline
+    if (gameSocket?.isConnected && matchId) {
+      gameSocket.offerDraw()
+      setDrawOffer('sent')
+      setChatMessages((prev) => [
+        ...prev,
+        { text: 'Đã gửi đề nghị hòa đến đối thủ.', isSystem: true },
+      ])
+      return
+    }
     const side = gameRef.current.turn() === 'w' ? player.username : opponent.username
-    setDrawOffer('received') // luôn hiển thị banner để bên kia xác nhận
     setChatMessages((prev) => [
       ...prev,
       { text: `${side} đề nghị hòa. Chấp nhận hay từ chối?`, isSystem: true },
     ])
-  }, [drawOffer, player.username, opponent.username])
+  }, [drawOffer, gameSocket, matchId, player.username, opponent.username])
 
   const handleAcceptDraw = useCallback(() => {
+    if (gameSocket?.isConnected && matchId) {
+      gameSocket.acceptDraw()
+      setDrawOffer(null)
+      return
+    }
     endGame('draw_agreement', 'draw')
     setDrawOffer(null)
-  }, [endGame])
+  }, [endGame, gameSocket, matchId])
 
   const handleDeclineDraw = useCallback(() => {
+    if (gameSocket?.isConnected && matchId) {
+      gameSocket.declineDraw()
+    }
     setDrawOffer(null)
-    setChatMessages((prev) => [...prev, { text: 'You declined the draw', isSystem: true }])
-  }, [])
+    setChatMessages((prev) => [...prev, { text: 'Bạn đã từ chối đề nghị hòa.', isSystem: true }])
+  }, [gameSocket, matchId])
 
   const handleSendChat = useCallback(
     (text) => {
@@ -970,15 +1022,6 @@ const RankedGamePage = () => {
   // ═══════════════════════════════════════════
   const goToLobby = useCallback(() => navigate('/ranked'), [navigate])
   const goToHistory = useCallback(() => navigate('/ranked/history'), [navigate])
-
-  // ═══════════════════════════════════════════
-  // CLEANUP on unmount
-  // ═══════════════════════════════════════════
-  useEffect(() => {
-    return () => {
-      if (inactivityRef.current) clearInterval(inactivityRef.current)
-    }
-  }, [])
 
   // ═══════════════════════════════════════════
   // NAVIGATE-AWAY FORFEIT
@@ -1152,7 +1195,7 @@ const RankedGamePage = () => {
                 playerColor={playerColor}
                 disabled={gamePhase !== GAME_PHASE.PLAYING || endedRef.current || !isMyTurn}
                 customSquareStyles={squareStyles}
-                showMoveHints={false}
+                showMoveHints={true}
                 showCoordinates={true}
                 highlightCheck={true}
                 soundEnabled={false}
@@ -1212,6 +1255,12 @@ const RankedGamePage = () => {
               />
             )}
 
+            {drawOffer === 'sent' && (
+              <div className="mx-3 my-2 bg-blue-50 border border-blue-300 rounded-lg p-3 text-sm text-blue-800 font-medium">
+                Đã gửi đề nghị hòa. Đang chờ đối thủ phản hồi...
+              </div>
+            )}
+
             {/* Moves header */}
             <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50">
               <List className="w-4 h-4 text-gray-500" />
@@ -1247,15 +1296,15 @@ const RankedGamePage = () => {
 
               <button
                 onClick={handleOfferDraw}
-                disabled={!playing || drawOffer !== null}
+                disabled={!playing || drawOffer !== null || !gameSocket?.isConnected}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all ${
-                  !playing || drawOffer !== null
+                  !playing || drawOffer !== null || !gameSocket?.isConnected
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-700'
                 }`}
               >
                 <Handshake className="w-4 h-4" />
-                {drawOffer === 'received' ? 'Đề nghị hòa' : 'Đề nghị hòa'}
+                Đề nghị hòa
               </button>
             </div>
 

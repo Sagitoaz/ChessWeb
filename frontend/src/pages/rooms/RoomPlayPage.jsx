@@ -120,6 +120,14 @@ export default function RoomPlayPage() {
     joinedGameRef.current = activeGameId
   }, [activeGameId, isSocketConnected, joinGame])
 
+  const endGame = useCallback((result, reason) => {
+    if (endedRef.current) return
+    endedRef.current = true
+    setGameResult({ result, reason })
+    setGamePhase('ended')
+    if (clockRef.current) clearInterval(clockRef.current)
+  }, [])
+
   useEffect(() => {
     if (!activeGameId || gamePhase !== 'playing') return
 
@@ -200,14 +208,6 @@ export default function RoomPlayPage() {
       if (clockRef.current) clearInterval(clockRef.current)
     }
   }, [gamePhase])
-
-  const endGame = useCallback((result, reason) => {
-    if (endedRef.current) return
-    endedRef.current = true
-    setGameResult({ result, reason })
-    setGamePhase('ended')
-    if (clockRef.current) clearInterval(clockRef.current)
-  }, [])
 
   const persistCompletedGame = useCallback(
     async (localResult) => {

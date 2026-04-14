@@ -144,6 +144,7 @@ export default function ReplayViewerPage() {
           userMove: currentMove.san || `${currentMove.from}-${currentMove.to}`,
           score: 0,
           refreshAi: forceRefresh,
+          playerColor: currentMove.color === 'w' ? 'white' : 'black',
         })
         .then((data) => {
           if (!active) return
@@ -316,6 +317,9 @@ export default function ReplayViewerPage() {
               >
                 <p className={`text-xs uppercase tracking-wider mb-1 ${THEME.text.muted}`}>
                   Đại kiện tướng AI phân tích
+                </p>
+                <p className={`text-[11px] ${THEME.text.secondary} mb-1`}>
+                  Góc nhìn: {currentMove.color === 'w' ? 'Trắng' : 'Đen'}
                 </p>
                 <p className={`text-sm ${THEME.text.primary}`}>
                   {isAnalyzing ? 'Đang phân tích nước đi...' : aiCommentary || aiFallback}

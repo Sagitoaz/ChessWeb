@@ -3,6 +3,24 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import authService from '@/services/authService'
 import gameService from '@/services/gameService'
+import { Avatar } from '@/components/common'
+
+const formatRelativeTime = (value) => {
+  if (!value) return 'vừa xong'
+  const ts = new Date(value).getTime()
+  if (Number.isNaN(ts)) return 'vừa xong'
+
+  const diffMs = Date.now() - ts
+  const diffMin = Math.floor(diffMs / 60_000)
+  if (diffMin < 1) return 'vừa xong'
+  if (diffMin < 60) return `${diffMin} phút trước`
+
+  const diffHour = Math.floor(diffMin / 60)
+  if (diffHour < 24) return `${diffHour} giờ trước`
+
+  const diffDay = Math.floor(diffHour / 24)
+  return `${diffDay} ngày trước`
+}
 
 const StatCard = ({ label, value, color = 'blue' }) => {
   const colors = {
@@ -29,6 +47,7 @@ const RatingBadge = ({ label, value }) => (
 const RecentGameRow = ({ opponent, result, eloChange, date }) => {
   const colors = { win: 'text-green-600', lose: 'text-red-500', draw: 'text-gray-500' }
   const labels = { win: 'Thắng', lose: 'Thua', draw: 'Hòa' }
+  const normalizedResult = result === 'loss' ? 'lose' : result
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
       <div className="flex items-center gap-3">
@@ -38,14 +57,16 @@ const RecentGameRow = ({ opponent, result, eloChange, date }) => {
         <span className="text-sm font-medium text-gray-700">{opponent}</span>
       </div>
       <div className="flex items-center gap-4">
-        <span className={`text-sm font-bold ${colors[result]}`}>{labels[result]}</span>
+        <span className={`text-sm font-bold ${colors[normalizedResult] || colors.draw}`}>
+          {labels[normalizedResult] || labels.draw}
+        </span>
         <span
           className={`text-xs font-semibold ${eloChange >= 0 ? 'text-green-600' : 'text-red-500'}`}
         >
           {eloChange >= 0 ? '+' : ''}
           {eloChange}
         </span>
-        <span className="text-xs text-gray-400">{date}</span>
+        <span className="text-xs text-gray-400">{formatRelativeTime(date)}</span>
       </div>
     </div>
   )
@@ -56,40 +77,43 @@ const ProfilePage = () => {
   const token = useAuthStore((state) => state.token)
   const setAuthLogin = useAuthStore((state) => state.login)
   const [recentGames, setRecentGames] = useState([])
+  const [rankedStats, setRankedStats] = useState(null)
 
   useEffect(() => {
     let mounted = true
     const refresh = async () => {
       try {
-        const [profileResponse, gamesResponse] = await Promise.all([
+        const [profileResponse, gamesResponse, rankedStatsResponse] = await Promise.all([
           authService.getCurrentUser(),
-          gameService.getUserGames({ page: 1, pageSize: 5 }),
+          gameService.getRankedHistory(1, 5),
+          gameService.getRankedStats(),
         ])
         const profileData = profileResponse?.data ?? profileResponse
         const nextUser = profileData?.user ?? profileData
+        const statsData = rankedStatsResponse?.data ?? rankedStatsResponse
         if (mounted && nextUser && token) {
-          setAuthLogin(nextUser, token)
+          setAuthLogin(
+            {
+              ...nextUser,
+              rating: Number(statsData?.currentRating ?? nextUser.rating ?? 1200),
+              gamesPlayed: Number(statsData?.gamesPlayed ?? nextUser.gamesPlayed ?? 0),
+              wins: Number(statsData?.wins ?? nextUser.wins ?? 0),
+              losses: Number(statsData?.losses ?? nextUser.losses ?? 0),
+              draws: Number(statsData?.draws ?? nextUser.draws ?? 0),
+            },
+            token
+          )
         }
 
         if (mounted) {
-          const gamesData = gamesResponse?.data ?? gamesResponse
-          const items = Array.isArray(gamesData?.items) ? gamesData.items : []
-          const games = Array.isArray(gamesData?.games) ? gamesData.games : []
-          const gameMap = new Map(games.map((game) => [String(game.id || game.gameId), game]))
-          const normalizedGames = items.map((item) => {
-            const game = gameMap.get(String(item.gameId))
-            const opponentUsername =
-              item.playerSide === 'white'
-                ? game?.blackPlayer?.username || 'Đối thủ'
-                : game?.whitePlayer?.username || 'Đối thủ'
-
-            return {
-              opponent: opponentUsername,
-              result: item.result || 'draw',
-              eloChange: 0,
-              date: item.finishedAt || item.createdAt || new Date().toISOString(),
-            }
-          })
+          setRankedStats(statsData)
+          const matches = Array.isArray(gamesResponse?.matches) ? gamesResponse.matches : []
+          const normalizedGames = matches.map((item) => ({
+            opponent: item.opponent?.username || 'Đối thủ',
+            result: item.result || 'draw',
+            eloChange: Number(item.ratingChange || 0),
+            date: item.playedAt || new Date().toISOString(),
+          }))
 
           setRecentGames(normalizedGames)
         }
@@ -110,11 +134,11 @@ const ProfilePage = () => {
     email: authUser?.email ?? '',
     bio: authUser?.bio ?? '',
     avatarUrl: authUser?.avatarUrl ?? null,
-    rating: authUser?.rating ?? 1200,
-    gamesPlayed: authUser?.gamesPlayed ?? 0,
-    wins: authUser?.wins ?? 0,
-    losses: authUser?.losses ?? 0,
-    draws: authUser?.draws ?? 0,
+    rating: rankedStats?.currentRating ?? authUser?.rating ?? 1200,
+    gamesPlayed: rankedStats?.gamesPlayed ?? authUser?.gamesPlayed ?? 0,
+    wins: rankedStats?.wins ?? authUser?.wins ?? 0,
+    losses: rankedStats?.losses ?? authUser?.losses ?? 0,
+    draws: rankedStats?.draws ?? authUser?.draws ?? 0,
   }
 
   const winRate = user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0
@@ -129,11 +153,9 @@ const ProfilePage = () => {
           {/* Profile info */}
           <div className="px-6 pb-6">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-10">
-              <img
-                src={user.avatarUrl ?? `https://i.pravatar.cc/100?u=${user.username}`}
-                alt={user.username}
-                className="w-20 h-20 rounded-2xl border-4 border-white shadow-md object-cover shrink-0"
-              />
+              <div className="shrink-0 rounded-2xl border-4 border-white shadow-md">
+                <Avatar src={user.avatarUrl} name={user.username} size="xl" />
+              </div>
               <div className="flex-1 sm:pb-1">
                 <h1 className="text-xl font-extrabold text-gray-900 leading-tight">
                   {user.displayName ?? user.username}

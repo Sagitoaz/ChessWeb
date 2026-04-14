@@ -150,14 +150,14 @@ export default function BotGamePage() {
       return
     }
     setGameState('InGame') // SM: Waiting → InGame
-  }, [])
+  }, [gameData, navigate, showError])
 
   // Nếu player chọn Black, bot (White) đi trước — trigger ngay khi vào game
   useEffect(() => {
     if (gameState === 'InGame' && chess.turn() !== playerColorCode) {
       executeBotMove(chess)
     }
-  }, [gameState]) // chỉ chạy 1 lần khi gameState chuyển sang InGame
+  }, [chess, executeBotMove, gameState, playerColorCode])
 
   // =============================================
   // CHECK END CONDITION
@@ -330,23 +330,6 @@ export default function BotGamePage() {
     [chess, gameState, isBotThinking, checkEndCondition, executeBotMove, forceUpdate]
   )
 
-  // UC4: Pause / Resume — SM: InGame ↔ Paused
-  const handlePause = async () => {
-    try {
-      await botGameAPI.pauseBotGame(gameId)
-      setGameState('Paused')
-    } catch {
-      showError('Không thể tạm dừng')
-    }
-  }
-  const handleResume = async () => {
-    try {
-      await botGameAPI.resumeBotGame(gameId)
-      setGameState('InGame')
-    } catch {
-      showError('Không thể tiếp tục')
-    }
-  }
   // Resign — SM: InGame → Finished
   const handleResign = () => {
     setGameResult(playerColor === 'White' ? 'BlackWin' : 'WhiteWin')
@@ -358,7 +341,7 @@ export default function BotGamePage() {
 
     const pgn = chess.pgn()
     if (!pgn || pgn.trim().length < 8) {
-      setTacticalHint('Cần thêm vài nước đi nữa để đưa gợi ý chi tiết.')
+      setTacticalHint('Cần thêm vài nước đi nữa để đưa gợi ý ngắn gọn.')
       setHintError('')
       setIsHintLoading(false)
       return
@@ -368,7 +351,7 @@ export default function BotGamePage() {
     setHintError('')
 
     try {
-      const data = await botGameAPI.getTacticalHint(pgn, 'detailed')
+      const data = await botGameAPI.getTacticalHint(pgn, 'quick')
       const hint = String(data?.hint || '').trim()
       if (!hint) {
         throw new Error('empty hint')
@@ -626,7 +609,7 @@ export default function BotGamePage() {
                   className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-amber-200 bg-white text-amber-700 hover:bg-amber-100"
                 >
                   <RefreshCcw className="w-3 h-3" />
-                  {isHintLoading ? 'Đang phân tích...' : 'Xin gợi ý chi tiết'}
+                  {isHintLoading ? 'Đang phân tích...' : 'Xin gợi ý nhanh'}
                 </button>
               </div>
               <div className="mt-2 rounded-lg border border-amber-100 bg-white p-2.5 text-sm text-gray-700 max-h-32 overflow-y-auto">

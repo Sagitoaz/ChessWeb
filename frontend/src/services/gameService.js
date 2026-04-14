@@ -710,6 +710,7 @@ export const replayAPI = {
           userMove: analysisParams.userMove,
           score: analysisParams.score,
           refreshAi: analysisParams.refreshAi ? 1 : undefined,
+          playerColor: analysisParams.playerColor,
         }
       : undefined
     const response = await gameAPI.get(`/games/${gameId}`, { params })
