@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
 import {
@@ -37,6 +38,7 @@ const PARTICIPANT_OPTIONS = [4, 8, 16, 32, 64]
 
 export default function CreateTournamentPage() {
   const navigate = useNavigate()
+  const { showNotification } = useNotification()
   const [currentStep, setCurrentStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
 
@@ -146,7 +148,11 @@ export default function CreateTournamentPage() {
         navigate('/tournaments')
       }
     } catch (_error) {
-      setErrors((prev) => ({ ...prev, submit: 'Không thể tạo giải đấu, vui lòng thử lại.' }))
+      showNotification({
+        type: 'error',
+        title: 'Lỗi tạo giải',
+        message: 'Không thể tạo giải đấu, vui lòng thử lại.',
+      })
     } finally {
       setIsCreating(false)
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
 import { Users, Clock, Lock, Globe, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
@@ -39,11 +40,11 @@ const normalizeRoomInfo = (room, code) => {
 export default function JoinRoomPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { showNotification } = useNotification()
 
   const [roomCode, setRoomCode] = useState('')
   const [isValidating, setIsValidating] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
-  const [error, setError] = useState('')
   const [roomInfo, setRoomInfo] = useState(null)
 
   // Get code from URL query params if exists
@@ -54,7 +55,6 @@ export default function JoinRoomPage() {
 
       const normalizedCode = codeFromUrl.toUpperCase()
       setRoomCode(normalizedCode)
-      setError('')
       setIsValidating(true)
       setRoomInfo(null)
 
@@ -63,7 +63,11 @@ export default function JoinRoomPage() {
         const room = response?.data ?? response
         setRoomInfo(normalizeRoomInfo(room, normalizedCode))
       } catch (err) {
-        setError(err.message || 'Không thể kiểm tra mã phòng')
+        showNotification({
+          type: 'error',
+          title: 'Lỗi kiểm tra',
+          message: err.message || 'Không thể kiểm tra mã phòng',
+        })
       } finally {
         setIsValidating(false)
       }
@@ -90,11 +94,14 @@ export default function JoinRoomPage() {
 
   const handleValidateRoom = async (code = roomCode) => {
     if (!code.trim()) {
-      setError('Vui lòng nhập mã phòng')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi đầu vào',
+        message: 'Vui lòng nhập mã phòng',
+      })
       return
     }
 
-    setError('')
     setIsValidating(true)
     setRoomInfo(null)
 
@@ -104,7 +111,11 @@ export default function JoinRoomPage() {
       const room = response?.data ?? response
       setRoomInfo(normalizeRoomInfo(room, normalizedCode))
     } catch (err) {
-      setError(err.message || 'Không thể kiểm tra mã phòng')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi',
+        message: err.message || 'Không thể kiểm tra mã phòng',
+      })
     } finally {
       setIsValidating(false)
     }
@@ -119,7 +130,11 @@ export default function JoinRoomPage() {
       }
       navigate(`/rooms/${roomInfo.code}`)
     } catch (err) {
-      setError(err.message || 'Không thể tham gia phòng')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi tham gia',
+        message: err.message || 'Không thể tham gia phòng',
+      })
     } finally {
       setIsJoining(false)
     }

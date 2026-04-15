@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useNotification } from '@/components/common/Notification'
 import {
   BarChart3,
   Trophy,
@@ -357,6 +358,7 @@ const RankProgressBar = ({ rating }) => {
 const RankedStatsPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { showNotification } = useNotification()
   const isDemo = location.pathname.startsWith('/demo')
   const storeUser = useAuthStore((s) => s.user)
 
@@ -382,7 +384,6 @@ const RankedStatsPage = () => {
   const [stats, setStats] = useState(null)
   const [botStats, setBotStats] = useState({ games: 0, wins: 0, losses: 0, draws: 0, winRate: 0 })
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
 
   const ratingHistory = Array.isArray(stats?.ratingHistory) ? stats.ratingHistory : []
   const monthlyPerf = Array.isArray(stats?.monthlyPerformance) ? stats.monthlyPerformance : []
@@ -390,7 +391,6 @@ const RankedStatsPage = () => {
   // ─── Fetch stats ───
   const fetchStats = useCallback(async () => {
     setLoading(true)
-    setError(null)
     try {
       const [data, botModeStats] = await Promise.all([
         gameService.getRankedStats(),
@@ -406,12 +406,16 @@ const RankedStatsPage = () => {
         winRate: Number(botModeStats?.winRate || 0),
       })
     } catch (err) {
-      setError('Không thể tải thống kê.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi tải thống kê',
+        message: err?.message || 'Không thể tải thống kê.',
+      })
       console.error('Failed to load stats:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showNotification])
 
   useEffect(() => {
     fetchStats()
@@ -431,11 +435,11 @@ const RankedStatsPage = () => {
     )
   }
 
-  if (error || !stats) {
+  if (!loading && !stats) {
     return (
       <MainLayout>
         <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-          <p className="text-red-400">{error || 'Something went wrong'}</p>
+          <p className="text-red-400">No stats available</p>
           <button
             onClick={fetchStats}
             className="px-4 py-2 bg-[#81b64c] hover:bg-[#6a9a3f] text-white rounded-lg text-sm transition-colors"

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useNotification } from '@/components/common/Notification'
 import {
   History,
   ChevronLeft,
@@ -281,6 +282,7 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
 const RankedHistoryPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { showNotification } = useNotification()
   const isDemo = location.pathname.startsWith('/demo')
   const storeUser = useAuthStore((s) => s.user)
 
@@ -305,7 +307,6 @@ const RankedHistoryPage = () => {
   // ─── Data ───
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
 
   // ─── Pagination ───
   const [currentPage, setCurrentPage] = useState(1)
@@ -325,7 +326,11 @@ const RankedHistoryPage = () => {
       setTotalPages(data.pagination?.totalPages || 1)
       setCurrentPage(data.pagination?.page || page)
     } catch (err) {
-      setError('Không thể tải lịch sử trận đấu.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi tải lịch sử',
+        message: err?.message || 'Không thể tải lịch sử trận đấu.',
+      })
       console.error('Failed to load history:', err)
     } finally {
       setLoading(false)

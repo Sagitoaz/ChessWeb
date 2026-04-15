@@ -4,6 +4,7 @@ import { Chess } from 'chess.js'
 import { ArrowLeft, Flag, ShieldAlert, Swords, Wifi, WifiOff, Crown } from 'lucide-react'
 import { Avatar, Button, Card, Loader } from '@/components/common'
 import { ChessBoard } from '@/components/game'
+import { useNotification } from '@/components/common/Notification'
 import { useAuthStore } from '@/store'
 import gameService from '@/services/gameService'
 import { useGameSocket } from '@/hooks/useWebSocket'
@@ -37,12 +38,11 @@ export default function TournamentMatchPlayPage() {
   const navigate = useNavigate()
   const { tournamentId, gameId } = useParams()
   const authUser = useAuthStore((state) => state.user)
+  const { showNotification } = useNotification()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [actionError, setActionError] = useState('')
   const [resultText, setResultText] = useState('')
-  const [noticeText, setNoticeText] = useState('')
   const [playerColor, setPlayerColor] = useState('white')
   const [whiteName, setWhiteName] = useState('Người chơi Trắng')
   const [blackName, setBlackName] = useState('Người chơi Đen')
@@ -88,7 +88,11 @@ export default function TournamentMatchPlayPage() {
         whitePlayerId !== String(currentUserId) &&
         blackPlayerId !== String(currentUserId)
       ) {
-        setError('Bạn không phải người chơi của trận đấu này.')
+        showNotification({
+          type: 'error',
+          title: 'Không thể vào trận',
+          message: 'Bạn không phải người chơi của trận đấu này.',
+        })
         return
       }
 
@@ -131,11 +135,19 @@ export default function TournamentMatchPlayPage() {
         const status = me?.status || null
         setParticipantStatus(status)
         if (status === 'eliminated') {
-          setNoticeText('Bạn đã bị loại khỏi giải đấu.')
+          showNotification({
+            type: 'error',
+            title: 'Loại khỏi giải',
+            message: 'Bạn đã bị loại khỏi giải đấu.',
+          })
         }
       }
     } catch (loadError) {
-      setError(loadError?.message || 'Không thể tải trận đấu tournament.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi tải trận',
+        message: loadError?.message || 'Không thể tải trận đấu tournament.',
+      })
     } finally {
       setLoading(false)
     }
@@ -172,12 +184,24 @@ export default function TournamentMatchPlayPage() {
       const resignedByUserId = String(payload?.resignedByUserId || '')
       if (reason === 'resignation') {
         if (resignedByUserId && resignedByUserId === String(currentUserId || '')) {
-          setNoticeText('Bạn đã đầu hàng. Kết quả đã được cập nhật.')
+          showNotification({
+            type: 'info',
+            title: 'Đầu hàng',
+            message: 'Bạn đã đầu hàng. Kết quả đã được cập nhật.',
+          })
         } else {
-          setNoticeText('Đối thủ đã đầu hàng. Kết quả đã được cập nhật.')
+          showNotification({
+            type: 'info',
+            title: 'Đối thủ đầu hàng',
+            message: 'Đối thủ đã đầu hàng. Kết quả đã được cập nhật.',
+          })
         }
       } else {
-        setNoticeText('Trận đấu đã kết thúc, bảng điểm đang được cập nhật.')
+        showNotification({
+          type: 'info',
+          title: 'Trận đấu kết thúc',
+          message: 'Trận đấu đã kết thúc, bảng điểm đang được cập nhật.',
+        })
       }
       void loadGame()
     }
@@ -217,7 +241,6 @@ export default function TournamentMatchPlayPage() {
     if (!tournamentId || !gameId || isFinished || submittingResign) return
 
     setSubmittingResign(true)
-    setActionError('')
 
     try {
       const targetMatchId = matchIdInBracket || gameId
@@ -225,7 +248,11 @@ export default function TournamentMatchPlayPage() {
       const payload = response?.data ?? response
 
       setResultText(normalizeResultLabel(payload?.result))
-      setNoticeText('Bạn đã đầu hàng. Kết quả trận và bảng điểm đã được cập nhật.')
+      showNotification({
+        type: 'success',
+        title: 'Đầu hàng thành công',
+        message: 'Bạn đã đầu hàng. Kết quả trận và bảng điểm đã được cập nhật.',
+      })
       setParticipantStatus('eliminated')
 
       if (isSocketConnected) {
@@ -238,7 +265,11 @@ export default function TournamentMatchPlayPage() {
         submitError?.response?.data?.message ||
         submitError?.message ||
         'Không thể cập nhật kết quả đầu hàng. Vui lòng thử lại.'
-      setActionError(String(message))
+      showNotification({
+        type: 'error',
+        title: 'Lỗi đầu hàng',
+        message: String(message),
+      })
     } finally {
       setSubmittingResign(false)
     }
@@ -346,17 +377,7 @@ export default function TournamentMatchPlayPage() {
         </div>
       )}
 
-      {actionError && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {actionError}
-        </div>
-      )}
-
-      {noticeText && (
-        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-          {noticeText}
-        </div>
-      )}
+      {/* Notifications are now global toasts */}
 
       {participantStatus === 'eliminated' && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">

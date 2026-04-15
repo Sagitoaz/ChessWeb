@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useNotification } from '@/components/common/Notification'
 import { Chess } from 'chess.js'
 import { ChessBoard } from '@components/game'
 import { Avatar, Button, Card } from '@/components/common'
@@ -48,12 +49,12 @@ export default function RoomPlayPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const user = useAuthStore((state) => state.user)
+  const { showNotification } = useNotification()
   const authToken = useAuthStore((state) => state.token)
   const setAuthLogin = useAuthStore((state) => state.login)
 
   const [room, setRoom] = useState(() => normalizeRoom(location.state?.room || null, roomId))
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [gamePhase, setGamePhase] = useState('waiting')
   const [showStartBusy, setShowStartBusy] = useState(false)
   const [showResignConfirm, setShowResignConfirm] = useState(false)

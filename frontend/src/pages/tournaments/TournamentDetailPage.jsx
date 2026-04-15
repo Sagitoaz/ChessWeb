@@ -78,6 +78,7 @@ const normalizeTournament = (tournament, tournamentId) => ({
 })
 
 export default function TournamentDetailPage() {
+  const { showNotification } = useNotification()
   const { tournamentId } = useParams()
   const navigate = useNavigate()
   const authUser = useAuthStore((state) => state.user)
@@ -87,8 +88,6 @@ export default function TournamentDetailPage() {
   const [isRegistered, setIsRegistered] = useState(false)
   const [isOrganizer, setIsOrganizer] = useState(false)
   const [participantStatus, setParticipantStatus] = useState(null)
-  const [actionError, setActionError] = useState('')
-  const [liveNotice, setLiveNotice] = useState('')
   const [checkInMinutes, setCheckInMinutes] = useState(3)
   const participantStatusRef = useRef(null)
   const {
@@ -124,6 +123,7 @@ export default function TournamentDetailPage() {
     if (!tournamentId) return
     setLoading(true)
     setActionError('')
+    // No-op: handled by notification
     try {
       const response = await gameService.getTournament(tournamentId)
       const payload = response?.data ?? response
@@ -147,6 +147,11 @@ export default function TournamentDetailPage() {
         nextParticipantStatus === 'eliminated'
       ) {
         setLiveNotice('Bạn đã bị loại khỏi giải đấu.')
+        showNotification({
+          type: 'error',
+          title: 'Loại khỏi giải',
+          message: 'Bạn đã bị loại khỏi giải đấu.',
+        })
       }
       participantStatusRef.current = nextParticipantStatus
       const ownerCandidates = [payload?.createdBy, payload?.organizerId, payload?.ownerUserId]
@@ -166,7 +171,7 @@ export default function TournamentDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [currentUserId, tournamentId])
+  }, [currentUserId, tournamentId, showNotification])
 
   useEffect(() => {
     void loadTournament()
@@ -178,6 +183,41 @@ export default function TournamentDetailPage() {
     const refreshIfRelevant = (payload, message) => {
       if (String(payload?.tournamentId || '') !== String(tournamentId)) return
       setLiveNotice(message || 'Giải đấu vừa được cập nhật. Đang tải lại...')
+      showNotification({
+        type: 'info',
+        title: 'Cập nhật giải đấu',
+        message: message || 'Giải đấu vừa được cập nhật. Đang tải lại...',
+      })
+      showNotification({
+        type: 'info',
+        title: 'Đăng ký mới',
+        message: 'Có người chơi mới tham gia. Đang cập nhật danh sách...',
+      })
+      showNotification({
+        type: 'info',
+        title: 'Rút lui',
+        message: 'Có người chơi rút lui. Đang cập nhật danh sách...',
+      })
+      showNotification({
+        type: 'info',
+        title: 'Bắt đầu giải đấu',
+        message: 'Giải đấu đã bắt đầu.',
+      })
+      showNotification({
+        type: 'info',
+        title: 'Cập nhật vòng đấu',
+        message: 'Kết quả vòng đấu đã cập nhật, đang làm mới bảng điểm...',
+      })
+      showNotification({
+        type: 'info',
+        title: 'Bàn đấu mới',
+        message: 'Có bàn đấu mới sẵn sàng.',
+      })
+      showNotification({
+        type: 'info',
+        title: 'Kết thúc giải đấu',
+        message: 'Giải đấu đã kết thúc, đang cập nhật kết quả cuối cùng...',
+      })
       void loadTournament()
     }
 
@@ -208,7 +248,7 @@ export default function TournamentDetailPage() {
     onTournamentCompleted(handleTournamentCompleted)
 
     return () => {
-      setLiveNotice('')
+      // No-op: handled by notification
     }
   }, [
     isTournamentSocketConnected,
@@ -220,6 +260,7 @@ export default function TournamentDetailPage() {
     onTournamentStarted,
     onTournamentCompleted,
     tournamentId,
+    showNotification,
   ])
 
   const handleRegister = async () => {
@@ -233,6 +274,11 @@ export default function TournamentDetailPage() {
         _error?.message ||
         'Không thể đăng ký giải đấu. Vui lòng thử lại.'
       setActionError(String(message))
+      showNotification({
+        type: 'error',
+        title: 'Lỗi đăng ký',
+        message: String(message),
+      })
     }
   }
 
@@ -243,6 +289,11 @@ export default function TournamentDetailPage() {
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể rút lui khỏi giải đấu. Vui lòng thử lại.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi rút lui',
+        message: 'Không thể rút lui khỏi giải đấu. Vui lòng thử lại.',
+      })
     }
   }
 
@@ -253,6 +304,11 @@ export default function TournamentDetailPage() {
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể bắt đầu giải đấu. Vui lòng kiểm tra số người chơi.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi bắt đầu giải',
+        message: 'Không thể bắt đầu giải đấu. Vui lòng kiểm tra số người chơi.',
+      })
     }
   }
 
@@ -264,6 +320,11 @@ export default function TournamentDetailPage() {
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể hủy giải đấu. Vui lòng thử lại.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi hủy giải',
+        message: 'Không thể hủy giải đấu. Vui lòng thử lại.',
+      })
     }
   }
 
@@ -276,6 +337,11 @@ export default function TournamentDetailPage() {
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể lưu kết quả trận đấu. Vui lòng thử lại.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi lưu kết quả',
+        message: 'Không thể lưu kết quả trận đấu. Vui lòng thử lại.',
+      })
     }
   }
 
@@ -287,9 +353,19 @@ export default function TournamentDetailPage() {
         checkInMinutes: Number(checkInMinutes || 3),
       })
       setLiveNotice('Đã mở bàn đấu cho vòng hiện tại.')
+      showNotification({
+        type: 'success',
+        title: 'Mở bàn đấu',
+        message: 'Đã mở bàn đấu cho vòng hiện tại.',
+      })
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể mở vòng hiện tại. Có thể vòng trước chưa hoàn thành.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi mở vòng',
+        message: 'Không thể mở vòng hiện tại. Có thể vòng trước chưa hoàn thành.',
+      })
     }
   }
 
@@ -298,9 +374,19 @@ export default function TournamentDetailPage() {
     try {
       await gameService.checkInTournamentMatch(tournamentId, matchId)
       setLiveNotice('Đã check-in thành công. Chờ đối thủ sẵn sàng.')
+      showNotification({
+        type: 'success',
+        title: 'Check-in thành công',
+        message: 'Đã check-in thành công. Chờ đối thủ sẵn sàng.',
+      })
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể check-in cho trận này.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi check-in',
+        message: 'Không thể check-in cho trận này.',
+      })
     }
   }
 
@@ -311,6 +397,11 @@ export default function TournamentDetailPage() {
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể duyệt người chơi. Vui lòng thử lại.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi duyệt người chơi',
+        message: 'Không thể duyệt người chơi. Vui lòng thử lại.',
+      })
     }
   }
 
@@ -321,6 +412,11 @@ export default function TournamentDetailPage() {
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể từ chối người chơi. Vui lòng thử lại.')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi từ chối người chơi',
+        message: 'Không thể từ chối người chơi. Vui lòng thử lại.',
+      })
     }
   }
 
@@ -565,17 +661,7 @@ export default function TournamentDetailPage() {
               )}
             </div>
 
-            {actionError && (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {actionError}
-              </div>
-            )}
-
-            {liveNotice && !actionError && (
-              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                {liveNotice}
-              </div>
-            )}
+            {/* Notifications are now global toasts, not local banners */}
 
             {tournamentWinnerLabel && (
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">

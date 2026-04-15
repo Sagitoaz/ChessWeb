@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
 import { useAuthStore } from '@store'
@@ -23,6 +24,7 @@ export default function CreateRoomPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const token = useAuthStore((state) => state.token)
+  const { showNotification } = useNotification()
 
   // Form state
   const [roomName, setRoomName] = useState('')
@@ -37,7 +39,6 @@ export default function CreateRoomPage() {
   const [copiedCode, setCopiedCode] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [waitingForPlayer, setWaitingForPlayer] = useState(false)
-  const [error, setError] = useState('')
 
   const selectedControl =
     TIME_CONTROLS.find((option) => option.value === timeControl) || TIME_CONTROLS[1]
