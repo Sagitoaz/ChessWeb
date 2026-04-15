@@ -8,7 +8,7 @@ import gameService from '@/services/gameService'
 import authService from '@/services/authService'
 import { useGameSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
-import { ArrowLeft, Clock, Flag, Handshake, Play, Trophy, Users } from 'lucide-react'
+import { ArrowLeft, Clock, Flag, Play, Trophy, Users } from 'lucide-react'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -60,7 +60,6 @@ export default function RoomPlayPage() {
   const [showResignConfirm, setShowResignConfirm] = useState(false)
   const [gameResult, setGameResult] = useState(null)
   const [moveHistory, setMoveHistory] = useState([])
-  const [lastMove, setLastMove] = useState(null)
   const [whiteTime, setWhiteTime] = useState(600)
   const [blackTime, setBlackTime] = useState(600)
 
@@ -97,13 +96,16 @@ export default function RoomPlayPage() {
       const response = await gameService.getRoom(roomId)
       const data = response?.data ?? response
       setRoom(normalizeRoom(data, roomId))
-      setError('')
     } catch (fetchError) {
-      setError(fetchError.message || 'Không thể tải phòng')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi tải phòng',
+        message: fetchError.message || 'Không thể tải phòng',
+      })
     } finally {
       setLoading(false)
     }
-  }, [roomId])
+  }, [roomId, showNotification])
 
   useEffect(() => {
     void refreshRoom()
@@ -121,13 +123,26 @@ export default function RoomPlayPage() {
     joinedGameRef.current = activeGameId
   }, [activeGameId, isSocketConnected, joinGame])
 
-  const endGame = useCallback((result, reason) => {
-    if (endedRef.current) return
-    endedRef.current = true
-    setGameResult({ result, reason })
-    setGamePhase('ended')
-    if (clockRef.current) clearInterval(clockRef.current)
-  }, [])
+  const endGame = useCallback(
+    (result, reason) => {
+      if (endedRef.current) return
+      endedRef.current = true
+      setGameResult({ result, reason })
+      setGamePhase('ended')
+      if (clockRef.current) clearInterval(clockRef.current)
+      showNotification({
+        type: result === 'draw' ? 'info' : result === 'win' ? 'success' : 'error',
+        title: result === 'draw' ? 'Ván đấu hòa' : result === 'win' ? 'Bạn thắng' : 'Bạn thua',
+        message:
+          reason === 'timeout'
+            ? 'Trận đấu đã kết thúc do hết giờ.'
+            : reason === 'resignation'
+              ? 'Trận đấu đã kết thúc do đầu hàng.'
+              : 'Trận đấu đã kết thúc.',
+      })
+    },
+    [showNotification]
+  )
 
   useEffect(() => {
     if (!activeGameId || gamePhase !== 'playing') return
@@ -145,7 +160,7 @@ export default function RoomPlayPage() {
           setMoveHistory(game.moves)
           const last = game.moves[game.moves.length - 1]
           if (last?.from && last?.to) {
-            setLastMove({ from: last.from, to: last.to })
+            // last move highlight is not used in this page yet
           }
         }
 
@@ -181,7 +196,6 @@ export default function RoomPlayPage() {
     if (room.activeGameId && loadedGameRef.current !== room.activeGameId) {
       chessRef.current = new Chess(INITIAL_FEN)
       setMoveHistory([])
-      setLastMove(null)
       endedRef.current = false
       setGameResult(null)
       loadedGameRef.current = room.activeGameId
@@ -241,12 +255,22 @@ export default function RoomPlayPage() {
         const refreshedUser = refreshed?.user ?? refreshed
         if (refreshedUser && authToken) {
           setAuthLogin(refreshedUser, authToken)
+          showNotification({
+            type: 'success',
+            title: 'Đã lưu ván đấu',
+            message: 'Ván chơi phòng đã được lưu vào lịch sử.',
+          })
         }
       } catch {
         // Keep UI responsive even if persistence fails.
+        showNotification({
+          type: 'error',
+          title: 'Không thể lưu ván đấu',
+          message: 'Trận đã kết thúc nhưng lưu lịch sử thất bại.',
+        })
       }
     },
-    [activeGameId, authToken, playerColor, setAuthLogin, user?.id]
+    [activeGameId, authToken, playerColor, setAuthLogin, showNotification, user?.id]
   )
 
   useEffect(() => {
@@ -282,7 +306,6 @@ export default function RoomPlayPage() {
       if (!applied) return
 
       setMoveHistory(chessRef.current.history({ verbose: true }))
-      setLastMove({ from: applied.from, to: applied.to })
       checkGameEnd()
     }
 
@@ -323,7 +346,6 @@ export default function RoomPlayPage() {
       if (gamePhase !== 'playing' || !activeGameId) return
 
       setMoveHistory(chessRef.current.history({ verbose: true }))
-      setLastMove({ from: move.from, to: move.to })
       checkGameEnd()
 
       if (isSocketConnected) {
@@ -353,7 +375,11 @@ export default function RoomPlayPage() {
       }))
       setGamePhase('playing')
     } catch (startError) {
-      setError(startError.message || 'Không thể bắt đầu ván đấu')
+      showNotification({
+        type: 'error',
+        title: 'Lỗi bắt đầu ván',
+        message: startError.message || 'Không thể bắt đầu ván đấu',
+      })
     } finally {
       setShowStartBusy(false)
     }
@@ -399,11 +425,7 @@ export default function RoomPlayPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {/* Notifications are shown via global toast */}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
         <div className="space-y-4">

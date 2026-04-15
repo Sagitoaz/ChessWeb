@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
-import { Users, Clock, Lock, Globe, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Users, Clock, Lock, Globe, ArrowLeft, CheckCircle2 } from 'lucide-react'
 
 const normalizeRoomInfo = (room, code) => {
   const members = Array.isArray(room?.members) ? room.members : []
@@ -74,7 +74,7 @@ export default function JoinRoomPage() {
     }
 
     validateFromUrl()
-  }, [searchParams])
+  }, [searchParams, showNotification])
 
   useEffect(() => {
     if (!roomInfo?.code) return
@@ -178,7 +178,6 @@ export default function JoinRoomPage() {
                     value={roomCode}
                     onChange={(e) => {
                       setRoomCode(e.target.value.toUpperCase())
-                      setError('')
                       setRoomInfo(null)
                     }}
                     onKeyPress={(e) => {
@@ -207,19 +206,8 @@ export default function JoinRoomPage() {
                 </p>
               </div>
 
-              {/* Error Message */}
-              {error && (
-                <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-red-900">Lỗi</p>
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                </div>
-              )}
-
               {/* Room Info - Hiển thị khi validate thành công */}
-              {roomInfo && !error && (
+              {roomInfo && (
                 <div className="border-2 border-green-200 rounded-lg p-6 bg-green-50">
                   <div className="flex items-start gap-3 mb-4">
                     <CheckCircle2 size={24} className="text-green-600 flex-shrink-0" />
@@ -311,7 +299,7 @@ export default function JoinRoomPage() {
             </div>
 
             {/* Help Section */}
-            {!roomInfo && !error && (
+            {!roomInfo && (
               <div className="pt-6 border-t border-gray-100">
                 <h3 className="font-semibold text-gray-900 mb-3">💡 Hướng dẫn</h3>
                 <ul className="space-y-2 text-sm text-gray-700">

@@ -5,10 +5,7 @@ import {
   History,
   ChevronLeft,
   ChevronRight,
-  Trophy,
-  Clock,
   Swords,
-  Filter,
   Search,
   Crown,
   Flag,
@@ -16,9 +13,6 @@ import {
   Timer,
   ArrowLeft,
   Eye,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   BarChart3,
 } from 'lucide-react'
 import { Button, Avatar, Loader } from '@components/common'
@@ -26,7 +20,7 @@ import { MainLayout } from '@components/layout'
 import { useAuthStore } from '@store'
 import gameService from '@services/gameService'
 import { RANKS } from '@utils/constants'
-import { formatEloDelta, eloDeltaColor, formatRelativeTime, formatDate } from '@utils/formatters'
+import { formatEloDelta, eloDeltaColor, formatRelativeTime } from '@utils/formatters'
 import { THEME } from '@/styles/theme'
 
 // ─────────────────────────────────────────────────────
@@ -317,25 +311,27 @@ const RankedHistoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('')
 
   // ─── Fetch Data ───
-  const fetchHistory = useCallback(async (page = 1) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await gameService.getRankedHistory(page, PAGE_SIZE)
-      setMatches(data.matches || [])
-      setTotalPages(data.pagination?.totalPages || 1)
-      setCurrentPage(data.pagination?.page || page)
-    } catch (err) {
-      showNotification({
-        type: 'error',
-        title: 'Lỗi tải lịch sử',
-        message: err?.message || 'Không thể tải lịch sử trận đấu.',
-      })
-      console.error('Failed to load history:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const fetchHistory = useCallback(
+    async (page = 1) => {
+      setLoading(true)
+      try {
+        const data = await gameService.getRankedHistory(page, PAGE_SIZE)
+        setMatches(data.matches || [])
+        setTotalPages(data.pagination?.totalPages || 1)
+        setCurrentPage(data.pagination?.page || page)
+      } catch (err) {
+        showNotification({
+          type: 'error',
+          title: 'Lỗi tải lịch sử',
+          message: err?.message || 'Không thể tải lịch sử trận đấu.',
+        })
+        console.error('Failed to load history:', err)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [showNotification]
+  )
 
   useEffect(() => {
     fetchHistory(currentPage)
@@ -464,13 +460,6 @@ const RankedHistoryPage = () => {
           <div className="flex flex-col items-center justify-center py-20">
             <Loader size="lg" />
             <p className={`${THEME.text.secondary} mt-4 text-sm`}>Loading history...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-20">
-            <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={() => fetchHistory(currentPage)} className="gap-2">
-              Retry
-            </Button>
           </div>
         ) : filteredMatches.length === 0 ? (
           <div className="text-center py-20">

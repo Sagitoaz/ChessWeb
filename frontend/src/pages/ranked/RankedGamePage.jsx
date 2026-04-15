@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { Button, Avatar } from '@components/common'
 import { MainLayout } from '@components/layout'
+import { useNotification } from '@/components/common/Notification'
 import { useGameSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
 import { ChessGame } from '@utils/chessLogic'
@@ -489,6 +490,7 @@ const RankedGamePage = () => {
   const storeUser = useAuthStore((s) => s.user)
   const setAuthLogin = useAuthStore((s) => s.login)
   const authToken = useAuthStore((s) => s.token)
+  const { showNotification } = useNotification()
   const [rankedStats, setRankedStats] = useState(null)
 
   // ─── Nhận dữ liệu trận đấu từ Lobby (qua navigate state) ───
@@ -635,9 +637,14 @@ const RankedGamePage = () => {
         setAuthLogin(mergedUser, token)
       } catch (error) {
         console.error('Failed to persist ranked result:', error)
+        showNotification({
+          type: 'error',
+          title: 'Không thể lưu kết quả',
+          message: 'Ván đấu đã kết thúc nhưng không lưu được lịch sử.',
+        })
       }
     },
-    [authToken, matchId, playerColor, setAuthLogin, storeUser]
+    [authToken, matchId, playerColor, setAuthLogin, showNotification, storeUser]
   )
 
   // ─── Derived state (recalculated each render) ───
@@ -786,11 +793,21 @@ const RankedGamePage = () => {
         ...prev,
         { text: `Game Over — ${txt} (${reason})`, isSystem: true },
       ])
+      showNotification({
+        type: result === 'draw' ? 'info' : result === 'win' ? 'success' : 'error',
+        title: result === 'draw' ? 'Hòa cờ' : result === 'win' ? 'Bạn thắng' : 'Bạn thua',
+        message:
+          reason === 'timeout'
+            ? 'Trận đấu đã kết thúc do hết giờ.'
+            : reason === 'resignation'
+              ? 'Trận đấu đã kết thúc do có người đầu hàng.'
+              : 'Trận đấu đã kết thúc và đang hiển thị kết quả.',
+      })
       playSound('gameEnd')
       void persistRankedResult(reason, result)
       setTimeout(() => setShowEndModal(true), 600)
     },
-    [persistRankedResult, playSound]
+    [persistRankedResult, playSound, showNotification]
   )
 
   // ─── Timeout detection (runs each clock tick) ───

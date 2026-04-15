@@ -62,10 +62,13 @@ export default function CreateRoomPage() {
 
   const handleCreateRoom = async () => {
     setIsCreating(true)
-    setError('')
 
     if (!user || !token) {
-      setError('Phien dang nhap khong hop le. Vui long dang nhap lai.')
+      showNotification({
+        type: 'error',
+        title: 'Phiên đăng nhập lỗi',
+        message: 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
+      })
       setIsCreating(false)
       navigate('/login')
       return
@@ -91,7 +94,11 @@ export default function CreateRoomPage() {
     } catch (createError) {
       const message =
         createError?.response?.data?.message || createError?.message || 'Không thể tạo phòng'
-      setError(message)
+      showNotification({
+        type: 'error',
+        title: 'Lỗi tạo phòng',
+        message,
+      })
     } finally {
       setIsCreating(false)
     }
@@ -250,11 +257,7 @@ export default function CreateRoomPage() {
           className="bg-white shadow-md border-none rounded-xl overflow-hidden"
         >
           <div className="p-8 space-y-6">
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
+            {/* Notifications are shown via global toast */}
 
             <div className="mb-4">
               <h2 className="text-2xl font-bold text-blue-400 mb-1">Cài đặt phòng</h2>

@@ -151,7 +151,7 @@ export default function TournamentMatchPlayPage() {
     } finally {
       setLoading(false)
     }
-  }, [currentUserId, gameId, tournamentId])
+  }, [currentUserId, gameId, tournamentId, showNotification])
 
   useEffect(() => {
     void loadGame()
@@ -213,7 +213,7 @@ export default function TournamentMatchPlayPage() {
       off('game:moveUpdate', handleMoveUpdate)
       off('game:end', handleGameEnd)
     }
-  }, [currentUserId, loadGame, off, onGameEnd, onMoveUpdate])
+  }, [currentUserId, loadGame, off, onGameEnd, onMoveUpdate, showNotification])
 
   const handleMove = useCallback(
     (move) => {
@@ -280,6 +280,7 @@ export default function TournamentMatchPlayPage() {
     loadGame,
     matchIdInBracket,
     resign,
+    showNotification,
     submittingResign,
     tournamentId,
   ])

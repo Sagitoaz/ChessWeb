@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Loader } from '@/components/common'
+import { useNotification } from '@/components/common/Notification'
 import gameService from '@/services/gameService'
 import { useAuthStore } from '@/store'
 import { useTournamentSocket } from '@/hooks'
@@ -122,8 +123,6 @@ export default function TournamentDetailPage() {
   const loadTournament = useCallback(async () => {
     if (!tournamentId) return
     setLoading(true)
-    setActionError('')
-    // No-op: handled by notification
     try {
       const response = await gameService.getTournament(tournamentId)
       const payload = response?.data ?? response
@@ -146,7 +145,6 @@ export default function TournamentDetailPage() {
         participantStatusRef.current !== nextParticipantStatus &&
         nextParticipantStatus === 'eliminated'
       ) {
-        setLiveNotice('Bạn đã bị loại khỏi giải đấu.')
         showNotification({
           type: 'error',
           title: 'Loại khỏi giải',
@@ -182,41 +180,10 @@ export default function TournamentDetailPage() {
 
     const refreshIfRelevant = (payload, message) => {
       if (String(payload?.tournamentId || '') !== String(tournamentId)) return
-      setLiveNotice(message || 'Giải đấu vừa được cập nhật. Đang tải lại...')
       showNotification({
         type: 'info',
         title: 'Cập nhật giải đấu',
         message: message || 'Giải đấu vừa được cập nhật. Đang tải lại...',
-      })
-      showNotification({
-        type: 'info',
-        title: 'Đăng ký mới',
-        message: 'Có người chơi mới tham gia. Đang cập nhật danh sách...',
-      })
-      showNotification({
-        type: 'info',
-        title: 'Rút lui',
-        message: 'Có người chơi rút lui. Đang cập nhật danh sách...',
-      })
-      showNotification({
-        type: 'info',
-        title: 'Bắt đầu giải đấu',
-        message: 'Giải đấu đã bắt đầu.',
-      })
-      showNotification({
-        type: 'info',
-        title: 'Cập nhật vòng đấu',
-        message: 'Kết quả vòng đấu đã cập nhật, đang làm mới bảng điểm...',
-      })
-      showNotification({
-        type: 'info',
-        title: 'Bàn đấu mới',
-        message: 'Có bàn đấu mới sẵn sàng.',
-      })
-      showNotification({
-        type: 'info',
-        title: 'Kết thúc giải đấu',
-        message: 'Giải đấu đã kết thúc, đang cập nhật kết quả cuối cùng...',
       })
       void loadTournament()
     }
@@ -273,7 +240,6 @@ export default function TournamentDetailPage() {
         _error?.response?.data?.message ||
         _error?.message ||
         'Không thể đăng ký giải đấu. Vui lòng thử lại.'
-      setActionError(String(message))
       showNotification({
         type: 'error',
         title: 'Lỗi đăng ký',
@@ -288,7 +254,6 @@ export default function TournamentDetailPage() {
       await gameService.withdrawTournament(tournamentId)
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể rút lui khỏi giải đấu. Vui lòng thử lại.')
       showNotification({
         type: 'error',
         title: 'Lỗi rút lui',
@@ -303,7 +268,6 @@ export default function TournamentDetailPage() {
       await gameService.startTournament(tournamentId)
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể bắt đầu giải đấu. Vui lòng kiểm tra số người chơi.')
       showNotification({
         type: 'error',
         title: 'Lỗi bắt đầu giải',
@@ -319,7 +283,6 @@ export default function TournamentDetailPage() {
       await gameService.cancelTournament(tournamentId)
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể hủy giải đấu. Vui lòng thử lại.')
       showNotification({
         type: 'error',
         title: 'Lỗi hủy giải',
@@ -336,7 +299,6 @@ export default function TournamentDetailPage() {
       })
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể lưu kết quả trận đấu. Vui lòng thử lại.')
       showNotification({
         type: 'error',
         title: 'Lỗi lưu kết quả',
@@ -352,7 +314,6 @@ export default function TournamentDetailPage() {
         roundIndex: Number(tournament?.currentRound || 1),
         checkInMinutes: Number(checkInMinutes || 3),
       })
-      setLiveNotice('Đã mở bàn đấu cho vòng hiện tại.')
       showNotification({
         type: 'success',
         title: 'Mở bàn đấu',
@@ -360,7 +321,6 @@ export default function TournamentDetailPage() {
       })
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể mở vòng hiện tại. Có thể vòng trước chưa hoàn thành.')
       showNotification({
         type: 'error',
         title: 'Lỗi mở vòng',
@@ -373,7 +333,6 @@ export default function TournamentDetailPage() {
     if (!tournamentId || !matchId) return
     try {
       await gameService.checkInTournamentMatch(tournamentId, matchId)
-      setLiveNotice('Đã check-in thành công. Chờ đối thủ sẵn sàng.')
       showNotification({
         type: 'success',
         title: 'Check-in thành công',
@@ -381,7 +340,6 @@ export default function TournamentDetailPage() {
       })
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể check-in cho trận này.')
       showNotification({
         type: 'error',
         title: 'Lỗi check-in',
@@ -396,7 +354,6 @@ export default function TournamentDetailPage() {
       await gameService.approveTournamentParticipant(tournamentId, participantUserId)
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể duyệt người chơi. Vui lòng thử lại.')
       showNotification({
         type: 'error',
         title: 'Lỗi duyệt người chơi',
@@ -411,7 +368,6 @@ export default function TournamentDetailPage() {
       await gameService.rejectTournamentParticipant(tournamentId, participantUserId)
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể từ chối người chơi. Vui lòng thử lại.')
       showNotification({
         type: 'error',
         title: 'Lỗi từ chối người chơi',

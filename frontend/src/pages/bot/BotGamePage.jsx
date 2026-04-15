@@ -4,7 +4,7 @@ import { Chess } from 'chess.js'
 import { ChessBoard } from '@components/game'
 import { useNotification } from '@hooks'
 import { botGameAPI } from '@services/gameService'
-import { Loader, Avatar } from '@components/common'
+import { Avatar, Button } from '@components/common'
 import { MainLayout } from '@components/layout'
 import { Flag, List, ArrowLeft, Trophy, Lightbulb, RefreshCcw } from 'lucide-react'
 import { THEME } from '@/styles/theme'
@@ -152,31 +152,31 @@ export default function BotGamePage() {
     setGameState('InGame') // SM: Waiting → InGame
   }, [gameData, navigate, showError])
 
-  // Nếu player chọn Black, bot (White) đi trước — trigger ngay khi vào game
-  useEffect(() => {
-    if (gameState === 'InGame' && chess.turn() !== playerColorCode) {
-      executeBotMove(chess)
-    }
-  }, [chess, executeBotMove, gameState, playerColorCode])
-
   // =============================================
   // CHECK END CONDITION
   // A1: "Check end condition (checkmate/stalemate/draw)"
   // =============================================
-  const checkEndCondition = useCallback((chessInst) => {
-    if (chessInst.isCheckmate()) {
-      const winner = chessInst.turn() === 'w' ? 'Black' : 'White'
-      setGameResult(winner === 'White' ? 'WhiteWin' : 'BlackWin')
-      setGameState('Finished') // SM: InGame → Finished
-      return true
-    }
-    if (chessInst.isStalemate() || chessInst.isDraw()) {
-      setGameResult('Draw')
-      setGameState('Finished')
-      return true
-    }
-    return false
-  }, [])
+  const checkEndCondition = useCallback(
+    (chessInst) => {
+      if (chessInst.isCheckmate()) {
+        const winner = chessInst.turn() === 'w' ? 'Black' : 'White'
+        setGameResult(winner === 'White' ? 'WhiteWin' : 'BlackWin')
+        setGameState('Finished') // SM: InGame → Finished
+        showSuccess(winner === 'White' ? 'Bạn đã thắng bot.' : 'Bạn đã thua bot.', {
+          duration: 3500,
+        })
+        return true
+      }
+      if (chessInst.isStalemate() || chessInst.isDraw()) {
+        setGameResult('Draw')
+        setGameState('Finished')
+        showSuccess('Ván bot đã kết thúc với kết quả hòa.', { duration: 3500 })
+        return true
+      }
+      return false
+    },
+    [showSuccess]
+  )
 
   // =============================================
   // AUTO-SAVE khi Finished (SM: Finished → Saved)
@@ -289,6 +289,13 @@ export default function BotGamePage() {
     [botSessionId, checkEndCondition, showError, forceUpdate]
   )
 
+  // Nếu player chọn Black, bot (White) đi trước — trigger ngay khi vào game
+  useEffect(() => {
+    if (gameState === 'InGame' && chess.turn() !== playerColorCode) {
+      executeBotMove(chess)
+    }
+  }, [chess, executeBotMove, gameState, playerColorCode])
+
   // =============================================
   // USER MOVE — UC3: Make Move
   // ChessBoard performs chess.move() internally and passes back the result object.
@@ -393,8 +400,21 @@ export default function BotGamePage() {
 
   if (!gameData)
     return (
-      <div className={`min-h-screen flex items-center justify-center ${THEME.background.page}`}>
-        <Loader size="lg" />
+      <div
+        className={`min-h-screen flex items-center justify-center px-4 ${THEME.background.page}`}
+      >
+        <div
+          className={`${THEME.background.card} ${THEME.rounded.lg} ${THEME.shadow.md} max-w-md w-full p-6 text-center border ${THEME.border.DEFAULT}`}
+        >
+          <div className="text-5xl mb-3">🤖</div>
+          <h2 className={`text-xl font-bold ${THEME.text.primary} mb-2`}>Không tải được ván bot</h2>
+          <p className={`${THEME.text.secondary} text-sm mb-5`}>
+            Dữ liệu ván đấu không còn hợp lệ hoặc trang vừa được mở lại.
+          </p>
+          <Button onClick={() => navigate('/bot')} className="w-full">
+            Quay lại chọn bot
+          </Button>
+        </div>
       </div>
     )
 
