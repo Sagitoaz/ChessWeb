@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Chess } from 'chess.js'
 import { ChessBoard } from '@components/game'
@@ -72,8 +72,19 @@ export default function BotGamePage() {
   const { error: showError, success: showSuccess } = useNotification()
 
   // Nhận gameData từ BotSelectPage qua navigation state
-  const { gameData, sessionId: sessionIdFromState } = location.state ?? {}
-  const botSessionId = gameData?.sessionId ?? sessionIdFromState ?? null
+  const storedGameData = useMemo(() => {
+    if (!gameId) return null
+    try {
+      const raw = sessionStorage.getItem(`bot-game-${gameId}`)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  }, [gameId])
+  const { gameData: locationGameData, sessionId: sessionIdFromState } = location.state ?? {}
+  const gameData = locationGameData ?? storedGameData
+  const botSessionId =
+    gameData?.sessionId ?? sessionIdFromState ?? storedGameData?.sessionId ?? null
   const [gameState, setGameState] = useState('Waiting')
   // chess instance là "live" — truyền trực tiếp vào ChessBoard làm gameState prop
   const [chess] = useState(() => new Chess(gameData?.initialFEN ?? undefined))
@@ -149,8 +160,13 @@ export default function BotGamePage() {
       navigate('/bot')
       return
     }
+    try {
+      sessionStorage.setItem(`bot-game-${gameData.gameId || gameId}`, JSON.stringify(gameData))
+    } catch {
+      // Ignore storage failures; game can still run from navigation state.
+    }
     setGameState('InGame') // SM: Waiting → InGame
-  }, [gameData, navigate, showError])
+  }, [gameData, gameId, navigate, showError])
 
   // =============================================
   // CHECK END CONDITION

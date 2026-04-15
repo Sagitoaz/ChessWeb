@@ -74,6 +74,11 @@ export default function BotSelectPage() {
     setIsStarting(true)
     try {
       const gameData = await botGameAPI.startBotGame(selectedLevel)
+      try {
+        sessionStorage.setItem(`bot-game-${gameData.gameId}`, JSON.stringify(gameData))
+      } catch {
+        // Ignore storage failures; navigation state still works.
+      }
       navigate(`/bot/game/${gameData.gameId}`, {
         state: { gameData, sessionId: gameData.sessionId },
       })
@@ -91,7 +96,9 @@ export default function BotSelectPage() {
           429: 'Quá nhiều yêu cầu, thử lại sau',
           503: 'Bot service tạm thời không khả dụng',
           504: 'Bot service timeout, thử lại',
-        }[status] ?? backendMessage ?? 'Không thể bắt đầu game'
+        }[status] ??
+        backendMessage ??
+        'Không thể bắt đầu game'
       showError(msg)
       setIsStarting(false)
     }
@@ -121,11 +128,15 @@ export default function BotSelectPage() {
                 }`}
               >
                 <div className="flex items-center justify-between mb-3">
-                  <div className={`w-12 h-12 ${lvl.bgLight} ${THEME.rounded.DEFAULT} flex items-center justify-center`}>
+                  <div
+                    className={`w-12 h-12 ${lvl.bgLight} ${THEME.rounded.DEFAULT} flex items-center justify-center`}
+                  >
                     <Icon className={`w-6 h-6 ${lvl.textColor}`} />
                   </div>
                   {isSelected && (
-                    <span className={`${lvl.bgLight} ${lvl.textColor} px-2 py-1 ${THEME.rounded.DEFAULT} text-xs font-bold`}>
+                    <span
+                      className={`${lvl.bgLight} ${lvl.textColor} px-2 py-1 ${THEME.rounded.DEFAULT} text-xs font-bold`}
+                    >
                       ✓ Đã chọn
                     </span>
                   )}
@@ -134,7 +145,9 @@ export default function BotSelectPage() {
                 <p className={`text-sm ${THEME.text.secondary} mb-3`}>{lvl.description}</p>
                 <div className={`text-xs ${THEME.text.muted} space-y-1`}>
                   <div>ELO: {lvl.ratingRange}</div>
-                  <div>Depth: {lvl.depth} | Time: {lvl.timeLimitMs}ms</div>
+                  <div>
+                    Depth: {lvl.depth} | Time: {lvl.timeLimitMs}ms
+                  </div>
                 </div>
               </button>
             )
