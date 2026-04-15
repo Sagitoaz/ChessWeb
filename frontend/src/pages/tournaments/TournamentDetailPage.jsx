@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Loader } from '@/components/common'
 import gameService from '@/services/gameService'
@@ -26,8 +26,34 @@ const normalizeTournament = (tournament, tournamentId) => ({
   name: tournament?.name || 'Giải đấu',
   organizer:
     typeof tournament?.organizer === 'string'
-      ? { username: tournament.organizer }
-      : tournament?.organizer || { username: 'Unknown' },
+      ? {
+          username: tournament.organizer,
+          userId: tournament?.organizerId || tournament?.createdBy || null,
+        }
+      : tournament?.organizer && typeof tournament.organizer === 'object'
+        ? {
+            username:
+              tournament.organizer.username ||
+              tournament.organizer.displayName ||
+              tournament.organizer.name ||
+              'Unknown',
+            userId:
+              tournament.organizer.userId ||
+              tournament.organizer.id ||
+              tournament?.organizerId ||
+              tournament?.createdBy ||
+              null,
+          }
+        : {
+            username:
+              tournament?.organizerName ||
+              tournament?.creatorName ||
+              tournament?.createdByUsername ||
+              'Unknown',
+            userId: tournament?.organizerId || tournament?.createdBy || null,
+          },
+  organizerId: tournament?.organizerId || tournament?.createdBy || tournament?.ownerUserId || null,
+  createdBy: tournament?.createdBy || null,
   startDate: tournament?.startDate || tournament?.start_date || new Date().toISOString(),
   registrationDeadline:
     tournament?.registrationDeadline ||
@@ -63,6 +89,8 @@ export default function TournamentDetailPage() {
   const [participantStatus, setParticipantStatus] = useState(null)
   const [actionError, setActionError] = useState('')
   const [liveNotice, setLiveNotice] = useState('')
+  const [checkInMinutes, setCheckInMinutes] = useState(3)
+  const participantStatusRef = useRef(null)
   const {
     isConnected: isTournamentSocketConnected,
     onPlayerRegistered,
@@ -84,6 +112,14 @@ export default function TournamentDetailPage() {
   const canManageTournament =
     isOrganizer || authRoles.includes('admin') || authRoles.includes('mod')
 
+  const activeParticipants = useMemo(
+    () =>
+      Array.isArray(tournament?.participants)
+        ? tournament.participants.filter((participant) => participant.status === 'active')
+        : [],
+    [tournament]
+  )
+
   const loadTournament = useCallback(async () => {
     if (!tournamentId) return
     setLoading(true)
@@ -103,8 +139,18 @@ export default function TournamentDetailPage() {
             )
           : null
       setIsRegistered(Boolean(currentParticipant))
-      setParticipantStatus(currentParticipant?.status || null)
+      const nextParticipantStatus = currentParticipant?.status || null
+      setParticipantStatus(nextParticipantStatus)
+      if (
+        participantStatusRef.current &&
+        participantStatusRef.current !== nextParticipantStatus &&
+        nextParticipantStatus === 'eliminated'
+      ) {
+        setLiveNotice('Bạn đã bị loại khỏi giải đấu.')
+      }
+      participantStatusRef.current = nextParticipantStatus
       const ownerCandidates = [payload?.createdBy, payload?.organizerId, payload?.ownerUserId]
+        .concat([normalized?.organizerId, normalized?.organizer?.userId])
         .map((value) => {
           if (typeof value === 'string') return value
           if (value && typeof value === 'object' && typeof value.toString === 'function') {
@@ -129,18 +175,37 @@ export default function TournamentDetailPage() {
   useEffect(() => {
     if (!isTournamentSocketConnected || !tournamentId) return undefined
 
-    const refreshIfRelevant = (payload) => {
+    const refreshIfRelevant = (payload, message) => {
       if (String(payload?.tournamentId || '') !== String(tournamentId)) return
-      setLiveNotice('Giải đấu vừa được cập nhật. Đang tải lại...')
+      setLiveNotice(message || 'Giải đấu vừa được cập nhật. Đang tải lại...')
       void loadTournament()
     }
 
-    onPlayerRegistered(refreshIfRelevant)
-    onPlayerWithdrawn(refreshIfRelevant)
-    onTournamentStarted(refreshIfRelevant)
-    onRoundUpdate(refreshIfRelevant)
-    onMatchReady(refreshIfRelevant)
-    onTournamentCompleted(refreshIfRelevant)
+    const handlePlayerRegistered = (payload) => {
+      refreshIfRelevant(payload, 'Có người chơi mới tham gia. Đang cập nhật danh sách...')
+    }
+    const handlePlayerWithdrawn = (payload) => {
+      refreshIfRelevant(payload, 'Có người chơi rút lui. Đang cập nhật danh sách...')
+    }
+    const handleTournamentStarted = (payload) => {
+      refreshIfRelevant(payload, 'Giải đấu đã bắt đầu.')
+    }
+    const handleRoundUpdate = (payload) => {
+      refreshIfRelevant(payload, 'Kết quả vòng đấu đã cập nhật, đang làm mới bảng điểm...')
+    }
+    const handleMatchReady = (payload) => {
+      refreshIfRelevant(payload, 'Có bàn đấu mới sẵn sàng.')
+    }
+    const handleTournamentCompleted = (payload) => {
+      refreshIfRelevant(payload, 'Giải đấu đã kết thúc, đang cập nhật kết quả cuối cùng...')
+    }
+
+    onPlayerRegistered(handlePlayerRegistered)
+    onPlayerWithdrawn(handlePlayerWithdrawn)
+    onTournamentStarted(handleTournamentStarted)
+    onRoundUpdate(handleRoundUpdate)
+    onMatchReady(handleMatchReady)
+    onTournamentCompleted(handleTournamentCompleted)
 
     return () => {
       setLiveNotice('')
@@ -163,7 +228,11 @@ export default function TournamentDetailPage() {
       await gameService.joinTournament(tournamentId)
       await loadTournament()
     } catch (_error) {
-      setActionError('Không thể đăng ký giải đấu. Vui lòng thử lại.')
+      const message =
+        _error?.response?.data?.message ||
+        _error?.message ||
+        'Không thể đăng ký giải đấu. Vui lòng thử lại.'
+      setActionError(String(message))
     }
   }
 
@@ -207,6 +276,31 @@ export default function TournamentDetailPage() {
       await loadTournament()
     } catch (_error) {
       setActionError('Không thể lưu kết quả trận đấu. Vui lòng thử lại.')
+    }
+  }
+
+  const handleOpenCurrentRound = async () => {
+    if (!tournamentId) return
+    try {
+      await gameService.openTournamentRound(tournamentId, {
+        roundIndex: Number(tournament?.currentRound || 1),
+        checkInMinutes: Number(checkInMinutes || 3),
+      })
+      setLiveNotice('Đã mở bàn đấu cho vòng hiện tại.')
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể mở vòng hiện tại. Có thể vòng trước chưa hoàn thành.')
+    }
+  }
+
+  const handleMatchCheckIn = async (matchId) => {
+    if (!tournamentId || !matchId) return
+    try {
+      await gameService.checkInTournamentMatch(tournamentId, matchId)
+      setLiveNotice('Đã check-in thành công. Chờ đối thủ sẵn sàng.')
+      await loadTournament()
+    } catch (_error) {
+      setActionError('Không thể check-in cho trận này.')
     }
   }
 
@@ -305,10 +399,12 @@ export default function TournamentDetailPage() {
   const canRegister =
     tournament.status === 'registration' &&
     tournament.participants.length < tournament.maxParticipants &&
-    !participantStatus
+    !participantStatus &&
+    !isOrganizer
 
-  const participantStateLabel =
-    participantStatus === 'pending'
+  const participantStateLabel = isOrganizer
+    ? 'Bạn là người tạo giải, không thể đăng ký tham gia giải này.'
+    : participantStatus === 'pending'
       ? 'Đã đăng ký, đang chờ duyệt'
       : participantStatus === 'active'
         ? 'Đã đăng ký, đã duyệt'
@@ -431,6 +527,22 @@ export default function TournamentDetailPage() {
                   <Eye size={18} />
                   Xem bracket
                 </Button>
+              )}
+              {canManageTournament && tournament.status === 'ongoing' && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={2}
+                    max={10}
+                    value={checkInMinutes}
+                    onChange={(event) => setCheckInMinutes(Number(event.target.value || 3))}
+                    className="w-20 rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                  />
+                  <Button variant="outline" onClick={handleOpenCurrentRound}>
+                    <Play size={16} />
+                    Mở bàn vòng {Number(tournament.currentRound || 1)}
+                  </Button>
+                </div>
               )}
               {canManageTournament && (
                 <>
@@ -604,6 +716,18 @@ export default function TournamentDetailPage() {
                     </div>
                   ))}
                 </div>
+
+                {canManageTournament &&
+                  tournament.status === 'registration' &&
+                  activeParticipants.length >= 2 && (
+                    <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                      <h4 className="text-base font-bold text-blue-900 mb-3">Xếp cặp tự động</h4>
+                      <p className="text-sm text-blue-800">
+                        Hệ thống sẽ tự động xếp cặp theo seed khi bạn bấm Bắt đầu giải đấu. Sau đó
+                        người tạo giải dùng Mở bàn vòng để điều phối vào trận và thời gian check-in.
+                      </p>
+                    </div>
+                  )}
               </div>
             )}
 
@@ -618,12 +742,36 @@ export default function TournamentDetailPage() {
                       {round.matches.map((match) => {
                         const player1Name = match.player1?.name || match.player1?.username || 'TBD'
                         const player2Name = match.player2?.name || match.player2?.username || 'TBD'
-                        const resultLabel =
-                          match.result === '1-0'
+                        const isCompleted = String(match.status || '').toLowerCase() === 'completed'
+                        const checkIn =
+                          match?.checkIn && typeof match.checkIn === 'object' ? match.checkIn : null
+                        const checkInDeadline = checkIn?.deadlineAt
+                          ? new Date(checkIn.deadlineAt).toLocaleTimeString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : null
+                        const currentUserIsP1 =
+                          String(match?.player1?.userId || '') === String(currentUserId || '')
+                        const currentUserIsP2 =
+                          String(match?.player2?.userId || '') === String(currentUserId || '')
+                        const currentUserCanCheckIn =
+                          !isCompleted &&
+                          checkIn &&
+                          (currentUserIsP1 || currentUserIsP2) &&
+                          !(
+                            (currentUserIsP1 && checkIn?.player1Ready) ||
+                            (currentUserIsP2 && checkIn?.player2Ready)
+                          )
+                        const resultLabel = isCompleted
+                          ? match.result === '1-0'
                             ? `${player1Name} thắng`
                             : match.result === '0-1'
                               ? `${player2Name} thắng`
-                              : match.result || 'Chưa thi đấu'
+                              : match.result === 'double_forfeit'
+                                ? 'Cả hai xử thua (walkover)'
+                                : match.result || 'Kết thúc'
+                          : 'Chưa thi đấu'
 
                         return (
                           <div key={match.id} className="rounded-lg border border-gray-200 p-4">
@@ -640,9 +788,31 @@ export default function TournamentDetailPage() {
                                     Game ID: {match.gameId}
                                   </p>
                                 )}
+                                {checkInDeadline && !isCompleted && (
+                                  <p className="mt-1 text-xs text-amber-600">
+                                    Check-in trước: {checkInDeadline}
+                                  </p>
+                                )}
+                                {checkIn && !isCompleted && (
+                                  <p className="mt-1 text-xs text-gray-600">
+                                    Ready: {checkIn.player1Ready ? 'P1' : '-'} /{' '}
+                                    {checkIn.player2Ready ? 'P2' : '-'}
+                                  </p>
+                                )}
                               </div>
                               <div className="flex items-center gap-3 flex-wrap justify-end">
                                 <span className="font-bold text-blue-600">{resultLabel}</span>
+                                {currentUserCanCheckIn && (
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => handleMatchCheckIn(match.id)}
+                                    className="bg-emerald-600 hover:bg-emerald-700"
+                                  >
+                                    <CheckCircle size={14} />
+                                    Sẵn sàng
+                                  </Button>
+                                )}
                                 {canManageTournament && match.status !== 'completed' && (
                                   <>
                                     <Button
@@ -650,14 +820,14 @@ export default function TournamentDetailPage() {
                                       size="sm"
                                       onClick={() => handleSetMatchResult(match.id, 'player1')}
                                     >
-                                      {player1Name} thắng
+                                      Xác nhận {player1Name} thắng
                                     </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => handleSetMatchResult(match.id, 'player2')}
                                     >
-                                      {player2Name} thắng
+                                      Xác nhận {player2Name} thắng
                                     </Button>
                                   </>
                                 )}

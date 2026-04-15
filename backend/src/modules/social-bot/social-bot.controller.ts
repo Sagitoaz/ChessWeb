@@ -19,9 +19,11 @@ import { CreateRoomDto } from "./dto/create-room.dto";
 import { UpdateTournamentMatchResultDto } from "./dto/manage-tournament-result.dto";
 import { SaveBotGameDto } from "./dto/save-bot-game.dto";
 import { BotTacticalHintDto } from "./dto/bot-tactical-hint.dto";
+import { TournamentSeedingDto } from "./dto/tournament-seeding.dto";
+import { TournamentOpenRoundDto } from "./dto/tournament-open-round.dto";
 
 type AuthRequest = {
-  user?: { sub?: string; userId?: string; roles?: string[] };
+  user?: { sub?: string; userId?: string; id?: string; roles?: string[] };
 };
 
 @Controller()
@@ -30,7 +32,7 @@ export class SocialBotController {
   constructor(private readonly service: SocialBotService) {}
 
   private getUserId(req: AuthRequest): string {
-    const userId = req.user?.sub || req.user?.userId;
+    const userId = req.user?.sub || req.user?.userId || req.user?.id;
     if (!userId) {
       throw new UnauthorizedException("User ID not found in request");
     }
@@ -153,6 +155,66 @@ export class SocialBotController {
       id,
       matchId,
       body,
+    );
+    return successResponse(data, requestId || null);
+  }
+
+  @Post("tournaments/:id/matches/:matchId/resign")
+  async resignTournamentMatch(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Param("matchId") matchId: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.resignTournamentMatch(
+      this.getUserId(req),
+      id,
+      matchId,
+    );
+    return successResponse(data, requestId || null);
+  }
+
+  @Post("tournaments/:id/seeding")
+  async setTournamentSeeding(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Body() body: TournamentSeedingDto,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.setTournamentSeeding(
+      this.getPrincipal(req),
+      id,
+      body,
+    );
+    return successResponse(data, requestId || null);
+  }
+
+  @Post("tournaments/:id/rounds/open")
+  async openTournamentRound(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Body() body: TournamentOpenRoundDto,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.openTournamentRound(
+      this.getPrincipal(req),
+      id,
+      body,
+    );
+    return successResponse(data, requestId || null);
+  }
+
+  @Post("tournaments/:id/matches/:matchId/check-in")
+  async checkInTournamentMatch(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Param("matchId") matchId: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.checkInTournamentMatch(
+      this.getUserId(req),
+      id,
+      matchId,
     );
     return successResponse(data, requestId || null);
   }

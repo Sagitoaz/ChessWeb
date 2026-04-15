@@ -546,7 +546,6 @@ export class CompetitionService {
         "Khong xac dinh duoc gameId cho ranked match",
       );
     }
-
     const game = await this.gamesCollection().findOne(gameQuery);
     if (!game) {
       throw new NotFoundException("Khong tim thay game cua ranked match");
@@ -1321,36 +1320,148 @@ export class CompetitionService {
     const db = this.mongoService.getDb();
     const games = db.collection("games");
 
+    const trackedModes = [CompetitionGameMode.RANKED, "tournament"];
+    const completedResults = [
+      "1-0",
+      "0-1",
+      "draw",
+      "win",
+      "lose",
+      "loss",
+      "white_win",
+      "black_win",
+      "whitewin",
+      "blackwin",
+      "white",
+      "black",
+      "1/2-1/2",
+    ];
+
     const rankedGames = await games
       .find({
-        mode: CompetitionGameMode.RANKED,
+        mode: { $in: trackedModes },
         $or: [{ whitePlayerId: user.userId }, { blackPlayerId: user.userId }],
+        result: { $in: completedResults },
+        finishedAt: { $exists: true, $ne: null },
+        endReason: { $ne: "double_no_show" },
+        status: { $nin: ["cancelled", "canceled"] },
       })
-      .project({ whitePlayerId: 1, blackPlayerId: 1, result: 1 })
+      .project({
+        whitePlayerId: 1,
+        blackPlayerId: 1,
+        result: 1,
+        finishedAt: 1,
+      })
+      .sort({ finishedAt: -1, createdAt: -1, _id: -1 })
       .toArray();
+
+    const normalizeResult = (
+      result: unknown,
+    ): "1-0" | "0-1" | "draw" | null => {
+      const value = typeof result === "string" ? result.toLowerCase() : "";
+      if (["1-0", "white_win", "white", "whitewin"].includes(value))
+        return "1-0";
+      if (["0-1", "black_win", "black", "blackwin"].includes(value))
+        return "0-1";
+      if (["draw", "1/2-1/2"].includes(value)) return "draw";
+      if (value === "win") return "1-0";
+      if (value === "lose" || value === "loss") return "0-1";
+      return null;
+    };
+
+    const resolveOutcome = (game: {
+      whitePlayerId?: string | null;
+      blackPlayerId?: string | null;
+      result?: unknown;
+    }) => {
+      const rawValue =
+        typeof game.result === "string" ? game.result.toLowerCase() : "";
+      if (rawValue === "win") return "win" as const;
+      if (rawValue === "lose" || rawValue === "loss") return "lose" as const;
+      const persistedResult = normalizeResult(game.result);
+      if (!persistedResult) return null;
+      const isWhite = game.whitePlayerId === user.userId;
+      const isBlack = game.blackPlayerId === user.userId;
+      if (persistedResult === "draw") return "draw" as const;
+      if (persistedResult === "1-0") return isWhite ? "win" : "lose";
+      return isBlack ? "win" : "lose";
+    };
 
     let wins = 0;
     let losses = 0;
     let draws = 0;
+    const opponentIds = new Set<string>();
+
+    let currentStreak = 0;
+    let currentStreakType: "win" | "lose" | null = null;
+    let bestStreak = 0;
+    let bestStreakType: "win" | "lose" | null = null;
+    let bestRunType: "win" | "lose" | null = null;
+    let bestRunLength = 0;
+    let currentStreakActive = false;
 
     for (const game of rankedGames) {
-      const result =
-        typeof game.result === "string" ? game.result.toLowerCase() : "";
-      const isWhite = game.whitePlayerId === user.userId;
-      const isBlack = game.blackPlayerId === user.userId;
+      const outcome = resolveOutcome(game);
+      if (!outcome) continue;
 
-      if (result === "draw" || result === "1/2-1/2") {
+      const opponentId =
+        game.whitePlayerId === user.userId
+          ? game.blackPlayerId
+          : game.whitePlayerId;
+      if (typeof opponentId === "string" && opponentId.length > 0) {
+        opponentIds.add(opponentId);
+      }
+
+      if (outcome === "draw") {
         draws += 1;
-      } else if (
-        (isWhite && ["1-0", "white_win", "white"].includes(result)) ||
-        (isBlack && ["0-1", "black_win", "black"].includes(result))
-      ) {
+        if (!currentStreakActive) {
+          break;
+        }
+        bestRunType = null;
+        bestRunLength = 0;
+      } else if (outcome === "win") {
         wins += 1;
-      } else if (
-        (isWhite && ["0-1", "black_win", "black"].includes(result)) ||
-        (isBlack && ["1-0", "white_win", "white"].includes(result))
-      ) {
+        if (!currentStreakActive) {
+          currentStreakActive = true;
+          currentStreakType = "win";
+          currentStreak = 1;
+        } else if (currentStreakType === "win") {
+          currentStreak += 1;
+        }
+        if (bestRunType === "win") {
+          bestRunLength += 1;
+        } else {
+          bestRunType = "win";
+          bestRunLength = 1;
+        }
+      } else if (outcome === "lose") {
         losses += 1;
+        if (!currentStreakActive) {
+          currentStreakActive = true;
+          currentStreakType = "lose";
+          currentStreak = 1;
+        } else if (currentStreakType === "lose") {
+          currentStreak += 1;
+        }
+        if (bestRunType === "lose") {
+          bestRunLength += 1;
+        } else {
+          bestRunType = "lose";
+          bestRunLength = 1;
+        }
+      }
+
+      bestStreak = Math.max(bestStreak, bestRunLength);
+      if (bestStreak === bestRunLength) {
+        bestStreakType = bestRunType;
+      }
+
+      if (
+        currentStreak > 0 &&
+        currentStreakType &&
+        outcome !== currentStreakType
+      ) {
+        break;
       }
     }
 
@@ -1358,6 +1469,23 @@ export class CompetitionService {
     const winRate =
       totalGames === 0 ? 0 : Number(((wins / totalGames) * 100).toFixed(2));
     const currentRating = await this.getUserRating(user.userId);
+    const opponentRatings =
+      opponentIds.size > 0
+        ? await Promise.all(
+            Array.from(opponentIds).map((opponentId) =>
+              this.getUserRating(opponentId),
+            ),
+          )
+        : [];
+    const avgOpponentRating =
+      opponentRatings.length > 0
+        ? Number(
+            (
+              opponentRatings.reduce((sum, rating) => sum + rating, 0) /
+              opponentRatings.length
+            ).toFixed(0),
+          )
+        : 0;
 
     return {
       userId: user.userId,
@@ -1367,6 +1495,11 @@ export class CompetitionService {
       losses,
       draws,
       winRate,
+      currentStreak,
+      currentStreakType,
+      bestStreak,
+      bestStreakType,
+      avgOpponentRating,
     };
   }
 
@@ -1382,6 +1515,8 @@ export class CompetitionService {
     const filter: Record<string, unknown> = {};
     if (query.status) {
       filter.status = query.status;
+    } else {
+      filter.status = { $ne: "cancelled" };
     }
 
     const [items, total] = await Promise.all([
@@ -1562,6 +1697,43 @@ export class CompetitionService {
       };
     });
 
+    const organizerIdRaw =
+      tournament.createdBy ||
+      tournament.organizerId ||
+      tournament.ownerUserId ||
+      (tournament.organizer as Record<string, unknown> | undefined)?.userId ||
+      (tournament.organizer as Record<string, unknown> | undefined)?._id ||
+      (tournament.organizer as Record<string, unknown> | undefined)?.id ||
+      "";
+    const organizerId = (() => {
+      if (typeof organizerIdRaw === "string") {
+        const match = organizerIdRaw.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
+        return match?.[1] || organizerIdRaw;
+      }
+      if (
+        organizerIdRaw &&
+        typeof organizerIdRaw === "object" &&
+        "toString" in organizerIdRaw &&
+        typeof (organizerIdRaw as { toString?: unknown }).toString ===
+          "function"
+      ) {
+        const asString = (
+          organizerIdRaw as { toString: () => string }
+        ).toString();
+        const match = asString.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
+        return match?.[1] || asString;
+      }
+      return "";
+    })();
+    const organizerProfile = organizerId
+      ? profileMap.get(organizerId) ||
+        (await userProfiles.findOne(
+          { _id: organizerId },
+          { projection: { _id: 1, username: 1 } },
+        )) ||
+        null
+      : null;
+
     return {
       ...tournament,
       id: tournament._id?.toString?.() || tournament._id,
@@ -1570,6 +1742,22 @@ export class CompetitionService {
       startDate: tournament.startAt,
       registrationDeadline:
         tournament.registrationDeadline || tournament.startAt,
+      organizerId: organizerId || null,
+      organizer: {
+        userId: organizerId || null,
+        username:
+          organizerProfile?.username ||
+          (typeof tournament.organizer === "string"
+            ? tournament.organizer
+            : null) ||
+          (typeof tournament.organizerName === "string"
+            ? tournament.organizerName
+            : null) ||
+          (typeof tournament.createdBy === "string"
+            ? tournament.createdBy
+            : null) ||
+          "Unknown",
+      },
       participants,
       status:
         tournament.status === "draft" || tournament.status === "open"

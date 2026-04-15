@@ -55,6 +55,18 @@ const formatRelativeTime = (value) => {
   return `${diffDay} ngày trước`
 }
 
+const formatStreak = (stats) => {
+  const count = Number(stats?.currentStreak ?? 0)
+  const type = stats?.currentStreakType
+  if (!count || !type) return '0'
+  return `${count}${type === 'win' ? 'W' : 'L'}`
+}
+
+const formatAverageOpponent = (value) => {
+  const rating = Number(value ?? 0)
+  return rating > 0 ? rating : '—'
+}
+
 // ==================== SUB-COMPONENTS ====================
 
 /**
@@ -292,6 +304,8 @@ export default function DashboardPage() {
   const displayedRating = Number(rankedStats?.currentRating ?? profile.rating ?? 1200)
   const displayedWins = Number(rankedStats?.wins ?? profile.wins ?? 0)
   const displayedGames = Number(rankedStats?.gamesPlayed ?? profile.gamesPlayed ?? 0)
+  const displayedStreak = formatStreak(rankedStats)
+  const displayedAvgOpponent = formatAverageOpponent(rankedStats?.avgOpponentRating)
   const winRate =
     displayedGames > 0
       ? Math.round(
@@ -319,11 +333,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           <StatCard icon={Star} label="ELO Rating" value={displayedRating} />
           <StatCard icon={Trophy} label="Thắng" value={displayedWins} />
           <StatCard icon={Clock} label="Tổng Ván" value={displayedGames} />
           <StatCard icon={Target} label="Tỷ Lệ Thắng" value={`${winRate}%`} />
+          <StatCard icon={Zap} label="Streak" value={displayedStreak} />
+          <StatCard icon={Users} label="AVG Opp" value={displayedAvgOpponent} />
         </div>
 
         {/* Quick Actions */}

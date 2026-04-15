@@ -370,6 +370,10 @@ export class ProfileRepository implements ProfileRepositoryPort {
   }> {
     const match: Record<string, unknown> = {
       $or: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
+      result: { $in: ["win", "lose", "draw"] },
+      finishedAt: { $exists: true, $ne: null },
+      endReason: { $ne: "double_no_show" },
+      status: { $nin: ["cancelled", "canceled"] },
     };
 
     if (mode) {

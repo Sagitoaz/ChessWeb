@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Input, Loader } from '@/components/common'
 import gameService from '@/services/gameService'
@@ -49,6 +49,7 @@ const groupTournamentsByStatus = (items = []) =>
   items.reduce(
     (acc, item) => {
       const t = normalizeTournament(item)
+      if (t.status === 'cancelled') return acc
       if (t.status === 'ongoing') acc.ongoing.push(t)
       else if (t.status === 'completed') acc.completed.push(t)
       else acc.upcoming.push(t)

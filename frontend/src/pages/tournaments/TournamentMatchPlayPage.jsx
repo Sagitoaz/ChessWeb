@@ -23,6 +23,16 @@ const normalizeResultLabel = (raw) => {
   return 'Hòa'
 }
 
+const findMatchByGameId = (rounds, targetGameId) => {
+  if (!Array.isArray(rounds) || !targetGameId) return null
+  for (const round of rounds) {
+    const matches = Array.isArray(round?.matches) ? round.matches : []
+    const found = matches.find((match) => String(match?.gameId || '') === String(targetGameId))
+    if (found) return found
+  }
+  return null
+}
+
 export default function TournamentMatchPlayPage() {
   const navigate = useNavigate()
   const { tournamentId, gameId } = useParams()
@@ -30,7 +40,9 @@ export default function TournamentMatchPlayPage() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
   const [resultText, setResultText] = useState('')
+  const [noticeText, setNoticeText] = useState('')
   const [playerColor, setPlayerColor] = useState('white')
   const [whiteName, setWhiteName] = useState('Người chơi Trắng')
   const [blackName, setBlackName] = useState('Người chơi Đen')
@@ -38,6 +50,9 @@ export default function TournamentMatchPlayPage() {
   const [blackPlayerId, setBlackPlayerId] = useState('')
   const [moveHistory, setMoveHistory] = useState([])
   const [lastMove, setLastMove] = useState(null)
+  const [matchIdInBracket, setMatchIdInBracket] = useState('')
+  const [participantStatus, setParticipantStatus] = useState(null)
+  const [submittingResign, setSubmittingResign] = useState(false)
 
   const chessRef = useRef(new Chess(INITIAL_FEN))
 
@@ -102,12 +117,29 @@ export default function TournamentMatchPlayPage() {
       if (game?.finishedAt || game?.state === 'Saved') {
         setResultText(normalizeResultLabel(game?.rawResult || game?.result))
       }
+
+      if (tournamentId) {
+        const tournamentPayload = await gameService.getTournament(tournamentId)
+        const tournament = tournamentPayload?.data ?? tournamentPayload
+        const match = findMatchByGameId(tournament?.rounds, gameId)
+        setMatchIdInBracket(String(match?.id || ''))
+
+        const participants = Array.isArray(tournament?.participants) ? tournament.participants : []
+        const me = participants.find(
+          (participant) => String(participant?.userId || '') === String(currentUserId || '')
+        )
+        const status = me?.status || null
+        setParticipantStatus(status)
+        if (status === 'eliminated') {
+          setNoticeText('Bạn đã bị loại khỏi giải đấu.')
+        }
+      }
     } catch (loadError) {
       setError(loadError?.message || 'Không thể tải trận đấu tournament.')
     } finally {
       setLoading(false)
     }
-  }, [currentUserId, gameId])
+  }, [currentUserId, gameId, tournamentId])
 
   useEffect(() => {
     void loadGame()
@@ -136,6 +168,18 @@ export default function TournamentMatchPlayPage() {
 
     const handleGameEnd = (payload) => {
       setResultText(normalizeResultLabel(payload?.result))
+      const reason = String(payload?.reason || '').toLowerCase()
+      const resignedByUserId = String(payload?.resignedByUserId || '')
+      if (reason === 'resignation') {
+        if (resignedByUserId && resignedByUserId === String(currentUserId || '')) {
+          setNoticeText('Bạn đã đầu hàng. Kết quả đã được cập nhật.')
+        } else {
+          setNoticeText('Đối thủ đã đầu hàng. Kết quả đã được cập nhật.')
+        }
+      } else {
+        setNoticeText('Trận đấu đã kết thúc, bảng điểm đang được cập nhật.')
+      }
+      void loadGame()
     }
 
     onMoveUpdate(handleMoveUpdate)
@@ -145,7 +189,7 @@ export default function TournamentMatchPlayPage() {
       off('game:moveUpdate', handleMoveUpdate)
       off('game:end', handleGameEnd)
     }
-  }, [off, onGameEnd, onMoveUpdate])
+  }, [currentUserId, loadGame, off, onGameEnd, onMoveUpdate])
 
   const handleMove = useCallback(
     (move) => {
@@ -168,7 +212,47 @@ export default function TournamentMatchPlayPage() {
   const myDisplayName = authUser?.displayName || authUser?.username || 'Bạn'
   const mySideLabel = playerColor === 'white' ? 'Trắng' : 'Đen'
   const myOpponentName = playerColor === 'white' ? blackName : whiteName
-  const canResign = !isFinished && isSocketConnected
+  const canResign = !isFinished && !submittingResign
+  const handleResign = useCallback(async () => {
+    if (!tournamentId || !gameId || isFinished || submittingResign) return
+
+    setSubmittingResign(true)
+    setActionError('')
+
+    try {
+      const targetMatchId = matchIdInBracket || gameId
+      const response = await gameService.resignTournamentMatch(tournamentId, targetMatchId)
+      const payload = response?.data ?? response
+
+      setResultText(normalizeResultLabel(payload?.result))
+      setNoticeText('Bạn đã đầu hàng. Kết quả trận và bảng điểm đã được cập nhật.')
+      setParticipantStatus('eliminated')
+
+      if (isSocketConnected) {
+        resign()
+      }
+
+      void loadGame()
+    } catch (submitError) {
+      const message =
+        submitError?.response?.data?.message ||
+        submitError?.message ||
+        'Không thể cập nhật kết quả đầu hàng. Vui lòng thử lại.'
+      setActionError(String(message))
+    } finally {
+      setSubmittingResign(false)
+    }
+  }, [
+    gameId,
+    isFinished,
+    isSocketConnected,
+    loadGame,
+    matchIdInBracket,
+    resign,
+    submittingResign,
+    tournamentId,
+  ])
+
   const hasValidPlayers = Boolean(whitePlayerId && blackPlayerId)
 
   const movePairs = useMemo(() => {
@@ -262,6 +346,24 @@ export default function TournamentMatchPlayPage() {
         </div>
       )}
 
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {actionError}
+        </div>
+      )}
+
+      {noticeText && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+          {noticeText}
+        </div>
+      )}
+
+      {participantStatus === 'eliminated' && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          Bạn đã bị loại khỏi giải đấu.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
         <Card className="p-3 bg-white border border-blue-100 shadow-lg">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
@@ -320,9 +422,9 @@ export default function TournamentMatchPlayPage() {
           </div>
 
           <div className="mt-1 flex gap-2">
-            <Button variant="outline" disabled={!canResign} onClick={() => resign()}>
+            <Button variant="outline" disabled={!canResign} onClick={handleResign}>
               <Flag className="w-4 h-4" />
-              Đầu hàng
+              {submittingResign ? 'Đang xử lý...' : 'Đầu hàng'}
             </Button>
             <Button
               variant="outline"

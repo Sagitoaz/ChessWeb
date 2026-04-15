@@ -44,6 +44,18 @@ const RatingBadge = ({ label, value }) => (
   </div>
 )
 
+const formatStreak = (stats) => {
+  const count = Number(stats?.currentStreak ?? 0)
+  const type = stats?.currentStreakType
+  if (!count || !type) return '0'
+  return `${count}${type === 'win' ? 'W' : 'L'}`
+}
+
+const formatAverageOpponent = (value) => {
+  const rating = Number(value ?? 0)
+  return rating > 0 ? rating : '—'
+}
+
 const RecentGameRow = ({ opponent, result, eloChange, date }) => {
   const colors = { win: 'text-green-600', lose: 'text-red-500', draw: 'text-gray-500' }
   const labels = { win: 'Thắng', lose: 'Thua', draw: 'Hòa' }
@@ -142,6 +154,8 @@ const ProfilePage = () => {
   }
 
   const winRate = user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0
+  const streakValue = formatStreak(rankedStats)
+  const avgOpponentValue = formatAverageOpponent(rankedStats?.avgOpponentRating)
 
   return (
     <div className="pb-12">
@@ -188,11 +202,13 @@ const ProfilePage = () => {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-4">
           <h2 className="text-base font-bold text-gray-900 mb-4">Thống kê</h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label="Tổng ván" value={user.gamesPlayed} color="blue" />
             <StatCard label="Thắng" value={user.wins} color="green" />
             <StatCard label="Thua" value={user.losses} color="red" />
             <StatCard label="Tỷ lệ thắng" value={`${winRate}%`} color="yellow" />
+            <StatCard label="Streak" value={streakValue} color="blue" />
+            <StatCard label="AVG Opp" value={avgOpponentValue} color="green" />
           </div>
         </div>
 

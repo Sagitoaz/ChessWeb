@@ -1,4 +1,3 @@
-import { API_URL } from '../utils/constants'
 import api from './api'
 
 /**
@@ -84,7 +83,15 @@ const normalizeRankedStats = (payload) => {
     draws,
     winRate: Number(data?.winRate ?? computedWinRate ?? 0),
     currentStreak: Number(data?.currentStreak ?? 0),
+    currentStreakType:
+      data?.currentStreakType === 'win' || data?.currentStreakType === 'lose'
+        ? data.currentStreakType
+        : null,
     bestStreak: Number(data?.bestStreak ?? 0),
+    bestStreakType:
+      data?.bestStreakType === 'win' || data?.bestStreakType === 'lose'
+        ? data.bestStreakType
+        : null,
     avgOpponentRating: Number(data?.avgOpponentRating ?? 0),
     timeControls:
       data?.timeControls && typeof data.timeControls === 'object' ? data.timeControls : {},
@@ -96,7 +103,7 @@ const normalizeRankedStats = (payload) => {
 /**
  * Mock responses for development
  */
-const mockGameAPI = {
+const _mockGameAPI = {
   // Ranked Match APIs
   async joinRankedQueue() {
     await new Promise((resolve) => setTimeout(resolve, 500))
@@ -186,7 +193,9 @@ const mockGameAPI = {
       draws: 16,
       winRate: 50.0,
       currentStreak: 3,
+      currentStreakType: 'win',
       bestStreak: 8,
+      bestStreakType: 'win',
       avgOpponentRating: 1512,
       timeControls: {
         blitz: { games: 89, rating: 1545 },
@@ -209,7 +218,7 @@ const mockGameAPI = {
     }
   },
 
-  async resignGame(matchId) {
+  async resignGame(_matchId) {
     await new Promise((resolve) => setTimeout(resolve, 300))
     return {
       success: true,
@@ -219,7 +228,7 @@ const mockGameAPI = {
     }
   },
 
-  async offerDraw(matchId) {
+  async offerDraw(_matchId) {
     await new Promise((resolve) => setTimeout(resolve, 300))
     return {
       success: true,
@@ -285,7 +294,7 @@ const mockGameAPI = {
     }
   },
 
-  async leaveRoom(roomCode) {
+  async leaveRoom(_roomCode) {
     await new Promise((resolve) => setTimeout(resolve, 300))
     return {
       success: true,
@@ -321,7 +330,7 @@ const mockGameAPI = {
     }
   },
 
-  async startRoomGame(roomCode) {
+  async startRoomGame(_roomCode) {
     await new Promise((resolve) => setTimeout(resolve, 500))
     return {
       success: true,
@@ -331,7 +340,7 @@ const mockGameAPI = {
   },
 
   // Tournament APIs
-  async getTournaments(filters = {}) {
+  async getTournaments(_filters = {}) {
     await new Promise((resolve) => setTimeout(resolve, 500))
     const tournaments = Array.from({ length: 5 }, (_, i) => ({
       id: `tournament-${i + 1}`,
@@ -443,7 +452,7 @@ const mockGameAPI = {
   },
 
   // POST /games/{gameId}/moves { move }
-  async submitPlayerMove(gameId, move) {
+  async submitPlayerMove(_gameId, _move) {
     await new Promise((resolve) => setTimeout(resolve, 200))
     return { success: true, fen: null }
   },
@@ -460,18 +469,18 @@ const mockGameAPI = {
     }
   },
 
-  async pauseBotGame(gameId) {
+  async pauseBotGame(_gameId) {
     await new Promise((resolve) => setTimeout(resolve, 200))
     return { success: true, state: 'Paused' }
   },
 
-  async resumeBotGame(gameId) {
+  async resumeBotGame(_gameId) {
     await new Promise((resolve) => setTimeout(resolve, 200))
     return { success: true, state: 'InGame' }
   },
 
   // UC6: Save Game — SM: Finished → Saved
-  async saveBotGame(gameId, gameData) {
+  async saveBotGame(gameId, _gameData) {
     await new Promise((resolve) => setTimeout(resolve, 400))
     return {
       success: true,
@@ -515,6 +524,7 @@ const mockGameAPI = {
     return game
   },
 }
+void _mockGameAPI
 
 /**
  * Game Service API
@@ -594,11 +604,23 @@ const gameService = {
   recordTournamentMatchResult: (tournamentId, matchId, data) =>
     gameAPI.post(`/tournaments/${tournamentId}/matches/${matchId}/result`, data),
 
+  resignTournamentMatch: (tournamentId, matchId) =>
+    gameAPI.post(`/tournaments/${tournamentId}/matches/${matchId}/resign`),
+
   approveTournamentParticipant: (tournamentId, userId) =>
     gameAPI.post(`/tournaments/${tournamentId}/participants/${userId}/approve`),
 
   rejectTournamentParticipant: (tournamentId, userId) =>
     gameAPI.post(`/tournaments/${tournamentId}/participants/${userId}/reject`),
+
+  setTournamentSeeding: (tournamentId, data) =>
+    gameAPI.post(`/tournaments/${tournamentId}/seeding`, data),
+
+  openTournamentRound: (tournamentId, data = {}) =>
+    gameAPI.post(`/tournaments/${tournamentId}/rounds/open`, data),
+
+  checkInTournamentMatch: (tournamentId, matchId) =>
+    gameAPI.post(`/tournaments/${tournamentId}/matches/${matchId}/check-in`),
 
   createTournament: (data) => gameAPI.post('/tournaments', data),
 }

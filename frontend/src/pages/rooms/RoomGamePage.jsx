@@ -1,21 +1,17 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Input, Modal } from '@/components/common'
 import gameService from '@/services/gameService'
 import { useAuthStore } from '@/store'
 import {
-  Users,
-  Clock,
   MessageCircle,
   RotateCcw,
   Flag,
   Handshake,
   Copy,
-  Share2,
   ArrowLeft,
   Trophy,
   Send,
-  X,
 } from 'lucide-react'
 
 const buildFallbackRoom = (roomId, user) => ({
@@ -62,11 +58,11 @@ export default function RoomGamePage() {
 
   // Game state
   const [roomData, setRoomData] = useState(() => buildFallbackRoom(roomId, user))
-  const [currentPlayer, setCurrentPlayer] = useState('white') // Mock: assume we're white
-  const [isMyTurn, setIsMyTurn] = useState(true)
+  const [currentPlayer] = useState('white') // Mock: assume we're white
+  const [isMyTurn] = useState(true)
   const [timeWhite, setTimeWhite] = useState(600) // 10 phút = 600 giây
   const [timeBlack, setTimeBlack] = useState(600)
-  const [moveHistory, setMoveHistory] = useState(['e4', 'e5', 'Nf3', 'Nc6'])
+  const [moveHistory] = useState(['e4', 'e5', 'Nf3', 'Nc6'])
   const [gameStatus, setGameStatus] = useState('playing') // playing, ended
 
   // Chat state
@@ -83,6 +79,7 @@ export default function RoomGamePage() {
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [gameResult, setGameResult] = useState(null)
   const [copiedCode, setCopiedCode] = useState(false)
+  const [systemNotice, setSystemNotice] = useState('')
 
   useEffect(() => {
     const loadRoom = async () => {
@@ -142,19 +139,20 @@ export default function RoomGamePage() {
     })
     setGameStatus('ended')
     setShowEndGameModal(true)
+    setSystemNotice('Bạn đã đầu hàng. Trận đấu đã kết thúc.')
   }
 
   const handleOfferDraw = () => {
     // TODO: Send draw offer to opponent via socket
     setShowDrawModal(false)
-    alert('Đã gửi đề nghị hòa đến đối thủ')
+    setSystemNotice('Đã gửi đề nghị hòa đến đối thủ.')
   }
 
   const handleRematch = () => {
     // TODO: Real implementation
     // socket.emit('room:offerRematch', { roomId })
     setShowRematchModal(false)
-    alert('Đã gửi lời mời chơi lại')
+    setSystemNotice('Đã gửi lời mời chơi lại.')
   }
 
   const handleLeaveRoom = () => {
@@ -200,6 +198,12 @@ export default function RoomGamePage() {
             </Button>
           </div>
         </div>
+
+        {systemNotice && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+            {systemNotice}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Left Column - Chess Board */}

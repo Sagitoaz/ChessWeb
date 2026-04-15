@@ -13,6 +13,8 @@ import {
   TournamentWinnerSlot,
   UpdateTournamentMatchResultDto,
 } from "./dto/manage-tournament-result.dto";
+import { TournamentSeedingDto } from "./dto/tournament-seeding.dto";
+import { TournamentOpenRoundDto } from "./dto/tournament-open-round.dto";
 import { SaveBotGameDto } from "./dto/save-bot-game.dto";
 import { BotTacticalHintDto } from "./dto/bot-tactical-hint.dto";
 import { GroqService } from "./groq.service";
@@ -201,16 +203,24 @@ export class SocialBotService {
       tournament.createdBy,
       tournament.organizerId,
       tournament.ownerUserId,
+      (tournament.organizer as Record<string, unknown> | undefined)?.userId,
+      (tournament.organizer as Record<string, unknown> | undefined)?._id,
+      (tournament.organizer as Record<string, unknown> | undefined)?.id,
     ]
       .map((value) => {
-        if (typeof value === "string") return value;
+        if (typeof value === "string") {
+          const match = value.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
+          return match?.[1] || value;
+        }
         if (
           value &&
           typeof value === "object" &&
           "toString" in value &&
           typeof (value as { toString?: unknown }).toString === "function"
         ) {
-          return (value as { toString: () => string }).toString();
+          const asString = (value as { toString: () => string }).toString();
+          const match = asString.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
+          return match?.[1] || asString;
         }
         return "";
       })
@@ -291,6 +301,28 @@ export class SocialBotService {
     return null;
   }
 
+  private locateTournamentMatchByGameId(
+    rounds: Array<Record<string, unknown>>,
+    gameId: string,
+  ): {
+    roundIndex: number;
+    matchIndex: number;
+    match: any;
+  } | null {
+    for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
+      const round = rounds[roundIndex] as any;
+      const matches = Array.isArray(round?.matches) ? round.matches : [];
+      for (let matchIndex = 0; matchIndex < matches.length; matchIndex += 1) {
+        const match = matches[matchIndex] as any;
+        if (String(match?.gameId || "") === gameId) {
+          return { roundIndex, matchIndex, match };
+        }
+      }
+    }
+
+    return null;
+  }
+
   private syncTournamentAdvancement(
     rounds: Array<Record<string, unknown>>,
     roundIndex: number,
@@ -350,6 +382,72 @@ export class SocialBotService {
           player2Name !== "TBD"
         ) {
           match.status = "scheduled";
+        }
+      }
+    }
+  }
+
+  private propagateBracketAutoAdvancement(
+    rounds: Array<Record<string, unknown>>,
+  ) {
+    for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
+      const round = rounds[roundIndex] as any;
+      if (!Array.isArray(round?.matches)) continue;
+
+      for (
+        let matchIndex = 0;
+        matchIndex < round.matches.length;
+        matchIndex += 1
+      ) {
+        const match = round.matches[matchIndex] as any;
+        const p1Name = String(match?.player1?.name || "");
+        const p2Name = String(match?.player2?.name || "");
+        const normalizedStatus = this.normalizeMatchStatus(match?.status);
+
+        if (normalizedStatus !== "completed") {
+          if (p1Name !== "TBD" && p2Name === "TBD") {
+            match.status = "completed";
+            match.winner = p1Name;
+            match.result = "1-0";
+            if (match.player1) match.player1.score = 1;
+            if (match.player2) match.player2.score = 0;
+          } else if (p2Name !== "TBD" && p1Name === "TBD") {
+            match.status = "completed";
+            match.winner = p2Name;
+            match.result = "0-1";
+            if (match.player1) match.player1.score = 0;
+            if (match.player2) match.player2.score = 1;
+          }
+        }
+
+        if (
+          this.normalizeMatchStatus(match?.status) === "completed" &&
+          String(match?.winner || "").length > 0
+        ) {
+          this.syncTournamentAdvancement(
+            rounds,
+            roundIndex,
+            matchIndex,
+            String(match.winner),
+            Number.isFinite(
+              Number(
+                match?.winner === p1Name
+                  ? match?.player1?.seed
+                  : match?.player2?.seed,
+              ),
+            )
+              ? Number(
+                  match?.winner === p1Name
+                    ? match?.player1?.seed
+                    : match?.player2?.seed,
+                )
+              : null,
+            String(
+              match?.winner === p1Name
+                ? match?.player1?.userId || ""
+                : match?.player2?.userId || "",
+            ) || null,
+          );
         }
       }
     }
@@ -429,6 +527,9 @@ export class SocialBotService {
           p2.points += 1;
           p2.wins += 1;
           p1.losses += 1;
+        } else if (result === "double_forfeit") {
+          p1.losses += 1;
+          p2.losses += 1;
         } else if (result === "draw" || result === "1/2-1/2") {
           p1.points += 0.5;
           p2.points += 0.5;
@@ -465,11 +566,18 @@ export class SocialBotService {
     tournamentId: string,
     rounds: Array<Record<string, unknown>>,
     roundIndex: number,
+    options?: { activateImmediately?: boolean; checkInMinutes?: number },
   ) {
     const round = rounds[roundIndex] as any;
     if (!round || !Array.isArray(round.matches)) return;
 
     const now = new Date();
+    const activateImmediately = options?.activateImmediately === true;
+    const checkInMinutes = Number(options?.checkInMinutes || 3);
+    const checkInDeadlineAt = new Date(
+      now.getTime() + Math.max(2, checkInMinutes) * 60 * 1000,
+    );
+
     for (const match of round.matches as Array<any>) {
       const status = this.normalizeMatchStatus(match?.status);
       const p1Id = String(match?.player1?.userId || "");
@@ -477,7 +585,18 @@ export class SocialBotService {
 
       if (status !== "scheduled") continue;
       if (!p1Id || !p2Id) continue;
-      if (String(match?.gameId || "").length > 0) continue;
+      if (String(match?.gameId || "").length > 0) {
+        if (!activateImmediately) {
+          match.status = "scheduled";
+          match.checkIn = {
+            player1Ready: Boolean(match?.checkIn?.player1Ready),
+            player2Ready: Boolean(match?.checkIn?.player2Ready),
+            openedAt: now,
+            deadlineAt: checkInDeadlineAt,
+          };
+        }
+        continue;
+      }
 
       const game = await this.repo.createGame({
         mode: "tournament",
@@ -486,18 +605,30 @@ export class SocialBotService {
         whitePlayerId: p1Id,
         blackPlayerId: p2Id,
         result: null,
-        state: "InGame",
-        status: "active",
+        state: activateImmediately ? "InGame" : "WaitingCheckIn",
+        status: activateImmediately ? "active" : "pending",
         initialFEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        noShowDeadlineAt: new Date(
-          now.getTime() + this.tournamentNoShowTimeoutMs,
-        ),
+        checkInDeadlineAt,
+        noShowDeadlineAt: activateImmediately
+          ? new Date(now.getTime() + this.tournamentNoShowTimeoutMs)
+          : null,
         createdAt: now,
         updatedAt: now,
         finishedAt: null,
       });
 
       match.gameId = String(game._id);
+      if (!activateImmediately) {
+        match.status = "scheduled";
+        match.checkIn = {
+          player1Ready: false,
+          player2Ready: false,
+          openedAt: now,
+          deadlineAt: checkInDeadlineAt,
+        };
+      } else {
+        match.status = "ongoing";
+      }
     }
   }
 
@@ -505,6 +636,7 @@ export class SocialBotService {
     tournamentId: string,
     rounds: Array<Record<string, unknown>>,
     startRoundIndex: number,
+    options?: { activateImmediately?: boolean; checkInMinutes?: number },
   ) {
     for (
       let roundIndex = startRoundIndex;
@@ -515,6 +647,7 @@ export class SocialBotService {
         tournamentId,
         rounds,
         roundIndex,
+        options,
       );
     }
   }
@@ -532,12 +665,14 @@ export class SocialBotService {
       if (!tournamentId) continue;
 
       const rounds = this.cloneTournamentRounds(tournament.rounds);
-      let cancelledByNoShow = false;
+      let roundsUpdated = false;
 
-      for (const round of rounds as Array<any>) {
+      for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
+        const round = rounds[roundIndex] as any;
         const matches = Array.isArray(round?.matches) ? round.matches : [];
 
-        for (const match of matches as Array<any>) {
+        for (let matchIndex = 0; matchIndex < matches.length; matchIndex += 1) {
+          const match = matches[matchIndex] as any;
           const matchStatus = this.normalizeMatchStatus(match?.status);
           if (matchStatus !== "scheduled" && matchStatus !== "ongoing")
             continue;
@@ -549,62 +684,150 @@ export class SocialBotService {
           if (!game) continue;
           if (game.finishedAt || game.state === "Saved") continue;
 
-          const deadlineRaw = game.noShowDeadlineAt || game.createdAt;
+          const checkIn =
+            match?.checkIn && typeof match.checkIn === "object"
+              ? match.checkIn
+              : {};
+          const p1Ready = Boolean((checkIn as any).player1Ready);
+          const p2Ready = Boolean((checkIn as any).player2Ready);
+
+          if (p1Ready && p2Ready && String(game.status || "") !== "active") {
+            await this.repo.updateGameById(gameId, {
+              state: "InGame",
+              status: "active",
+              checkInClosedAt: new Date(),
+              noShowDeadlineAt: null,
+              updatedAt: new Date(),
+            });
+
+            match.status = "ongoing";
+            this.rankedGateway.emitTournamentMatchReady({
+              tournamentId,
+              matchId: String(match?.id || ""),
+              gameId,
+              roundIndex,
+            });
+            roundsUpdated = true;
+            continue;
+          }
+
+          const deadlineRaw =
+            (checkIn as any).deadlineAt ||
+            game.checkInDeadlineAt ||
+            game.noShowDeadlineAt ||
+            game.createdAt;
           const deadline = deadlineRaw ? new Date(deadlineRaw).getTime() : NaN;
           if (!Number.isFinite(deadline) || now < deadline) continue;
 
-          const moves = Array.isArray(game.moves) ? game.moves : [];
-
-          if (moves.length === 0) {
+          if (!p1Ready && !p2Ready) {
             await this.repo.updateGameById(gameId, {
               state: "Saved",
               status: "cancelled",
-              result: "draw",
+              result: "double_forfeit",
               finishedAt: new Date(),
               updatedAt: new Date(),
               endReason: "double_no_show",
             });
 
-            await this.repo.updateTournamentById(tournamentId, {
-              status: "cancelled",
-              cancelledAt: new Date(),
-              cancelReason: `Double no-show at match ${String(match?.id || "")}`,
-              updatedAt: new Date(),
-            });
-
-            this.rankedGateway.emitTournamentRoundUpdate({
-              tournamentId,
-              status: "cancelled",
-              rounds,
-            });
-            cancelledByNoShow = true;
-            break;
+            match.status = "completed";
+            match.winner = null;
+            match.result = "double_forfeit";
+            match.completedAt = new Date();
+            if (match.player1) match.player1.score = 0;
+            if (match.player2) match.player2.score = 0;
+            roundsUpdated = true;
+            continue;
           }
 
-          if (moves.length === 1) {
+          if (p1Ready !== p2Ready) {
+            const winnerSlot = p1Ready
+              ? TournamentWinnerSlot.PLAYER1
+              : TournamentWinnerSlot.PLAYER2;
+            const winnerPlayer: any =
+              winnerSlot === TournamentWinnerSlot.PLAYER1
+                ? match.player1
+                : match.player2;
+
             await this.repo.updateGameById(gameId, {
               state: "Saved",
               status: "finished",
-              result: "white_win",
+              result:
+                winnerSlot === TournamentWinnerSlot.PLAYER1
+                  ? "white_win"
+                  : "black_win",
               finishedAt: new Date(),
               updatedAt: new Date(),
               endReason: "no_show_forfeit",
             });
 
-            await this.updateTournamentMatchResult(
-              {
-                userId: String(tournament.createdBy || "system"),
-                roles: ["admin"],
-              },
-              tournamentId,
-              String(match.id || ""),
-              { winnerSlot: TournamentWinnerSlot.PLAYER1, overwrite: true },
+            match.status = "completed";
+            match.winner = winnerPlayer?.name || null;
+            match.result =
+              winnerSlot === TournamentWinnerSlot.PLAYER1 ? "1-0" : "0-1";
+            match.completedAt = new Date();
+            if (match.player1) {
+              match.player1.score =
+                winnerSlot === TournamentWinnerSlot.PLAYER1 ? 1 : 0;
+            }
+            if (match.player2) {
+              match.player2.score =
+                winnerSlot === TournamentWinnerSlot.PLAYER2 ? 1 : 0;
+            }
+
+            this.syncTournamentAdvancement(
+              rounds,
+              roundIndex,
+              matchIndex,
+              String(winnerPlayer?.name || ""),
+              Number.isFinite(Number(winnerPlayer?.seed))
+                ? Number(winnerPlayer?.seed)
+                : null,
+              String(winnerPlayer?.userId || "") || null,
             );
+            roundsUpdated = true;
           }
         }
+      }
 
-        if (cancelledByNoShow) {
-          break;
+      if (roundsUpdated) {
+        this.refreshBracketRoundStatuses(rounds);
+        this.propagateBracketAutoAdvancement(rounds);
+
+        const allCompleted = rounds.every((round: any) => {
+          const matches = Array.isArray(round?.matches) ? round.matches : [];
+          return matches.every(
+            (match: any) =>
+              this.normalizeMatchStatus(match?.status) === "completed",
+          );
+        });
+
+        const finalRound = rounds[rounds.length - 1] as any;
+        const finalMatch = Array.isArray(finalRound?.matches)
+          ? (finalRound.matches[0] as any)
+          : null;
+        const winnerName = String(finalMatch?.winner || "") || null;
+
+        await this.repo.updateTournamentById(tournamentId, {
+          rounds,
+          status: allCompleted ? "completed" : "ongoing",
+          winner: winnerName,
+          completedAt: allCompleted ? new Date() : null,
+          updatedAt: new Date(),
+        });
+
+        this.rankedGateway.emitTournamentRoundUpdate({
+          tournamentId,
+          status: allCompleted ? "completed" : "ongoing",
+          rounds,
+        });
+
+        if (allCompleted) {
+          this.rankedGateway.emitTournamentCompleted({
+            tournamentId,
+            winner: winnerName || "",
+            status: "completed",
+            rounds,
+          });
         }
       }
     }
@@ -716,6 +939,198 @@ export class SocialBotService {
     }
 
     return rounds;
+  }
+
+  private createEliminationRoundsFromFirstRound(
+    firstRoundMatches: Array<Record<string, unknown>>,
+  ) {
+    const rounds: Array<Record<string, unknown>> = [
+      {
+        name: "Round 1",
+        matches: firstRoundMatches,
+      },
+    ];
+
+    let matchesInRound = firstRoundMatches.length;
+    let roundIndex = 2;
+    while (matchesInRound > 1) {
+      matchesInRound = Math.floor(matchesInRound / 2);
+      const matches = Array.from({ length: matchesInRound }, (_, idx) => ({
+        id: `r${roundIndex}-m${idx + 1}`,
+        status: "pending",
+        winner: null,
+        result: null,
+        player1: { name: "TBD", seed: null, userId: null, score: null },
+        player2: { name: "TBD", seed: null, userId: null, score: null },
+      }));
+
+      rounds.push({
+        name: matchesInRound === 1 ? "Final" : `Round ${roundIndex}`,
+        matches,
+      });
+
+      roundIndex += 1;
+    }
+
+    for (let idx = 0; idx < rounds.length - 1; idx += 1) {
+      const currentRound = rounds[idx] as any;
+      const nextRound = rounds[idx + 1] as any;
+      if (
+        !Array.isArray(currentRound?.matches) ||
+        !Array.isArray(nextRound?.matches)
+      ) {
+        continue;
+      }
+
+      for (
+        let matchIndex = 0;
+        matchIndex < currentRound.matches.length;
+        matchIndex += 1
+      ) {
+        const currentMatch = currentRound.matches[matchIndex] as any;
+        const nextMatchIndex = Math.floor(matchIndex / 2);
+        const nextMatch = nextRound.matches[nextMatchIndex] as any;
+        if (!nextMatch) continue;
+
+        currentMatch.nextMatchId = nextMatch.id;
+        currentMatch.nextSlot = matchIndex % 2 === 0 ? "player1" : "player2";
+      }
+    }
+
+    return rounds;
+  }
+
+  private createTournamentRoundsFromManualPairs(
+    participants: Array<{ userId: string; name: string; seed: number }>,
+    pairs: Array<{ player1UserId: string; player2UserId?: string }>,
+  ) {
+    const nextPowerOfTwo =
+      participants.length <= 1
+        ? 2
+        : Math.pow(2, Math.ceil(Math.log2(participants.length)));
+    const firstRoundCount = nextPowerOfTwo / 2;
+
+    const participantById = new Map(
+      participants.map((participant) => [participant.userId, participant]),
+    );
+
+    const usedUserIds = new Set<string>();
+    const firstRoundMatches: Array<Record<string, unknown>> = [];
+
+    for (let i = 0; i < firstRoundCount; i += 1) {
+      const pair = pairs[i] || null;
+      const p1Id = String(pair?.player1UserId || "");
+      const p2Id = String(pair?.player2UserId || "");
+
+      const p1 = participantById.get(p1Id) || {
+        userId: "",
+        name: "TBD",
+        seed: 0,
+      };
+      const p2 = p2Id
+        ? participantById.get(p2Id) || { userId: "", name: "TBD", seed: 0 }
+        : { userId: "", name: "TBD", seed: 0 };
+
+      if (p1.userId) usedUserIds.add(p1.userId);
+      if (p2.userId) usedUserIds.add(p2.userId);
+
+      const p1Bye = p1.name === "TBD";
+      const p2Bye = p2.name === "TBD";
+      const winner =
+        p1Bye && !p2Bye ? p2.name : p2Bye && !p1Bye ? p1.name : null;
+
+      firstRoundMatches.push({
+        id: `r1-m${i + 1}`,
+        status: winner ? "completed" : "scheduled",
+        winner,
+        result: winner ? (winner === p1.name ? "1-0" : "0-1") : null,
+        player1: {
+          name: p1.name,
+          seed: p1.seed || null,
+          userId: p1.userId || null,
+          score: winner === p1.name ? 1 : winner ? 0 : null,
+        },
+        player2: {
+          name: p2.name,
+          seed: p2.seed || null,
+          userId: p2.userId || null,
+          score: winner === p2.name ? 1 : winner ? 0 : null,
+        },
+      });
+    }
+
+    const leftovers = participants.filter(
+      (participant) => !usedUserIds.has(participant.userId),
+    );
+    if (leftovers.length > 0) {
+      for (const match of firstRoundMatches as Array<any>) {
+        if (leftovers.length === 0) break;
+        if (!match?.player1?.userId || match.player1.name === "TBD") {
+          const next = leftovers.shift()!;
+          match.player1 = {
+            name: next.name,
+            seed: next.seed,
+            userId: next.userId,
+            score: null,
+          };
+        }
+        if (leftovers.length === 0) break;
+        if (!match?.player2?.userId || match.player2.name === "TBD") {
+          const next = leftovers.shift()!;
+          match.player2 = {
+            name: next.name,
+            seed: next.seed,
+            userId: next.userId,
+            score: null,
+          };
+        }
+      }
+    }
+
+    for (const match of firstRoundMatches as Array<any>) {
+      const p1Name = String(match?.player1?.name || "TBD");
+      const p2Name = String(match?.player2?.name || "TBD");
+      const p1Bye = p1Name === "TBD";
+      const p2Bye = p2Name === "TBD";
+      if (p1Bye && !p2Bye) {
+        match.status = "completed";
+        match.winner = p2Name;
+        match.result = "0-1";
+      } else if (p2Bye && !p1Bye) {
+        match.status = "completed";
+        match.winner = p1Name;
+        match.result = "1-0";
+      }
+    }
+
+    return this.createEliminationRoundsFromFirstRound(firstRoundMatches);
+  }
+
+  private resolveTargetRoundIndex(
+    rounds: Array<Record<string, unknown>>,
+    inputRoundIndex?: number,
+  ): number {
+    if (
+      typeof inputRoundIndex === "number" &&
+      Number.isFinite(inputRoundIndex)
+    ) {
+      const normalized = Math.max(1, Math.floor(inputRoundIndex));
+      if (normalized > rounds.length) {
+        throw new BadRequestException("Round index is out of range");
+      }
+      return normalized - 1;
+    }
+
+    const firstPendingIndex = rounds.findIndex((round: any) => {
+      const matches = Array.isArray(round?.matches) ? round.matches : [];
+      return matches.some(
+        (match: any) =>
+          this.normalizeMatchStatus(match?.status) !== "completed",
+      );
+    });
+
+    if (firstPendingIndex >= 0) return firstPendingIndex;
+    return Math.max(0, rounds.length - 1);
   }
 
   async createRoom(userId: string, dto: CreateRoomDto) {
@@ -898,6 +1313,39 @@ export class SocialBotService {
     const tournament = await this.repo.findTournamentById(tournamentId);
     if (!tournament) {
       throw new NotFoundException("Tournament not found");
+    }
+
+    const organizerCandidates = [
+      tournament.createdBy,
+      tournament.organizerId,
+      tournament.ownerUserId,
+      (tournament.organizer as Record<string, unknown> | undefined)?.userId,
+      (tournament.organizer as Record<string, unknown> | undefined)?._id,
+      (tournament.organizer as Record<string, unknown> | undefined)?.id,
+    ]
+      .map((value) => {
+        if (typeof value === "string") {
+          const match = value.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
+          return match?.[1] || value;
+        }
+        if (
+          value &&
+          typeof value === "object" &&
+          "toString" in value &&
+          typeof (value as { toString?: unknown }).toString === "function"
+        ) {
+          const asString = (value as { toString: () => string }).toString();
+          const match = asString.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
+          return match?.[1] || asString;
+        }
+        return "";
+      })
+      .filter((value) => value.length > 0);
+
+    if (organizerCandidates.includes(String(userId))) {
+      throw new BadRequestException(
+        "Organizer cannot join their own tournament",
+      );
     }
 
     if (!this.isTournamentRegistrationOpen(tournament)) {
@@ -1104,8 +1552,6 @@ export class SocialBotService {
       }
     }
 
-    await this.attachTournamentGamesForRounds(tournamentId, rounds, 0);
-
     const standings = this.buildTournamentStandings(activeParticipants, rounds);
 
     const updated = await this.repo.updateTournamentById(tournamentId, {
@@ -1130,19 +1576,6 @@ export class SocialBotService {
         status: String(updated.status || "ongoing"),
         rounds,
       });
-      const firstRound = Array.isArray(rounds) ? (rounds[0] as any) : null;
-      if (Array.isArray(firstRound?.matches)) {
-        for (const match of firstRound.matches as Array<any>) {
-          if (String(match?.gameId || "").length > 0) {
-            this.rankedGateway.emitTournamentMatchReady({
-              tournamentId,
-              matchId: String(match.id || ""),
-              gameId: String(match.gameId),
-              roundIndex: 0,
-            });
-          }
-        }
-      }
     }
 
     return {
@@ -1151,6 +1584,286 @@ export class SocialBotService {
       status: "ongoing",
       rounds: Array.isArray(updated?.rounds) ? updated.rounds : rounds,
       standings,
+    };
+  }
+
+  async setTournamentSeeding(
+    principal: TournamentPrincipal,
+    tournamentId: string,
+    dto: TournamentSeedingDto,
+  ) {
+    const tournament = await this.repo.findTournamentById(tournamentId);
+    if (!tournament) {
+      throw new NotFoundException("Tournament not found");
+    }
+
+    if (!this.canManageTournament(principal, tournament)) {
+      throw new BadRequestException("Only organizer or admin can set seeding");
+    }
+
+    const status = this.normalizeTournamentStatus(tournament.status);
+    if (status !== "registration") {
+      throw new BadRequestException(
+        "Seeding is only allowed before tournament starts",
+      );
+    }
+
+    const normalizedId = ObjectId.isValid(tournamentId)
+      ? new ObjectId(tournamentId)
+      : tournamentId;
+    const participantsRaw =
+      await this.repo.findTournamentParticipants(normalizedId);
+
+    const activeParticipants = participantsRaw
+      .filter((participant: any) => participant.status === "active")
+      .map((participant: any, idx: number) => ({
+        userId: String(participant.userId),
+        name:
+          typeof participant.username === "string" &&
+          participant.username.length > 0
+            ? participant.username
+            : `Player ${idx + 1}`,
+        seed: Number(participant.seed || idx + 1),
+      }));
+
+    if (activeParticipants.length < 2) {
+      throw new BadRequestException(
+        "Need at least 2 active participants to seed",
+      );
+    }
+
+    const activeUserIdSet = new Set(
+      activeParticipants.map((participant) => participant.userId),
+    );
+    const pairUserIds = dto.pairs.flatMap((pair) =>
+      [pair.player1UserId, pair.player2UserId]
+        .map((value) => String(value || "").trim())
+        .filter((value) => value.length > 0),
+    );
+
+    const seen = new Set<string>();
+    for (const userId of pairUserIds) {
+      if (!activeUserIdSet.has(userId)) {
+        throw new BadRequestException(
+          `User ${userId} is not an active participant`,
+        );
+      }
+      if (seen.has(userId)) {
+        throw new BadRequestException(
+          `User ${userId} appears multiple times in seeding`,
+        );
+      }
+      seen.add(userId);
+    }
+
+    const rounds = this.createTournamentRoundsFromManualPairs(
+      activeParticipants,
+      dto.pairs,
+    );
+    this.refreshBracketRoundStatuses(rounds);
+    this.propagateBracketAutoAdvancement(rounds);
+
+    const updated = await this.repo.updateTournamentById(tournamentId, {
+      rounds,
+      currentRound: 1,
+      updatedAt: new Date(),
+    });
+
+    this.rankedGateway.emitTournamentRoundUpdate({
+      tournamentId,
+      roundIndex: 0,
+      status: this.normalizeTournamentStatus(updated?.status),
+      rounds,
+    });
+
+    return {
+      seeded: true,
+      tournamentId,
+      rounds,
+    };
+  }
+
+  async openTournamentRound(
+    principal: TournamentPrincipal,
+    tournamentId: string,
+    dto: TournamentOpenRoundDto,
+  ) {
+    const tournament = await this.repo.findTournamentById(tournamentId);
+    if (!tournament) {
+      throw new NotFoundException("Tournament not found");
+    }
+
+    if (!this.canManageTournament(principal, tournament)) {
+      throw new BadRequestException("Only organizer or admin can open round");
+    }
+
+    const rounds = this.cloneTournamentRounds(tournament.rounds);
+    if (rounds.length === 0) {
+      throw new BadRequestException("Tournament bracket is not initialized");
+    }
+
+    const targetRoundIndex = this.resolveTargetRoundIndex(
+      rounds,
+      dto.roundIndex,
+    );
+    if (targetRoundIndex > 0) {
+      const previousRound = rounds[targetRoundIndex - 1] as any;
+      const previousMatches = Array.isArray(previousRound?.matches)
+        ? previousRound.matches
+        : [];
+      const allPreviousDone = previousMatches.every(
+        (match: any) =>
+          this.normalizeMatchStatus(match?.status) === "completed",
+      );
+      if (!allPreviousDone) {
+        throw new BadRequestException("Previous round is not completed yet");
+      }
+    }
+
+    await this.attachTournamentGamesForRound(
+      tournamentId,
+      rounds,
+      targetRoundIndex,
+      {
+        activateImmediately: false,
+        checkInMinutes: dto.checkInMinutes,
+      },
+    );
+
+    const normalizedId = ObjectId.isValid(tournamentId)
+      ? new ObjectId(tournamentId)
+      : tournamentId;
+    const participantsRaw =
+      await this.repo.findTournamentParticipants(normalizedId);
+    const activeParticipants = participantsRaw
+      .filter((participant: any) => participant.status === "active")
+      .map((participant: any, idx: number) => ({
+        userId: String(participant.userId),
+        name:
+          typeof participant.username === "string" &&
+          participant.username.length > 0
+            ? participant.username
+            : `Player ${idx + 1}`,
+        rating: Number(participant.rating || 1200),
+        seed: Number(participant.seed || idx + 1),
+      }));
+
+    const standings = this.buildTournamentStandings(activeParticipants, rounds);
+    const updated = await this.repo.updateTournamentById(tournamentId, {
+      rounds,
+      standings,
+      currentRound: targetRoundIndex + 1,
+      status: "ongoing",
+      updatedAt: new Date(),
+    });
+
+    this.rankedGateway.emitTournamentRoundUpdate({
+      tournamentId,
+      roundIndex: targetRoundIndex,
+      status: "ongoing",
+      rounds,
+    });
+
+    return {
+      opened: true,
+      tournamentId,
+      roundIndex: targetRoundIndex + 1,
+      status: updated?.status || "ongoing",
+      rounds,
+    };
+  }
+
+  async checkInTournamentMatch(
+    userId: string,
+    tournamentId: string,
+    matchId: string,
+  ) {
+    const tournament = await this.repo.findTournamentById(tournamentId);
+    if (!tournament) {
+      throw new NotFoundException("Tournament not found");
+    }
+
+    const rounds = this.cloneTournamentRounds(tournament.rounds);
+    const found = this.locateTournamentMatch(rounds, matchId);
+    if (!found) {
+      throw new NotFoundException("Match not found in tournament bracket");
+    }
+
+    const match = found.match;
+    if (this.normalizeMatchStatus(match?.status) === "completed") {
+      throw new BadRequestException("Match already completed");
+    }
+
+    const p1Id = String(match?.player1?.userId || "");
+    const p2Id = String(match?.player2?.userId || "");
+    if (userId !== p1Id && userId !== p2Id) {
+      throw new BadRequestException("Only match participants can check in");
+    }
+
+    const gameId = String(match?.gameId || "");
+    if (!gameId) {
+      throw new BadRequestException("Match room is not opened yet");
+    }
+
+    const now = new Date();
+    const checkIn = {
+      player1Ready: Boolean(match?.checkIn?.player1Ready),
+      player2Ready: Boolean(match?.checkIn?.player2Ready),
+      openedAt: match?.checkIn?.openedAt || now,
+      deadlineAt:
+        match?.checkIn?.deadlineAt || new Date(now.getTime() + 3 * 60 * 1000),
+    } as Record<string, unknown>;
+
+    if (userId === p1Id) {
+      checkIn.player1Ready = true;
+      checkIn.player1ReadyAt = now;
+    } else {
+      checkIn.player2Ready = true;
+      checkIn.player2ReadyAt = now;
+    }
+
+    const bothReady =
+      Boolean(checkIn.player1Ready) && Boolean(checkIn.player2Ready);
+    match.checkIn = checkIn;
+
+    if (bothReady) {
+      match.status = "ongoing";
+      match.startedAt = now;
+      await this.repo.updateGameById(gameId, {
+        state: "InGame",
+        status: "active",
+        checkInClosedAt: now,
+        noShowDeadlineAt: null,
+        updatedAt: now,
+      });
+
+      this.rankedGateway.emitTournamentMatchReady({
+        tournamentId,
+        matchId,
+        gameId,
+        roundIndex: found.roundIndex,
+      });
+    }
+
+    await this.repo.updateTournamentById(tournamentId, {
+      rounds,
+      updatedAt: now,
+    });
+
+    this.rankedGateway.emitTournamentRoundUpdate({
+      tournamentId,
+      roundIndex: found.roundIndex,
+      status: this.normalizeTournamentStatus(tournament.status),
+      rounds,
+    });
+
+    return {
+      checkedIn: true,
+      tournamentId,
+      matchId,
+      bothReady,
+      checkIn,
+      gameId,
     };
   }
 
@@ -1303,6 +2016,74 @@ export class SocialBotService {
     };
   }
 
+  async resignTournamentMatch(
+    userId: string,
+    tournamentId: string,
+    matchIdOrGameId: string,
+  ) {
+    const tournament = await this.repo.findTournamentById(tournamentId);
+    if (!tournament) {
+      throw new NotFoundException("Tournament not found");
+    }
+
+    const rounds = this.cloneTournamentRounds(tournament.rounds);
+    const found =
+      this.locateTournamentMatch(rounds, matchIdOrGameId) ||
+      this.locateTournamentMatchByGameId(rounds, matchIdOrGameId);
+    if (!found) {
+      throw new NotFoundException("Match not found in tournament bracket");
+    }
+
+    const match = found.match as any;
+    if (this.normalizeMatchStatus(match?.status) === "completed") {
+      return {
+        alreadyCompleted: true,
+        tournamentId,
+        matchId: String(match?.id || matchIdOrGameId),
+        result: String(match?.result || ""),
+        winner: String(match?.winner || ""),
+      };
+    }
+
+    const player1Id = String(match?.player1?.userId || "");
+    const player2Id = String(match?.player2?.userId || "");
+    if (userId !== player1Id && userId !== player2Id) {
+      throw new BadRequestException("Only match participants can resign");
+    }
+
+    const winnerSlot =
+      userId === player1Id
+        ? TournamentWinnerSlot.PLAYER2
+        : TournamentWinnerSlot.PLAYER1;
+
+    const result = await this.updateTournamentMatchResult(
+      { userId, roles: ["admin"] },
+      tournamentId,
+      String(match?.id || matchIdOrGameId),
+      { winnerSlot },
+    );
+
+    const gameId = String(match?.gameId || "");
+    if (ObjectId.isValid(gameId)) {
+      await this.repo.updateGameIfNotSaved(gameId, {
+        state: "Saved",
+        status: "finished",
+        result:
+          winnerSlot === TournamentWinnerSlot.PLAYER1
+            ? "white_win"
+            : "black_win",
+        endReason: "resignation",
+        finishedAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+
+    return {
+      ...result,
+      resignedByUserId: userId,
+    };
+  }
+
   async updateTournamentMatchResult(
     principal: TournamentPrincipal,
     tournamentId: string,
@@ -1338,6 +2119,10 @@ export class SocialBotService {
       winnerSlot === TournamentWinnerSlot.PLAYER1
         ? match.player1
         : match.player2;
+    const loserPlayer: any =
+      winnerSlot === TournamentWinnerSlot.PLAYER1
+        ? match.player2
+        : match.player1;
 
     if (!winnerPlayer || String(winnerPlayer.name || "") === "TBD") {
       throw new BadRequestException("Winner player is not set");
@@ -1368,6 +2153,21 @@ export class SocialBotService {
     );
 
     this.refreshBracketRoundStatuses(rounds);
+
+    const gameId = String(match?.gameId || "");
+    if (ObjectId.isValid(gameId)) {
+      await this.repo.updateGameIfNotSaved(gameId, {
+        state: "Saved",
+        status: "finished",
+        result:
+          winnerSlot === TournamentWinnerSlot.PLAYER1
+            ? "white_win"
+            : "black_win",
+        endReason: "tournament_result_recorded",
+        finishedAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
 
     await this.attachTournamentGamesForRounds(
       tournamentId,
@@ -1409,6 +2209,7 @@ export class SocialBotService {
         seed: Number(participant.seed || idx + 1),
       }));
     const standings = this.buildTournamentStandings(activeParticipants, rounds);
+    const eliminatedUserId = String(loserPlayer?.userId || "") || null;
 
     const finalRound = rounds[rounds.length - 1];
     const finalMatch = Array.isArray(finalRound?.matches)
@@ -1462,11 +2263,29 @@ export class SocialBotService {
       }
     }
 
+    if (eliminatedUserId) {
+      const loserParticipant = participantsRaw.find(
+        (participant: any) =>
+          String(participant?.userId || "") === eliminatedUserId,
+      );
+      if (
+        loserParticipant &&
+        String(loserParticipant?.status || "") === "active"
+      ) {
+        await this.repo.updateTournamentParticipantStatus(
+          normalizedId,
+          eliminatedUserId,
+          "eliminated",
+        );
+      }
+    }
+
     return {
       tournamentId,
       matchId,
       result: match.result,
       winner: match.winner,
+      eliminatedUserId,
       status:
         updated?.status || (tournamentCompleted ? "completed" : "ongoing"),
       rounds: Array.isArray(updated?.rounds) ? updated.rounds : rounds,
