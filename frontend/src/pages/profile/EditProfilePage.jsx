@@ -59,14 +59,14 @@ const EditProfilePage = () => {
     mode: 'onTouched',
   })
 
-  const onSaveProfile = async (data) => {
+  const onSaveProfile = async (_data) => {
     // TODO: gọi authService.updateProfile(data)
     await new Promise((r) => setTimeout(r, 800))
     showNotification({ type: 'success', title: 'Đã lưu', message: 'Hồ sơ cập nhật thành công.' })
     navigate('/profile')
   }
 
-  const onChangePassword = async (data) => {
+  const onChangePassword = async (_data) => {
     // TODO: gọi authService.changePassword(data)
     await new Promise((r) => setTimeout(r, 800))
     showNotification({

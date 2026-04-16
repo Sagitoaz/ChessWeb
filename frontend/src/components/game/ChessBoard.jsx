@@ -112,7 +112,7 @@ const ChessBoard = ({
       setMoveFrom('')
       setOptionSquares({})
     },
-    [moveFrom, disabled, getMoveOptions, onMove, playSound, safeMove]
+    [moveFrom, disabled, gameState, getMoveOptions, onMove, playSound, safeMove]
   )
 
   const onPieceDrop = useCallback(
@@ -134,7 +134,7 @@ const ChessBoard = ({
       setOptionSquares({})
       return true
     },
-    [disabled, onMove, playSound, safeMove]
+    [disabled, gameState, onMove, playSound, safeMove]
   )
 
   const onSquareRightClick = useCallback((square) => {

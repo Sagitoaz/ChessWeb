@@ -125,6 +125,7 @@ export default function BotGamePage() {
 
   const playerColor = gameData?.playerColor ?? 'White'
   const playerColorCode = playerColor === 'White' ? 'w' : 'b'
+  const playerSideLabel = playerColor === 'White' ? 'Trắng' : 'Đen'
 
   const difficultyRaw = String(
     gameData?.config?.difficultyCode || gameData?.difficulty || gameData?.config?.difficulty || ''
@@ -364,7 +365,7 @@ export default function BotGamePage() {
 
     const pgn = chess.pgn()
     if (!pgn || pgn.trim().length < 8) {
-      setTacticalHint('Cần thêm vài nước đi nữa để đưa gợi ý ngắn gọn.')
+      setTacticalHint(`Bạn đang cầm quân ${playerSideLabel}. Cần thêm vài nước đi nữa để đưa gợi ý ngắn gọn.`)
       setHintError('')
       setIsHintLoading(false)
       return
@@ -374,12 +375,15 @@ export default function BotGamePage() {
     setHintError('')
 
     try {
-      const data = await botGameAPI.getTacticalHint(pgn, 'quick')
+      const data = await botGameAPI.getTacticalHint(pgn, 'quick', {
+        playerSide: playerSideLabel,
+        playerColor,
+      })
       const hint = String(data?.hint || '').trim()
       if (!hint) {
         throw new Error('empty hint')
       }
-      setTacticalHint(hint)
+      setTacticalHint(`Bạn đang cầm quân ${playerSideLabel}. ${hint}`)
     } catch {
       setHintError('Gia sư đang bận, thử lại sau.')
     } finally {

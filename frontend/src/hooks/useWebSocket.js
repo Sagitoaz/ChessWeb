@@ -88,6 +88,8 @@ export function useWebSocket(autoConnect = true) {
     socketService.on('disconnect', handleDisconnect)
     socketService.on('connect_error', handleError)
 
+    const trackedListeners = listenersRef.current
+
     // Cleanup on unmount
     return () => {
       socketService.off('connect', handleConnect)
@@ -95,12 +97,12 @@ export function useWebSocket(autoConnect = true) {
       socketService.off('connect_error', handleError)
 
       // Clean up all tracked listeners
-      listenersRef.current.forEach((callbacks, event) => {
+      trackedListeners.forEach((callbacks, event) => {
         callbacks.forEach((callback) => {
           socketService.off(event, callback)
         })
       })
-      listenersRef.current.clear()
+      trackedListeners.clear()
 
       if (autoConnect) {
         disconnect()

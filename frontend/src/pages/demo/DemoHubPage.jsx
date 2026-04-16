@@ -99,10 +99,7 @@ const DemoHubPage = () => {
           <div key={section.title}>
             {/* Section header */}
             <div className="mb-4">
-              <h2
-                className="text-xl font-bold mb-1"
-                style={{ color: section.color }}
-              >
+              <h2 className="text-xl font-bold mb-1" style={{ color: section.color }}>
                 {section.title}
               </h2>
               <p className="text-sm text-gray-500">{section.description}</p>
@@ -124,17 +121,12 @@ const DemoHubPage = () => {
                         backgroundColor: `${section.color}20`,
                       }}
                     >
-                      <Icon
-                        className="w-5 h-5"
-                        style={{ color: section.color }}
-                      />
+                      <Icon className="w-5 h-5" style={{ color: section.color }} />
                     </div>
                     <h3 className="font-semibold text-white text-sm mb-1 group-hover:text-[#81b64c] transition-colors">
                       {item.label}
                     </h3>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      {item.desc}
-                    </p>
+                    <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
                   </Link>
                 )
               })}
@@ -145,8 +137,8 @@ const DemoHubPage = () => {
         {/* Quick tip */}
         <div className="bg-[#262421] border border-gray-700 rounded-xl p-4 text-center">
           <p className="text-xs text-gray-500">
-            💡 Demo pages use mock data and don't require login. All WebSocket
-            events are simulated locally.
+            💡 Demo pages use mock data and do not require login. All WebSocket events are simulated
+            locally.
           </p>
         </div>
       </div>

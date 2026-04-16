@@ -137,7 +137,18 @@ Input.displayName = 'Input'
 
 Input.propTypes = {
   label: PropTypes.string,
-  type: PropTypes.oneOf(['text', 'email', 'password', 'number', 'tel', 'url', 'search']),
+  type: PropTypes.oneOf([
+    'text',
+    'email',
+    'password',
+    'number',
+    'tel',
+    'url',
+    'search',
+    'date',
+    'time',
+    'datetime-local',
+  ]),
   error: PropTypes.string,
   helperText: PropTypes.string,
   placeholder: PropTypes.string,

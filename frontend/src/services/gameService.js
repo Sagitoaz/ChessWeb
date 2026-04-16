@@ -701,8 +701,12 @@ export const botGameAPI = {
     return response?.data ?? response
   },
 
-  getTacticalHint: async (pgn, detailLevel = 'detailed') => {
-    const response = await gameAPI.post('/bot/tactical-hint', { pgn, detailLevel })
+  getTacticalHint: async (pgn, detailLevel = 'detailed', context = null) => {
+    const response = await gameAPI.post('/bot/tactical-hint', {
+      pgn,
+      detailLevel,
+      ...(context && typeof context === 'object' ? context : {}),
+    })
     return response?.data ?? response
   },
 

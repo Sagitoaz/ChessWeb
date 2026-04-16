@@ -24,10 +24,13 @@ const CommonComponentsDemo = () => {
 
   const handleShowNotification = (type) => {
     showNotification(
-      type === 'success' ? 'Success message!' : 
-      type === 'error' ? 'Error message!' : 
-      type === 'warning' ? 'Warning message!' : 
-      'Info message!',
+      type === 'success'
+        ? 'Success message!'
+        : type === 'error'
+          ? 'Error message!'
+          : type === 'warning'
+            ? 'Warning message!'
+            : 'Info message!',
       type
     )
   }
@@ -93,16 +96,8 @@ const CommonComponentsDemo = () => {
                 placeholder="Enter email"
                 helperText="We'll never share your email"
               />
-              <Input
-                label="Password"
-                type="password"
-                placeholder="Enter password"
-              />
-              <Input
-                label="Disabled"
-                placeholder="Disabled input"
-                disabled
-              />
+              <Input label="Password" type="password" placeholder="Enter password" />
+              <Input label="Disabled" placeholder="Disabled input" disabled />
               <Input
                 label="With Error"
                 placeholder="Invalid input"
@@ -135,8 +130,12 @@ const CommonComponentsDemo = () => {
               </p>
             </CardBody>
             <CardFooter>
-              <Button variant="primary" size="sm">Action</Button>
-              <Button variant="ghost" size="sm">Cancel</Button>
+              <Button variant="primary" size="sm">
+                Action
+              </Button>
+              <Button variant="ghost" size="sm">
+                Cancel
+              </Button>
             </CardFooter>
           </Card>
 
@@ -165,7 +164,7 @@ const CommonComponentsDemo = () => {
                 <Avatar src="https://i.pravatar.cc/150?img=3" alt="User" size="lg" />
                 <Avatar src="https://i.pravatar.cc/150?img=4" alt="User" size="xl" />
               </div>
-              
+
               <div className="flex items-center gap-4">
                 <Avatar fallback="AB" size="md" />
                 <Avatar fallback="CD" size="md" status="online" />
@@ -195,7 +194,7 @@ const CommonComponentsDemo = () => {
                 <Spinner size="md" />
                 <Spinner size="lg" />
               </div>
-              
+
               <div className="flex items-center gap-4">
                 <Loader size="sm" text="Loading..." />
                 <Loader size="md" text="Processing..." />
@@ -217,14 +216,12 @@ const CommonComponentsDemo = () => {
           </CardHeader>
           <CardBody>
             <div className="flex flex-wrap gap-4">
-              <Button onClick={() => setIsModalOpen(true)}>
-                Open Modal
-              </Button>
+              <Button onClick={() => setIsModalOpen(true)}>Open Modal</Button>
 
               <Dropdown
                 trigger={<Button>Dropdown Menu</Button>}
                 items={dropdownItems}
-                onSelect={(item) => console.log('Selected:', item)}
+                onSelect={() => {}}
               />
             </div>
           </CardBody>
@@ -254,19 +251,12 @@ const CommonComponentsDemo = () => {
         </Card>
 
         {/* Modal Component */}
-        <Modal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          title="Demo Modal"
-        >
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Demo Modal">
           <div className="space-y-4">
             <p className="text-gray-600 dark:text-gray-300">
               This is a modal dialog. You can put any content here.
             </p>
-            <Input
-              label="Example Input"
-              placeholder="Type something..."
-            />
+            <Input label="Example Input" placeholder="Type something..." />
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)}>

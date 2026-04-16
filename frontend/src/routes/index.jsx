@@ -15,12 +15,12 @@ const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@pages/auth/ForgotPasswordPage'))
 
 // Home
-const DashboardPage = lazy(() => import('@pages/home/DashboardPage'))
+import DashboardPage from '@pages/home/DashboardPage'
 
 // Profile
-const ProfilePage = lazy(() => import('@pages/profile/ProfilePage'))
-const EditProfilePage = lazy(() => import('@pages/profile/EditProfilePage'))
-const LeaderboardPage = lazy(() => import('@pages/profile/LeaderboardPage'))
+import ProfilePage from '@pages/profile/ProfilePage'
+import EditProfilePage from '@pages/profile/EditProfilePage'
+import LeaderboardPage from '@pages/profile/LeaderboardPage'
 
 // Ranked — những trang này quản lý layout BÊN TRONG nên không cần AppLayout bọc ngoài
 const RankedLobbyPage = lazy(() => import('@pages/ranked/RankedLobbyPage'))

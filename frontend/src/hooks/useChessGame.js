@@ -4,7 +4,7 @@ import { ChessGame } from '../utils/chessLogic'
 /**
  * Custom hook for managing chess game state and logic
  * Provides a clean interface for chess operations in React components
- * 
+ *
  * @param {Object} options - Configuration options
  * @param {string} options.initialFen - Initial FEN position
  * @param {Function} options.onMove - Callback when a move is made
@@ -63,7 +63,7 @@ export function useChessGame(options = {}) {
     (move) => {
       try {
         const result = gameRef.current.move(move)
-        
+
         if (result) {
           // Update all state
           setFen(gameRef.current.fen())
@@ -72,7 +72,7 @@ export function useChessGame(options = {}) {
           setLastMove({ from: result.from, to: result.to })
           setSelectedSquare(null)
           setValidMoves([])
-          
+
           // Update game status
           updateGameStatus()
 
@@ -121,21 +121,24 @@ export function useChessGame(options = {}) {
   }, [updateGameStatus])
 
   // Reset game
-  const resetGame = useCallback((newFen) => {
-    if (newFen) {
-      gameRef.current.load(newFen)
-    } else {
-      gameRef.current = new ChessGame()
-    }
-    
-    setFen(gameRef.current.fen())
-    setHistory([])
-    setCurrentTurn(gameRef.current.turn())
-    setSelectedSquare(null)
-    setValidMoves([])
-    setLastMove(null)
-    updateGameStatus()
-  }, [updateGameStatus])
+  const resetGame = useCallback(
+    (newFen) => {
+      if (newFen) {
+        gameRef.current.load(newFen)
+      } else {
+        gameRef.current = new ChessGame()
+      }
+
+      setFen(gameRef.current.fen())
+      setHistory([])
+      setCurrentTurn(gameRef.current.turn())
+      setSelectedSquare(null)
+      setValidMoves([])
+      setLastMove(null)
+      updateGameStatus()
+    },
+    [updateGameStatus]
+  )
 
   // Load position from FEN
   const loadFen = useCallback(
@@ -185,11 +188,11 @@ export function useChessGame(options = {}) {
   // Select a square
   const selectSquare = useCallback((square) => {
     setSelectedSquare(square)
-    
+
     if (square) {
       // Get valid moves for this square
       const moves = gameRef.current.getMovesForSquare(square)
-      setValidMoves(moves.map(m => m.to))
+      setValidMoves(moves.map((m) => m.to))
     } else {
       setValidMoves([])
     }
@@ -218,10 +221,9 @@ export function useChessGame(options = {}) {
       if (validMoves.includes(square)) {
         // Check if it's a pawn promotion
         const piece = gameRef.current.get(selectedSquare)
-        const isPromotion = 
-          piece?.type === 'p' && 
-          ((piece.color === 'w' && square[1] === '8') || 
-           (piece.color === 'b' && square[1] === '1'))
+        const isPromotion =
+          piece?.type === 'p' &&
+          ((piece.color === 'w' && square[1] === '8') || (piece.color === 'b' && square[1] === '1'))
 
         if (isPromotion) {
           // For now, auto-promote to queen. In a real app, show a dialog
@@ -320,7 +322,7 @@ export function useChessGame(options = {}) {
 /**
  * Hook for managing chess game with online opponent
  * Integrates with WebSocket for real-time moves
- * 
+ *
  * @param {Object} options - Configuration options
  * @param {string} options.matchId - Match ID
  * @param {string} options.playerColor - Player's color ('w' or 'b')
@@ -345,6 +347,10 @@ export function useOnlineChessGame(options = {}) {
     onGameEnd: options.onGameEnd,
   })
 
+  const makeLocalMove = chessGame.makeMove
+  const currentTurn = chessGame.currentTurn
+  const baseOnSquareClick = chessGame.onSquareClick
+
   // Listen for opponent moves
   useEffect(() => {
     if (!gameSocket || !matchId) return
@@ -353,7 +359,7 @@ export function useOnlineChessGame(options = {}) {
       if (data.matchId === matchId) {
         setOpponentMove(data.move)
         // Make the move on our local board
-        chessGame.makeMove(data.move)
+        makeLocalMove(data.move)
       }
     }
 
@@ -365,17 +371,17 @@ export function useOnlineChessGame(options = {}) {
         gameSocket.off('game:moveUpdate', handleMoveUpdate)
       }
     }
-  }, [gameSocket, matchId])
+  }, [gameSocket, matchId, makeLocalMove])
 
   // Override onSquareClick to only allow moves on player's turn
   const onSquareClick = useCallback(
     (square) => {
       // Only allow moves if it's player's turn
-      if (chessGame.currentTurn === playerColor) {
-        chessGame.onSquareClick(square)
+      if (currentTurn === playerColor) {
+        baseOnSquareClick(square)
       }
     },
-    [chessGame.currentTurn, chessGame.onSquareClick, playerColor]
+    [baseOnSquareClick, currentTurn, playerColor]
   )
 
   return {

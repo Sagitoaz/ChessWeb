@@ -354,10 +354,14 @@ export default function TournamentDetailPage() {
       await gameService.approveTournamentParticipant(tournamentId, participantUserId)
       await loadTournament()
     } catch (_error) {
+      const message =
+        _error?.response?.data?.message ||
+        _error?.message ||
+        'Không thể duyệt người chơi. Vui lòng thử lại.'
       showNotification({
         type: 'error',
         title: 'Lỗi duyệt người chơi',
-        message: 'Không thể duyệt người chơi. Vui lòng thử lại.',
+        message: String(message),
       })
     }
   }
@@ -368,10 +372,14 @@ export default function TournamentDetailPage() {
       await gameService.rejectTournamentParticipant(tournamentId, participantUserId)
       await loadTournament()
     } catch (_error) {
+      const message =
+        _error?.response?.data?.message ||
+        _error?.message ||
+        'Không thể từ chối người chơi. Vui lòng thử lại.'
       showNotification({
         type: 'error',
         title: 'Lỗi từ chối người chơi',
-        message: 'Không thể từ chối người chơi. Vui lòng thử lại.',
+        message: String(message),
       })
     }
   }

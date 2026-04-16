@@ -3,17 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
-import {
-  ArrowLeft,
-  Trophy,
-  Users,
-  Clock,
-  Calendar,
-  ChevronRight,
-  ChevronLeft,
-  Check,
-  Info,
-} from 'lucide-react'
+import { ArrowLeft, Trophy, Calendar, ChevronRight, ChevronLeft, Check, Info } from 'lucide-react'
 
 // Tournament format options
 const FORMATS = [

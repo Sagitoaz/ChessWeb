@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * @fileoverview Validation script for Game Services
  * Run manual checks and validation for all created services and hooks
@@ -53,11 +54,11 @@ function addResult(passed, message, errorDetails = null) {
  */
 async function validateFile(filePath, checks = []) {
   log.section(`Validating: ${filePath}`)
-  
+
   try {
     const module = await import(filePath)
     addResult(true, `File exists and can be imported`)
-    
+
     // Run custom checks
     for (const check of checks) {
       try {
@@ -177,31 +178,22 @@ async function validateUseChessGame() {
  */
 async function validateAPICalls() {
   log.section('Testing API Calls (Mock Mode)')
-  
+
   try {
     const gameService = (await import('../services/gameService.js')).default
-    
+
     // Test ranked queue
     const queueResult = await gameService.joinRankedQueue()
-    addResult(
-      queueResult.success === true,
-      'joinRankedQueue returns success'
-    )
-    
+    addResult(queueResult.success === true, 'joinRankedQueue returns success')
+
     // Test match retrieval
     const match = await gameService.getMatch('test-123')
-    addResult(
-      match.id === 'test-123',
-      'getMatch returns correct match'
-    )
-    
+    addResult(match.id === 'test-123', 'getMatch returns correct match')
+
     // Test ranked stats
     const stats = await gameService.getRankedStats()
-    addResult(
-      stats.currentRating !== undefined,
-      'getRankedStats returns rating'
-    )
-    
+    addResult(stats.currentRating !== undefined, 'getRankedStats returns rating')
+
     // Test room creation
     const room = await gameService.createRoom({
       isPrivate: false,
@@ -211,13 +203,10 @@ async function validateAPICalls() {
       room.code !== undefined && room.code.startsWith('ROOM'),
       'createRoom returns room code'
     )
-    
+
     // Test tournament list
     const tournaments = await gameService.getTournaments()
-    addResult(
-      Array.isArray(tournaments.tournaments),
-      'getTournaments returns array'
-    )
+    addResult(Array.isArray(tournaments.tournaments), 'getTournaments returns array')
   } catch (error) {
     addResult(false, 'API call testing failed', error.message)
   }
@@ -228,20 +217,17 @@ async function validateAPICalls() {
  */
 async function validateCommonIssues() {
   log.section('Checking for Common Issues')
-  
-  // Read source files and check for common mistakes
-  const issues = []
-  
+
   // This would require fs module in Node.js
   // For browser environment, we skip this
   log.warning('Source code analysis skipped (requires Node.js environment)')
-  
+
   // Check for console.logs in production
   log.info('Remember to remove console.logs before production')
-  
+
   // Check for proper error handling
   log.info('Verify error handling in all async functions')
-  
+
   // Check for memory leaks
   log.info('Verify cleanup in useEffect hooks')
 }
@@ -253,7 +239,7 @@ async function runValidation() {
   console.log('\n' + '='.repeat(60))
   console.log(`${colors.magenta}Game Services Validation${colors.reset}`)
   console.log('='.repeat(60))
-  
+
   try {
     await validateGameService()
     await validateUseWebSocket()
@@ -263,7 +249,7 @@ async function runValidation() {
   } catch (error) {
     log.error(`Validation failed: ${error.message}`)
   }
-  
+
   // Print summary
   console.log('\n' + '='.repeat(60))
   console.log(`${colors.cyan}Validation Summary${colors.reset}`)
@@ -271,7 +257,7 @@ async function runValidation() {
   console.log(`${colors.green}Passed:${colors.reset} ${results.passed}`)
   console.log(`${colors.red}Failed:${colors.reset} ${results.failed}`)
   console.log(`${colors.yellow}Warnings:${colors.reset} ${results.warnings}`)
-  
+
   if (results.errors.length > 0) {
     console.log(`\n${colors.red}Errors:${colors.reset}`)
     results.errors.forEach((err, i) => {
@@ -281,14 +267,14 @@ async function runValidation() {
       }
     })
   }
-  
+
   console.log('\n' + '='.repeat(60) + '\n')
-  
+
   const exitCode = results.failed > 0 ? 1 : 0
   if (typeof process !== 'undefined') {
     process.exit(exitCode)
   }
-  
+
   return exitCode === 0
 }
 

@@ -3,14 +3,14 @@
  * Testing game API calls and mock responses
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import gameService from '../gameService'
 
 describe('gameService', () => {
   describe('Ranked Match APIs', () => {
     it('should join ranked queue', async () => {
       const result = await gameService.joinRankedQueue()
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
       expect(result).toHaveProperty('queuePosition')
@@ -19,7 +19,7 @@ describe('gameService', () => {
 
     it('should leave ranked queue', async () => {
       const result = await gameService.leaveRankedQueue()
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
     })
@@ -27,7 +27,7 @@ describe('gameService', () => {
     it('should get match details', async () => {
       const matchId = 'test-match-123'
       const match = await gameService.getMatch(matchId)
-      
+
       expect(match).toBeDefined()
       expect(match.id).toBe(matchId)
       expect(match.type).toBe('ranked')
@@ -39,7 +39,7 @@ describe('gameService', () => {
 
     it('should get ranked history with pagination', async () => {
       const result = await gameService.getRankedHistory(1, 10)
-      
+
       expect(result).toBeDefined()
       expect(result.matches).toBeInstanceOf(Array)
       expect(result.pagination).toBeDefined()
@@ -49,7 +49,7 @@ describe('gameService', () => {
 
     it('should get ranked stats', async () => {
       const stats = await gameService.getRankedStats()
-      
+
       expect(stats).toBeDefined()
       expect(stats).toHaveProperty('currentRating')
       expect(stats).toHaveProperty('wins')
@@ -61,9 +61,9 @@ describe('gameService', () => {
     it('should make a move', async () => {
       const matchId = 'test-match-123'
       const move = { from: 'e2', to: 'e4' }
-      
+
       const result = await gameService.makeMove(matchId, move)
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
       expect(result.move).toEqual(move)
@@ -73,7 +73,7 @@ describe('gameService', () => {
     it('should resign game', async () => {
       const matchId = 'test-match-123'
       const result = await gameService.resignGame(matchId)
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
       expect(result.result).toBe('loss')
@@ -82,18 +82,18 @@ describe('gameService', () => {
     it('should offer draw', async () => {
       const matchId = 'test-match-123'
       const result = await gameService.offerDraw(matchId)
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
     })
 
     it('should respond to draw offer', async () => {
       const matchId = 'test-match-123'
-      
+
       const acceptResult = await gameService.respondToDrawOffer(matchId, true)
       expect(acceptResult.success).toBe(true)
       expect(acceptResult.result).toBe('draw')
-      
+
       const declineResult = await gameService.respondToDrawOffer(matchId, false)
       expect(declineResult.success).toBe(true)
       expect(declineResult.result).toBeNull()
@@ -106,11 +106,11 @@ describe('gameService', () => {
         isPrivate: false,
         allowSpectators: true,
         timeControl: { initial: 600, increment: 5 },
-        rated: false
+        rated: false,
       }
-      
+
       const room = await gameService.createRoom(settings)
-      
+
       expect(room).toBeDefined()
       expect(room.code).toBeDefined()
       expect(room.code).toMatch(/^ROOM/)
@@ -122,7 +122,7 @@ describe('gameService', () => {
     it('should join a room', async () => {
       const roomCode = 'ROOMTEST123'
       const room = await gameService.joinRoom(roomCode)
-      
+
       expect(room).toBeDefined()
       expect(room.code).toBe(roomCode)
       expect(room.players).toBeInstanceOf(Array)
@@ -131,7 +131,7 @@ describe('gameService', () => {
     it('should leave a room', async () => {
       const roomCode = 'ROOMTEST123'
       const result = await gameService.leaveRoom(roomCode)
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
     })
@@ -139,7 +139,7 @@ describe('gameService', () => {
     it('should get room details', async () => {
       const roomCode = 'ROOMTEST123'
       const room = await gameService.getRoom(roomCode)
-      
+
       expect(room).toBeDefined()
       expect(room.code).toBe(roomCode)
       expect(room.host).toBeDefined()
@@ -149,7 +149,7 @@ describe('gameService', () => {
     it('should start room game', async () => {
       const roomCode = 'ROOMTEST123'
       const result = await gameService.startRoomGame(roomCode)
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
       expect(result.matchId).toBeDefined()
@@ -159,7 +159,7 @@ describe('gameService', () => {
   describe('Tournament APIs', () => {
     it('should get tournaments list', async () => {
       const result = await gameService.getTournaments()
-      
+
       expect(result).toBeDefined()
       expect(result.tournaments).toBeInstanceOf(Array)
       expect(result.tournaments.length).toBeGreaterThan(0)
@@ -168,9 +168,9 @@ describe('gameService', () => {
     it('should get tournaments with filters', async () => {
       const result = await gameService.getTournaments({
         status: 'upcoming',
-        type: 'swiss'
+        type: 'swiss',
       })
-      
+
       expect(result).toBeDefined()
       expect(result.tournaments).toBeInstanceOf(Array)
     })
@@ -178,7 +178,7 @@ describe('gameService', () => {
     it('should get tournament details', async () => {
       const tournamentId = 'tournament-123'
       const tournament = await gameService.getTournament(tournamentId)
-      
+
       expect(tournament).toBeDefined()
       expect(tournament.id).toBe(tournamentId)
       expect(tournament.name).toBeDefined()
@@ -189,7 +189,7 @@ describe('gameService', () => {
     it('should join tournament', async () => {
       const tournamentId = 'tournament-123'
       const result = await gameService.joinTournament(tournamentId)
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
       expect(result.tournamentId).toBe(tournamentId)
@@ -198,7 +198,7 @@ describe('gameService', () => {
     it('should withdraw from tournament', async () => {
       const tournamentId = 'tournament-123'
       const result = await gameService.withdrawTournament(tournamentId)
-      
+
       expect(result).toBeDefined()
       expect(result.success).toBe(true)
     })
@@ -209,11 +209,11 @@ describe('gameService', () => {
         type: 'swiss',
         timeControl: { initial: 180, increment: 2 },
         maxPlayers: 16,
-        startTime: new Date('2024-12-31T19:00:00')
+        startTime: new Date('2024-12-31T19:00:00'),
       }
-      
+
       const tournament = await gameService.createTournament(data)
-      
+
       expect(tournament).toBeDefined()
       expect(tournament.id).toBeDefined()
       expect(tournament.name).toBe(data.name)

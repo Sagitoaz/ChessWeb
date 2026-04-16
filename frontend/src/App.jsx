@@ -19,6 +19,18 @@ const queryClient = new QueryClient({
 function App() {
   useEffect(() => {
     useAuthStore.getState().loadUser()
+
+    const handleStorageChange = (event) => {
+      if (event.key === 'token' || event.key === 'user' || event.key === 'refreshToken') {
+        useAuthStore.getState().loadUser()
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+    }
   }, [])
 
   return (

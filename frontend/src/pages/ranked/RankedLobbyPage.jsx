@@ -227,7 +227,6 @@ const RankedLobbyPage = () => {
   const isDemo = location.pathname.startsWith('/demo')
 
   // ──── Auth/User State ────
-  const { isAuthenticated } = useAuthStore()
   const storeUser = useAuthStore((s) => s.user)
   const user = useMemo(
     () =>
