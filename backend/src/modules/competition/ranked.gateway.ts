@@ -55,7 +55,7 @@ type GameDrawPayload = {
 
 @WebSocketGateway({
   cors: {
-    origin: true,
+    origin: env.corsOrigins,
     credentials: true,
   },
 })

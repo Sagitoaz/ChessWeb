@@ -7,6 +7,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
+    "start:railway": "node dist/main.js",
+    "build:railway": "npm run build",
     "db:check": "ts-node --transpile-only src/scripts/check-db-connection.ts",
     "test:tv2:day1": "ts-node --transpile-only src/modules/profile/tests/day1-profile.service.unit-test.ts",
     "test:tv2:day2": "ts-node --transpile-only src/modules/profile/tests/day2-profile-password.unit-test.ts",

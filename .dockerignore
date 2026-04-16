@@ -1,0 +1,13 @@
+.git
+.gitignore
+.vscode
+node_modules
+**/node_modules
+**/dist
+frontend
+aidlc-docs
+diagram
+docs
+stockfish-gateway
+*.md
+*.log
