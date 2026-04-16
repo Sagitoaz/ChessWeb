@@ -1,0 +1,87 @@
+@startuml RegisterActivity
+skinparam defaultTextAlignment center
+skinparam ActivityBackgroundColor LightYellow
+skinparam ActivityBorderColor Black
+skinparam ActivityDiamondBackgroundColor LightBlue
+skinparam ActivityDiamondBorderColor Blue
+
+title Quy trình đăng ký tài khoản
+
+start
+
+:Người dùng truy cập\ntrang đăng ký;
+
+:Nhập thông tin đăng ký
+- Username
+- Email
+- Password
+- Confirm Password;
+
+:Gửi form đăng ký;
+
+partition "Validation" {
+  :Kiểm tra định dạng\nthông tin đầu vào;
+  
+  if (Định dạng hợp lệ?) then (Không)
+    :Hiển thị lỗi:
+    - Username phải >= 3 ký tự
+    - Email không hợp lệ
+    - Password yếu
+    - Password không khớp;
+    stop
+  else (Có)
+    :Kiểm tra username\ntrong database;
+    
+    if (Username đã tồn tại?) then (Có)
+      :Hiển thị lỗi:\n"Username đã được sử dụng";
+      stop
+    endif
+    
+    :Kiểm tra email\ntrong database;
+    
+    if (Email đã tồn tại?) then (Có)
+      :Hiển thị lỗi:\n"Email đã được đăng ký";
+      stop
+    endif
+  endif
+}
+
+partition "Create Account" {
+  :Mã hóa password\n(bcrypt/hash);
+  
+  :Tạo bản ghi\ntài khoản mới;
+  
+  :Khởi tạo thông tin\nmặc định:
+  - Rating = 500
+  - Avatar mặc định
+  - Stats = 0;
+  
+  if (Lưu vào database\nthành công?) then (Không)
+    #Pink :Lỗi hệ thống:\nKhông thể tạo tài khoản;
+    stop
+  else (Có)
+    :Tạo token xác thực email;
+    
+    fork
+      :Gửi email xác nhận\nđến người dùng;
+    fork again
+      :Tự động đăng nhập\nvà tạo session;
+    end fork
+    
+    #LightGreen :Hiển thị thông báo:\n"Đăng ký thành công!";
+    
+    :Chuyển hướng đến\ntrang chủ/dashboard;
+  endif
+}
+
+stop
+
+note right
+  **Lưu ý:**
+  - Password phải tối thiểu 8 ký tự
+  - Có chứa chữ hoa, chữ thường, số
+  - Email verification có thể bất đồng bộ
+  - Rating khởi tạo: 500 Elo
+end note
+
+@enduml

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chessweb.local/contracts/shared-response.schema.json",
+  "title": "SharedApiResponse",
+  "type": "object",
+  "required": ["success", "data", "error", "meta"],
+  "properties": {
+    "success": {
+      "type": "boolean"
+    },
+    "data": {},
+    "error": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" },
+            "details": {}
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "meta": {
+      "type": "object",
+      "required": ["requestId", "timestamp"],
+      "properties": {
+        "requestId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "page": { "type": "integer", "minimum": 1 },
+            "pageSize": { "type": "integer", "minimum": 1 },
+            "total": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

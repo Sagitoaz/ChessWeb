@@ -1,0 +1,151 @@
+@startuml Sequence_CreateJoinRoom
+!theme plain
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Create Room & Join Room
+
+actor "Chủ phòng\n(Host)" as Host
+actor "Người chơi\n(Player)" as Player
+participant "Frontend\n(UI)" as UI
+participant "RoomController" as RoomCtrl
+participant "RoomService" as RoomSvc
+participant "RoomRepository" as RoomRepo
+database "Database" as DB
+
+' ============ CREATE ROOM ============
+== Tạo phòng (Create Room) ==
+
+Host -> UI : Nhấn "Tạo phòng"
+activate UI
+
+UI -> UI : Hiển thị form cài đặt phòng
+Host -> UI : Nhập cài đặt\n(thời gian, luật chơi)
+UI -> RoomCtrl : POST /api/rooms/create\n{hostId, settings}
+activate RoomCtrl
+
+RoomCtrl -> RoomSvc : createRoom(hostId, settings)
+activate RoomSvc
+
+RoomSvc -> RoomSvc : generateUniqueCode()
+note right: Tạo mã phòng 6 ký tự\nví dụ: "ABC123"
+
+RoomSvc -> RoomRepo : save(room)
+activate RoomRepo
+RoomRepo -> DB : INSERT room
+DB --> RoomRepo : roomId
+RoomRepo --> RoomSvc : Room
+deactivate RoomRepo
+
+RoomSvc --> RoomCtrl : Room{code, status=OPEN}
+deactivate RoomSvc
+
+RoomCtrl --> UI : 201 Created\n{roomCode, inviteLink}
+deactivate RoomCtrl
+
+UI --> Host : Hiển thị mã phòng & link mời
+deactivate UI
+
+Host -> Host : Chia sẻ mã/link cho bạn bè
+
+|||
+
+' ============ JOIN ROOM ============
+== Tham gia phòng (Join Room) ==
+
+Player -> UI : Nhập mã phòng / Click link
+activate UI
+
+UI -> RoomCtrl : POST /api/rooms/join\n{roomCode, playerId}
+activate RoomCtrl
+
+RoomCtrl -> RoomSvc : joinRoom(roomCode, playerId)
+activate RoomSvc
+
+RoomSvc -> RoomRepo : findByCode(roomCode)
+activate RoomRepo
+RoomRepo -> DB : SELECT * FROM rooms WHERE code = ?
+DB --> RoomRepo : Room / null
+RoomRepo --> RoomSvc : Room / null
+deactivate RoomRepo
+
+alt Mã phòng không tồn tại
+    RoomSvc --> RoomCtrl : RoomNotFoundException
+    RoomCtrl --> UI : 404 Not Found\n{error: "Mã phòng không hợp lệ"}
+    UI --> Player : Thông báo lỗi
+    
+else Phòng đã đầy (2 người)
+    RoomSvc --> RoomCtrl : RoomFullException
+    RoomCtrl --> UI : 400 Bad Request\n{error: "Phòng đã đầy"}
+    UI --> Player : Thông báo lỗi
+    
+else Phòng đang trong trận đấu
+    RoomSvc --> RoomCtrl : RoomInMatchException
+    RoomCtrl --> UI : 400 Bad Request\n{error: "Phòng đang trong trận đấu"}
+    UI --> Player : Thông báo lỗi
+    
+else Tham gia thành công
+    RoomSvc -> RoomSvc : addPlayer(playerId)
+    RoomSvc -> RoomRepo : update(room)
+    activate RoomRepo
+    RoomRepo -> DB : UPDATE rooms SET status = 'READY'
+    RoomRepo --> RoomSvc : Room
+    deactivate RoomRepo
+    
+    RoomSvc --> RoomCtrl : Room{status=READY}
+    deactivate RoomSvc
+    
+    RoomCtrl --> UI : 200 OK\n{room, players}
+    deactivate RoomCtrl
+    
+    UI --> Player : Vào phòng chờ
+    UI --> Host : Thông báo có người tham gia
+    
+    note over Host, Player
+        Cả hai người chơi đều thấy
+        nhau trong phòng chờ
+    end note
+end
+
+deactivate UI
+
+|||
+
+' ============ START MATCH ============
+== Bắt đầu trận đấu (Start Match) ==
+
+Host -> UI : Nhấn "Bắt đầu trận đấu"
+activate UI
+
+UI -> RoomCtrl : POST /api/rooms/{roomCode}/start
+activate RoomCtrl
+
+RoomCtrl -> RoomSvc : startMatch(roomCode)
+activate RoomSvc
+
+RoomSvc -> RoomSvc : validateRoomReady()
+RoomSvc -> RoomSvc : initializeChessGame()
+RoomSvc -> RoomRepo : update(room)
+activate RoomRepo
+RoomRepo -> DB : UPDATE status = 'IN_MATCH'
+RoomRepo --> RoomSvc : Room
+deactivate RoomRepo
+
+RoomSvc --> RoomCtrl : GameSession{boardState, timeControl}
+deactivate RoomSvc
+
+RoomCtrl --> UI : 200 OK\n{gameSession}
+deactivate RoomCtrl
+
+UI --> Host : Hiển thị bàn cờ
+UI --> Player : Hiển thị bàn cờ
+
+note over Host, Player
+    Trận đấu bắt đầu
+    WebSocket được sử dụng để
+    đồng bộ nước đi real-time
+end note
+
+deactivate UI
+
+@enduml

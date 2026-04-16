@@ -1,0 +1,165 @@
+@startuml LoginSequence
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam maxmessagesize 100
+skinparam sequenceParticipant underline
+
+title Sequence Diagram - Login Flow
+
+actor "Người dùng" as User
+participant "Login Page" as LoginPage
+participant "Auth Controller" as AuthController
+participant "Auth Service" as AuthService
+participant "Database" as DB
+participant "Session Manager" as Session
+
+User -> LoginPage: Truy cập trang đăng nhập
+activate LoginPage
+LoginPage --> User: Hiển thị form đăng nhập
+deactivate LoginPage
+
+User -> LoginPage: Nhập username/email và password
+activate LoginPage
+User -> LoginPage: Click "Đăng nhập"
+
+LoginPage -> AuthController: POST /api/auth/login\n{username, password}
+activate AuthController
+
+AuthController -> AuthController: Validate request body
+
+alt Request body không hợp lệ (thiếu field)
+    AuthController --> LoginPage: 400 Bad Request\n{"error": "Username và password là bắt buộc"}
+    deactivate AuthController
+    LoginPage --> User: Hiển thị lỗi: "Vui lòng nhập đầy đủ thông tin"
+    deactivate LoginPage
+    
+else Request hợp lệ
+    AuthController -> AuthService: validateCredentials(username, password)
+    activate AuthService
+    
+    AuthService -> DB: findUserByUsername(username)
+    activate DB
+    
+    alt User không tồn tại
+        DB --> AuthService: null
+        deactivate DB
+        AuthService --> AuthController: Error: User not found
+        deactivate AuthService
+        AuthController --> LoginPage: 404 Not Found\n{"error": "Tài khoản không tồn tại"}
+        deactivate AuthController
+        LoginPage --> User: Hiển thị lỗi: "Tài khoản không tồn tại"
+        deactivate LoginPage
+        
+    else User tồn tại
+        DB --> AuthService: User data (có hash password, isActive, isVerified)
+        deactivate DB
+        
+        alt Tài khoản bị khóa
+            AuthService --> AuthController: Error: Account disabled
+            deactivate AuthService
+            AuthController --> LoginPage: 403 Forbidden\n{"error": "Tài khoản đã bị khóa"}
+            deactivate AuthController
+            LoginPage --> User: Hiển thị lỗi: "Tài khoản của bạn đã bị khóa.\nVui lòng liên hệ admin"
+            deactivate LoginPage
+            
+        else Tài khoản chưa xác thực email
+            AuthService -> AuthService: Check isVerified
+            alt Email chưa verify
+                AuthService --> AuthController: Error: Email not verified
+                deactivate AuthService
+                AuthController --> LoginPage: 403 Forbidden\n{"error": "Email chưa được xác thực",\n"needVerification": true}
+                deactivate AuthController
+                LoginPage --> User: Hiển thị: "Vui lòng xác thực email\ntrước khi đăng nhập"
+                deactivate LoginPage
+                
+            else Email đã verify
+                AuthService -> AuthService: comparePassword(password, hashedPassword)
+                
+                alt Sai mật khẩu
+                    AuthService -> DB: incrementFailedLoginAttempts(userId)
+                    activate DB
+                    DB --> AuthService: failedAttempts count
+                    deactivate DB
+                    
+                    alt Quá nhiều lần thử sai (>= 5)
+                        AuthService --> AuthController: Error: Too many attempts
+                        deactivate AuthService
+                        AuthController --> LoginPage: 429 Too Many Requests\n{"error": "Quá nhiều lần đăng nhập sai",\n"lockoutTime": 15, "unit": "minutes"}
+                        deactivate AuthController
+                        LoginPage --> User: Hiển thị lỗi: "Tài khoản tạm khóa 15 phút\ndo đăng nhập sai nhiều lần"
+                        deactivate LoginPage
+                        
+                    else Chưa đạt giới hạn
+                        AuthService --> AuthController: Error: Invalid password
+                        deactivate AuthService
+                        AuthController --> LoginPage: 401 Unauthorized\n{"error": "Username hoặc password sai",\n"attemptsLeft": 3}
+                        deactivate AuthController
+                        LoginPage --> User: Hiển thị lỗi: "Thông tin đăng nhập không đúng\n(Còn 3 lần thử)"
+                        deactivate LoginPage
+                    end
+                    
+                else Password đúng - Đăng nhập thành công
+                    AuthService -> DB: resetFailedLoginAttempts(userId)
+                    activate DB
+                    DB --> AuthService: Reset success
+                    deactivate DB
+                    AuthService --> AuthController: Success: User validated
+                    deactivate AuthService
+                    AuthService --> AuthController: Success: User validated
+                    deactivate AuthService
+                    
+                    AuthController -> Session: createSession(userId)
+                    activate Session
+                    Session -> Session: Tạo JWT token hoặc session ID
+                    Session -> DB: Lưu session vào database
+                    activate DB
+                    
+                    alt Lỗi database khi lưu session
+                        DB --> Session: Error: Database connection failed
+                        deactivate DB
+                        Session --> AuthController: Error: Cannot create session
+                        deactivate Session
+                        AuthController --> LoginPage: 500 Internal Server Error\n{"error": "Lỗi hệ thống, vui lòng thử lại"}
+                        deactivate AuthController
+                        LoginPage --> User: Hiển thị lỗi: "Lỗi hệ thống, vui lòng thử lại sau"
+                        deactivate LoginPage
+                        
+                    else Session lưu thành công
+                        DB --> Session: Session saved
+                        deactivate DB
+                        Session --> AuthController: {sessionId, token, refreshToken, expiresAt}
+                        deactivate Session
+                        
+                        AuthController -> DB: updateLastLogin(userId)
+                        activate DB
+                        DB --> AuthController: Updated
+                        deactivate DB
+                        
+                        AuthController --> LoginPage: 200 OK\n{token, refreshToken,\nuser: {id, username, email, avatar, rating}}
+                        deactivate AuthController
+                        
+                        LoginPage -> LoginPage: Lưu token vào localStorage\nLưu refreshToken vào httpOnly cookie
+                        LoginPage --> User: Chuyển hướng đến trang chủ/dashboard
+                        deactivate LoginPage
+                        
+                        User -> LoginPage: Truy cập trang chủ
+                        activate LoginPage
+                        LoginPage --> User: Hiển thị trang với thông tin user
+                        deactivate LoginPage
+                    end
+                end
+            end
+        end
+    end
+end
+
+note right of Session
+  Session có thể sử dụng:
+  - JWT (stateless)
+  - Redis session store
+  - Database session
+  
+  Thời gian hết hạn: 7-30 ngày
+end note
+
+@enduml

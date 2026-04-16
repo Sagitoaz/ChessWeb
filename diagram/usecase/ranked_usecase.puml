@@ -1,0 +1,55 @@
+@startuml UML_P3_Ranked_UseCase
+
+title Use Case Diagram - Ranked Match (Thành viên 3)
+
+left to right direction
+
+' ===== ACTORS =====
+actor "User" as User
+
+' ===== SYSTEM =====
+rectangle "Ranked Match" {
+    (Join Queue) as UC1
+    (Play Game) as UC2
+    (View Rating) as UC3
+    (Update Elo) as UC4
+    (Handle AFK) as UC5
+    (Handle Disconnect) as UC6
+}
+
+' ===== RELATIONSHIPS =====
+User --> UC1
+User --> UC2
+User --> UC3
+
+UC2 ..> UC4 : <<include>>
+UC5 ..> UC2 : <<extend>>
+UC6 ..> UC2 : <<extend>>
+
+' ===== NOTES =====
+note right of UC1 : Vào hàng đợi, tìm đối thủ ±100 Elo
+
+note right of UC2
+  Clock: 10 phút/người
+  Inactivity: 2 phút
+end note
+
+note right of UC4 : Công thức: ΔR = K×(S-E), K=32
+
+note right of UC5 : Không thao tác >2 phút → Thua
+
+note right of UC6 : Mất kết nối >30s → Thua
+
+@enduml
+  - Không reconnect → Thua
+  - Trừ Elo
+end note
+
+' ===== BOUNDARY NOTE =====
+note top of "Hệ thống Ranked Match"
+  Chỉ User đã đăng nhập mới truy cập được
+  Database: matches, ratings, elo_history
+  Real-time: WebSocket
+end note
+
+@enduml

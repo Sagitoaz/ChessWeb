@@ -1,0 +1,49 @@
+{
+  "name": "chessweb-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NestJS backend foundation for ChessWeb",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "db:check": "ts-node --transpile-only src/scripts/check-db-connection.ts",
+    "test:tv2:day1": "ts-node --transpile-only src/modules/profile/tests/day1-profile.service.unit-test.ts",
+    "test:tv2:day2": "ts-node --transpile-only src/modules/profile/tests/day2-profile-password.unit-test.ts",
+    "test:tv2:day2:avatar-stats": "ts-node --transpile-only src/modules/profile/tests/day2-profile-avatar-stats.unit-test.ts",
+    "test:tv2:day2:repository": "ts-node --transpile-only src/modules/profile/tests/day2-profile-repository-verify-email.unit-test.ts",
+    "test:tv2:day2:controller-requestid": "ts-node --transpile-only src/modules/profile/tests/day2-profile-controller-request-id.unit-test.ts",
+    "test:tv2:day2:repository:integration": "ts-node --transpile-only src/modules/profile/tests/day2-profile-repository-verify-email.integration-test.ts",
+    "test:tv2:day2:all": "npm run test:tv2:day2 && npm run test:tv2:day2:avatar-stats && npm run test:tv2:day2:repository",
+    "test:tv2:day3": "ts-node --transpile-only src/modules/profile/tests/day3-profile-leaderboard-games.unit-test.ts",
+    "test:tv2:day3:controller-dto": "ts-node --transpile-only src/modules/profile/tests/day3-profile-controller-dto.unit-test.ts",
+    "test:tv2:day3:repository:integration": "ts-node --transpile-only src/modules/profile/tests/day3-profile-repository-leaderboard-games.integration-test.ts",
+    "test:tv2:day3:all": "npm run test:tv2:day3 && npm run test:tv2:day3:controller-dto && npm run test:tv2:day3:repository:integration"
+  },
+  "engines": {
+    "node": ">=20.0.0 <25.0.0"
+  },
+  "dependencies": {
+    "groq-sdk": "^1.1.2",
+    "@nestjs/common": "^10.4.17",
+    "@nestjs/core": "^10.4.17",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/platform-express": "^10.4.17",
+    "@nestjs/platform-socket.io": "10.4.22",
+    "@nestjs/websockets": "10.4.22",
+    "chess.js": "^1.4.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "dotenv": "^16.6.1",
+    "mongodb": "^6.20.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "socket.io": "4.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.2"
+  }
+}

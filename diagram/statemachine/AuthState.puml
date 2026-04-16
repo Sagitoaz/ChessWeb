@@ -1,0 +1,93 @@
+@startuml AuthStateMachine
+skinparam state {
+    BackgroundColor LightYellow
+    BorderColor Black
+    ArrowColor Blue
+    FontSize 12
+}
+
+title State Machine - Authentication State Flow
+
+[*] --> LoggedOut : Khởi tạo ứng dụng
+
+state LoggedOut {
+    LoggedOut : User chưa đăng nhập
+    LoggedOut : Token = null
+    LoggedOut : Session = null
+    LoggedOut : Hiển thị trang đăng nhập
+    LoggedOut : Chỉ truy cập public pages
+}
+
+state LoggingIn {
+    LoggingIn : Đang xác thực
+    LoggingIn : Gửi credentials đến server
+    LoggingIn : Đợi response
+    LoggingIn : Hiển thị loading spinner
+}
+
+state LoggedIn {
+    LoggedIn : User đã đăng nhập
+    LoggedIn : Token valid
+    LoggedIn : Session active
+    LoggedIn : Truy cập đầy đủ chức năng
+    LoggedIn : Auto-refresh token
+}
+
+state TokenExpired {
+    TokenExpired : Token hết hạn
+    TokenExpired : Session invalid
+    TokenExpired : Thử refresh token
+    TokenExpired : Hoặc yêu cầu đăng nhập lại
+}
+
+state RefreshingToken {
+    RefreshingToken : Đang làm mới token
+    RefreshingToken : Gửi refresh token
+    RefreshingToken : Đợi token mới
+}
+
+state CheckingToken <<choice>>
+
+LoggedOut --> LoggingIn : Click "Đăng nhập"
+
+LoggingIn --> LoggedIn : Xác thực thành công
+LoggingIn --> LoggedOut : Xác thực thất bại
+
+LoggedIn --> CheckingToken : Định kỳ kiểm tra token
+CheckingToken --> LoggedIn : Token còn hạn
+CheckingToken --> TokenExpired : Token hết hạn
+
+LoggedIn --> LoggedOut : Click "Đăng xuất"
+
+TokenExpired --> RefreshingToken : Có refresh token
+TokenExpired --> LoggedOut : Không có refresh token
+
+RefreshingToken --> LoggedIn : Refresh thành công
+RefreshingToken --> LoggedOut : Refresh thất bại
+
+LoggedOut --> LoggedOut : Thử đăng nhập sai\nnhiều lần
+LoggedIn --> LoggedIn : Activity detected
+
+note right of LoggedOut
+  Trạng thái mặc định:
+  - Chưa có authentication
+  - Chỉ xem được public content
+  - Cần login để sử dụng features
+end note
+
+note right of LoggedIn
+  Trạng thái active:
+  - Có quyền truy cập đầy đủ
+  - Token được kiểm tra định kỳ
+  - Auto-refresh trước khi hết hạn
+  - Timeout: 15 phút không hoạt động
+end note
+
+note bottom of TokenExpired
+  Token lifecycle:
+  - Access token: 15 phút - 1 giờ
+  - Refresh token: 7-30 ngày
+  - Auto-refresh khi còn 5 phút
+end note
+
+@enduml

@@ -1,0 +1,95 @@
+@startuml TournamentState
+!theme plain
+skinparam stateBackgroundColor #E8F4FD
+skinparam stateBorderColor #1E88E5
+skinparam stateArrowColor #333333
+
+title State Machine Diagram - Tournament State
+
+[*] --> Draft : Tạo giải đấu mới
+
+state Draft {
+    [*] --> Editing
+    Editing : Organizer chỉnh sửa\nthông tin giải đấu
+    Editing --> Editing : Cập nhật thông tin
+}
+
+Draft --> Published : publish()
+note right of Published
+    Giải đấu được công khai
+    trên danh sách
+end note
+
+Published --> Registration : openRegistration()
+
+state Registration {
+    [*] --> WaitingForPlayers
+    
+    WaitingForPlayers : Đang chờ người chơi\nđăng ký tham gia
+    
+    WaitingForPlayers --> WaitingForPlayers : Người chơi đăng ký
+    WaitingForPlayers --> RegistrationFull : Đủ số người tối đa
+    
+    RegistrationFull : Không thể đăng ký thêm
+    RegistrationFull --> WaitingForPlayers : Người chơi rút lui
+}
+
+Registration --> Running : start()\n[đủ người tối thiểu]
+Registration --> Cancelled : cancel()\n[không đủ người hoặc\nOrganizer hủy]
+
+state Running {
+    [*] --> GeneratingBracket
+    
+    GeneratingBracket : Tạo bảng đấu\nvà ghép cặp
+    GeneratingBracket --> RoundInProgress : Hoàn thành ghép cặp
+    
+    state RoundInProgress {
+        [*] --> MatchesOngoing
+        
+        MatchesOngoing : Các trận đấu\nđang diễn ra
+        MatchesOngoing --> MatchesOngoing : Trận đấu kết thúc
+        MatchesOngoing --> AllMatchesComplete : Tất cả trận\ntrong vòng hoàn thành
+        
+        AllMatchesComplete : Cập nhật standings
+    }
+    
+    RoundInProgress --> AdvancingRound : advanceRound()
+    
+    AdvancingRound : Chuyển sang vòng tiếp theo
+    AdvancingRound --> GeneratingBracket : [còn vòng tiếp]
+    AdvancingRound --> DeterminingWinner : [vòng cuối cùng]
+    
+    DeterminingWinner : Xác định người\nthắng cuộc
+}
+
+Running --> Completed : complete()\n[tất cả vòng hoàn thành]
+Running --> Cancelled : cancel()\n[Organizer hủy giữa chừng]
+
+state Completed {
+    [*] --> ShowingResults
+    ShowingResults : Hiển thị kết quả\nvà bảng xếp hạng cuối
+}
+
+state Cancelled {
+    [*] --> NotifyingParticipants
+    NotifyingParticipants : Thông báo đến\nngười tham gia
+}
+
+Completed --> [*]
+Cancelled --> [*]
+
+note bottom of Draft
+    **Trạng thái Draft:**
+    - Organizer có thể chỉnh sửa
+    - Chưa hiển thị công khai
+    - Có thể xóa giải đấu
+end note
+
+note bottom of Running
+    **Trạng thái Running:**
+    - Không thể đăng ký thêm
+    - Các trận đấu diễn ra tuần tự
+    - Standings được cập nhật real-time
+end note
+
+@enduml

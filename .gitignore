@@ -1,0 +1,56 @@
+# =============================================
+# ChessWeb - Root .gitignore
+# =============================================
+
+# ==================== Dependencies ====================
+node_modules/
+
+# ==================== IDE & Editors ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ==================== OS Files ====================
+Thumbs.db
+*.pem
+.DS_Store
+
+# ==================== Environment ====================
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+!.env.example
+!**/.env.example
+
+# ==================== Logs ====================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ==================== Build & Cache ====================
+dist/
+build/
+.cache/
+.temp/
+
+# ==================== Container Runtime ====================
+*.pid
+*.seed
+mongo_data/
+
+# ==================== Project Specific ====================
+# Xóa dòng này nếu muốn commit README cho components
+# frontend/src/components/common/README.md
+
+.github/
+.aidlc-rule-details/
+aidlc-docs/
+AGENTS.md

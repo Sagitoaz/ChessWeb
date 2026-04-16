@@ -1,0 +1,56 @@
+@startuml UML_P3_Ranked_Elo_Update_Sequence
+
+title Sequence Diagram 2 - Game End & Elo Update
+
+actor "User A" as A
+participant "Frontend" as FE
+participant "Backend API" as API
+database "Database" as DB
+actor "User B" as B
+
+== Game End ==
+
+A -> FE: Đi nước chiếu hết
+FE -> API: POST /move {matchId, move}
+API -> API: Validate move
+API -> API: Check game end
+
+API -> DB: SELECT rating FROM users\nWHERE id IN (A, B)
+DB --> API: {A: 1500, B: 1450}
+
+== Calculate Elo ==
+
+note over API
+  **Công thức Elo:**
+  E = 1 / (1 + 10^((Rb-Ra)/400))
+  ΔR = K × (S - E)
+  K = 32
+  
+  **Ví dụ:**
+  Ra=1500, Rb=1450
+  Ea=0.57, Eb=0.43
+  A thắng → Sa=1, Sb=0
+  ΔRa = +14, ΔRb = -14
+end note
+
+== Save Results ==
+
+API -> DB: UPDATE matches SET\nstatus='done', winnerId=A
+DB --> API: OK
+
+API -> DB: UPDATE users SET\nrating=1514 WHERE id=A
+DB --> API: OK
+
+API -> DB: UPDATE users SET\nrating=1436 WHERE id=B
+DB --> API: OK
+
+API -> DB: INSERT elo_history
+DB --> API: OK
+
+== Notify Players ==
+
+API --> FE: WebSocket: game_end
+FE --> A: "Thắng! +14 Elo"
+FE --> B: "Thua! -14 Elo"
+
+@enduml

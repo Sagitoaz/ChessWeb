@@ -1,0 +1,142 @@
+@startuml
+title Sequence S2 - Load Replay (with Error Handling, HTTP-aware)
+
+actor User
+boundary "HistoryPage" as HistoryPage
+boundary "ReplayPage" as ReplayPage
+control "GameService" as GameService
+control "GameAPI" as API
+database "Database" as DB
+
+User -> HistoryPage : selectGame(gameId)
+HistoryPage -> ReplayPage : openReplay(gameId)
+
+ReplayPage -> GameService : loadReplay(gameId)
+GameService --> ReplayPage : showLoading()
+
+GameService -> API : GET /games/{gameId}
+note right: Consider caching for frequently accessed replays
+
+alt 400 Bad Request
+  API --> GameService : 400 Invalid gameId format
+  GameService --> ReplayPage : showError("Invalid game ID")
+  break
+
+else 401 Unauthorized
+  API --> GameService : 401 Unauthorized
+  GameService --> ReplayPage : showError("Login required")
+  break
+
+else 429 Too Many Requests
+  API --> GameService : 429 Rate limited
+  GameService --> ReplayPage : showError("Too many requests, retry after delay")
+  note right: Client should implement exponential backoff
+  break
+
+else Authorized
+  API -> DB : query game + moves by id
+  
+  alt Database timeout
+    DB --> API : connection timeout
+    API --> GameService : 504 Gateway Timeout
+    GameService --> ReplayPage : showError("Database timeout, retry")
+    note right: Retryable error - suggest retry
+    break
+  
+  else Database error
+    DB --> API : query error / connection failed
+    API --> GameService : 503 Service Unavailable
+    GameService --> ReplayPage : showError("Service temporarily unavailable")
+    note right: DB down - retry with backoff
+    break
+  
+  else Database returns result
+    DB --> API : gameData / null
+
+    alt 404 Not Found
+      API --> GameService : 404 Not Found
+      GameService --> ReplayPage : showError("Game not found")
+      break
+
+    else Found
+    alt 403 Forbidden (not owner / no access)
+      API --> GameService : 403 Forbidden
+      GameService --> ReplayPage : showError("Access denied")
+      break
+
+    else 200 OK
+      API --> GameService : 200 gameData(status, initialFEN, moves[], metadata)
+      note right: Cache response for performance
+      
+      alt Data validation failed
+        GameService -> GameService : validateGameData(gameData)
+        
+        alt Invalid FEN format
+          GameService --> ReplayPage : showError("Corrupted game data: invalid FEN")
+          break
+        
+        else Empty or invalid moves
+          GameService --> ReplayPage : showError("No moves available for replay")
+          break
+        
+        else Moves data corrupted
+          GameService --> ReplayPage : showError("Corrupted move data")
+          break
+        end
+      
+      else Data valid
+        alt gameData.status != Saved
+          GameService --> ReplayPage : showError("Replay not available for this game")
+          break
+        
+        else Replay allowed
+          GameService -> GameService : create ReplaySession(gameId, moves)
+          
+          alt Session creation failed
+            GameService --> ReplayPage : showError("Failed to initialize replay")
+            note right: 500 Internal Error scenario
+            break
+          
+          else Session created
+            GameService --> ReplayPage : hideLoading()
+            GameService --> ReplayPage : initReplay(initialFEN, moves, metadata)
+
+            loop Replay interaction
+              User -> ReplayPage : Next / Prev / Jump / Exit
+              
+              alt Exit
+                ReplayPage -> GameService : closeReplay()
+                GameService --> ReplayPage : closed()
+                break
+              
+              else Navigation (Next/Prev/Jump)
+                ReplayPage -> GameService : navigate(step/moveIndex)
+                
+                alt Invalid step/index
+                  GameService --> ReplayPage : error("Invalid move index")
+                  note right: Out of bounds or invalid input
+                
+                else Step valid
+                  GameService -> GameService : computeBoardState(moveIndex)
+                  
+                  alt Computation error
+                    GameService --> ReplayPage : error("Failed to compute state")
+                    note right: FEN application error
+                  
+                  else Success
+                    GameService --> ReplayPage : boardState(FEN, moveIndex, moveData)
+                  end
+                
+                else Already at boundary
+                  GameService --> ReplayPage : noChange(atStart/atEnd)
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+@enduml

@@ -1,0 +1,149 @@
+@startuml
+title Sequence S1 - Start Bot Game & Get Bot Move (HTTP-correct)
+
+actor User
+boundary "GamePage (UI)" as UI
+control "GameService (API)" as API
+control "BotService (Internal/Microservice)" as Bot
+entity "Stockfish Engine" as Engine
+
+== Start bot game ==
+User -> UI : ChooseDifficulty(level)
+User -> UI : StartBotGame()
+UI -> API : POST /games/bot { level }
+
+alt 401 Unauthorized
+  API --> UI : 401 Login required
+  break
+else 403 Forbidden
+  API --> UI : 403 Not allowed to create game
+  break
+else 422 Unprocessable Entity
+  API --> UI : 422 Invalid difficulty (domain validation)
+  break
+else 429 Too Many Requests
+  API --> UI : 429 Rate limited
+  break
+else 500 Internal Server Error
+  API --> UI : 500 Server error
+  break
+else 201 Created
+  API -> Bot : POST /bot/sessions { gameId, level }
+  alt 503 Service Unavailable
+    Bot --> API : 503 Bot service unavailable
+    API --> UI : 503 Bot unavailable (retry after delay)
+    note right: Client can retry or offer fallback mode
+    break
+  else 504 Gateway Timeout
+    Bot --> API : 504 Bot session creation timeout
+    API --> UI : 503 Bot unavailable (retry)
+    break
+  else 201 Created
+    Bot --> API : 201 botSessionCreated(sessionId)
+    API --> UI : 201 gameCreated(gameId, initialFEN, sessionId)
+  end
+end
+
+== Gameplay loop ==
+loop Each user turn
+  User -> UI : MakeMove(move)
+  UI -> API : POST /games/{gameId}/moves { move }
+
+  alt 401 Unauthorized
+    API --> UI : 401 Login required
+    break
+
+  else 403 Forbidden
+    API --> UI : 403 Not your game
+    break
+
+  else 404 Not Found
+    API --> UI : 404 Game not found
+    break
+
+  else 409 Conflict
+    API --> UI : 409 Not your turn / Game already finished / State conflict
+    break
+
+  else 400 Bad Request
+    API --> UI : 400 Invalid request format (bad JSON, missing fields)
+    ' UI can retry with corrected payload
+
+  else 422 Unprocessable Entity
+    API --> UI : 422 Illegal move / Move not allowed by rules
+    ' UI can retry another move
+
+  else 200 OK
+    API -> API : applyPlayerMove()
+    API -> API : evaluateGameState()
+
+    alt Game finished
+      API --> UI : 200 gameFinished(result, finalFEN)
+      break
+
+    else Bot turn
+      API -> Bot : POST /bot/move { sessionId, FEN }
+
+      alt 504 Gateway Timeout
+        Bot --> API : 504 Bot API timeout
+        API --> UI : 503 Bot move timeout (retry or resign)
+        note right: Consider auto-retry or let user choose
+        break
+
+      else Bot service error
+        Bot --> API : 503 Service Unavailable
+        API --> UI : 503 Bot unavailable (retry)
+        break
+
+      else 200 OK - Bot processes move
+        Bot -> Engine : computeBestMove(FEN)
+
+        alt Engine timeout (upstream)
+          Engine --> Bot : timeout
+          Bot --> API : 504 Gateway Timeout
+          API --> UI : 503 Bot temporarily unavailable (retry)
+          note right: 5xx errors: exponential backoff retry
+          break
+
+        else Engine crash / upstream error
+          Engine --> Bot : error/crash
+          Bot --> API : 502 Bad Gateway
+          API --> UI : 503 Bot unavailable (retry)
+          break
+
+        else 200 OK
+          Engine --> Bot : bestMove
+          Bot -> Bot : validateMove(bestMove, FEN)
+          
+          alt Invalid move from bot
+            Bot --> API : 500 Internal Server Error (invalid bot move)
+            API --> UI : 503 Bot malfunction
+            note right: Critical: Bot produced illegal move
+            break
+          
+          else Valid move
+            Bot --> API : 200 { bestMove, validatedFEN }
+            API -> API : applyBotMove(bestMove)
+            
+            alt Apply move failed
+              API --> UI : 500 Server error (state inconsistency)
+              note right: Requires manual intervention/rollback
+              break
+            
+            else Move applied successfully
+              API -> API : evaluateGameState()
+              
+              alt Game finished after bot move
+                API --> UI : 200 gameFinished(result, finalFEN, lastMove=bestMove)
+              else Game continues
+                API --> UI : 200 stateUpdated(FEN, lastMove=bestMove, waitingForPlayer)
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+@enduml

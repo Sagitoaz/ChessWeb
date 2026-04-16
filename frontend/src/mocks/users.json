@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "testuser",
+      "email": "test@example.com",
+      "displayName": "Test User",
+      "avatarUrl": "https://i.pravatar.cc/150?img=1",
+      "bio": "Chess enthusiast",
+      "rating": 1500,
+      "gamesPlayed": 120,
+      "wins": 60,
+      "losses": 40,
+      "draws": 20
+    }
+  ],
+  "leaderboard": [
+    {"rank": 1, "username": "GrandMaster", "rating": 2500, "gamesPlayed": 500, "winRate": 75},
+    {"rank": 2, "username": "ChessKing", "rating": 2400, "gamesPlayed": 450, "winRate": 72},
+    {"rank": 3, "username": "Player123", "rating": 2300, "gamesPlayed": 400, "winRate": 70}
+  ]
+}

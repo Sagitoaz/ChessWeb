@@ -1,0 +1,16 @@
+@startuml
+title State Machine - GameState
+
+[*] --> Waiting
+
+Waiting --> InGame : startGame()
+
+InGame --> Paused : pause() [optional]
+Paused --> InGame : resume() [optional]
+
+InGame --> Finished : checkmate/stalemate/draw/timeout/resign
+Finished --> Saved : saveToHistory()
+
+Saved --> [*]
+
+@enduml

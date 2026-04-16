@@ -1,0 +1,75 @@
+# =============================================
+# ChessWeb Frontend - .gitignore
+# =============================================
+
+# ==================== Dependencies ====================
+node_modules/
+.pnp
+.pnp.js
+package-lock.json
+
+# ==================== Testing ====================
+coverage/
+*.test.js.snap
+.nyc_output/
+
+# ==================== Production Build ====================
+build/
+dist/
+*.tsbuildinfo
+.vercel/
+.netlify/
+
+# ==================== Environment Variables ====================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# ==================== Vite ====================
+.vite/
+vite.config.js.timestamp-*
+dist-ssr/
+*.local
+
+# ==================== Logs ====================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==================== OS Files ====================
+.DS_Store
+*.pem
+Thumbs.db
+desktop.ini
+
+# ==================== IDE & Editors ====================
+.vscode/
+.vscode-test/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ==================== Temporary Files ====================
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# ==================== ESLint Cache ====================
+.eslintcache
+
+# ==================== TypeScript ====================
+*.tsbuildinfo
+.tsbuildinfo
+
+# ==================== Hot Module Replacement ====================
+.hot-update.js
+.hot-update.json

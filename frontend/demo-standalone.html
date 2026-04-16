@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChessWeb - Common Components Demo</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <style>
+    /* Chess.com inspired theme */
+    :root {
+      --chess-dark: #312e2b;
+      --chess-darker: #262421;
+      --chess-green: #81b64c;
+      --chess-green-hover: #739e44;
+      --chess-brown: #b58863;
+      --chess-light: #f0d9b5;
+      --chess-board-dark: #769656;
+      --chess-board-light: #eeeed2;
+    }
+
+    body {
+      background: var(--chess-dark);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes slideDown {
+      from { transform: translateY(-10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOutRight {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-in-out; }
+    .animate-slideUp { animation: slideUp 0.3s ease-out; }
+    .animate-slideDown { animation: slideDown 0.2s ease-out; }
+    .animate-slideInRight { animation: slideInRight 0.3s ease-out; }
+    .animate-slideOutRight { animation: slideOutRight 0.3s ease-in; }
+
+    /* Custom scrollbar - Chess.com style */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--chess-darker);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--chess-brown);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--chess-green);
+    }
+
+    /* Chess.com button style */
+    .btn-chess {
+      background: var(--chess-green);
+      color: white;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .btn-chess:hover {
+      background: var(--chess-green-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .btn-chess:active {
+      transform: translateY(0);
+    }
+
+    /* Card style */
+    .card-chess {
+      background: var(--chess-darker);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* Chess board pattern decoration */
+    .chess-pattern {
+      background-image: 
+        linear-gradient(45deg, var(--chess-board-dark) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--chess-board-dark) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--chess-board-dark) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--chess-board-dark) 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      opacity: 0.05;
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, createContext, useContext } = React;
+
+    // ==================== SPINNER ====================
+    const Spinner = ({ size = 'md', text = '' }) => {
+      const sizeClasses = {
+        sm: 'w-6 h-6',
+        md: 'w-10 h-10',
+        lg: 'w-16 h-16',
+      };
+
+      return (
+        <div className="flex flex-col items-center justify-center gap-4">
+          <div className={`${sizeClasses[size]} border-4 border-gray-600 border-t-green-500 rounded-full animate-spin`} />
+          {text && <p className="text-gray-300 text-sm">{text}</p>}
+        </div>
+      );
+    };
+
+    // ==================== SKELETON ====================
+    const Skeleton = ({ variant = 'text', width = '100%', height, count = 1, circle = false }) => {
+      const getVariantClasses = () => {
+        if (circle) return 'rounded-full';
+        switch (variant) {
+          case 'text': return 'h-4 rounded';
+          case 'title': return 'h-8 rounded';
+          case 'avatar': return 'w-12 h-12 rounded-full';
+          case 'thumbnail': return 'w-full h-48 rounded-lg';
+          default: return 'rounded';
+        }
+      };
+
+      const skeletonElement = (
+        <div
+          className={`bg-gray-700 animate-pulse ${getVariantClasses()}`}
+          style={{ width: circle ? height : width, height }}
+        />
+      );
+
+      if (count > 1) {
+        return (
+          <div className="space-y-3">
+            {[...Array(count)].map((_, index) => (
+              <div key={index}>{skeletonElement}</div>
+            ))}
+          </div>
+        );
+      }
+
+      return skeletonElement;
+    };
+
+    // ==================== MODAL ====================
+    const Modal = ({ isOpen, onClose, title, children, footer, size = 'md', showCloseButton = true }) => {
+      const sizeClasses = {
+        sm: 'max-w-sm',
+        md: 'max-w-md',
+        lg: 'max-w-lg',
+        xl: 'max-w-xl',
+      };
+
+      useEffect(() => {
+        if (isOpen) {
+          document.body.style.overflow = 'hidden';
+          const handleEsc = (e) => e.key === 'Escape' && onClose?.();
+          window.addEventListener('keydown', handleEsc);
+          return () => {
+            document.body.style.overflow = 'unset';
+            window.removeEventListener('keydown', handleEsc);
+          };
+        }
+      }, [isOpen, onClose]);
+
+      if (!isOpen) return null;
+
+      return (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={(e) => e.target === e.currentTarget && onClose?.()}
+        >
+          <div className={`relative w-full ${sizeClasses[size]} bg-[#262421] rounded-lg shadow-2xl border border-gray-700 animate-slideUp`}>
+            {(title || showCloseButton) && (
+              <div className="flex items-center justify-between p-4 border-b border-gray-700">
+                {title && <h2 className="text-xl font-semibold text-gray-100">{title}</h2>}
+                {showCloseButton && (
+                  <button
+                    onClick={onClose}
+                    className="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="p-6 overflow-y-auto max-h-[calc(100vh-200px)]">{children}</div>
+            {footer && (
+              <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-700">
+                {footer}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // ==================== DROPDOWN ====================
+    const Dropdown = ({ options = [], value, onChange, placeholder = 'Select...', label, searchable = false, size = 'md' }) => {
+      const [isOpen, setIsOpen] = useState(false);
+      const [searchTerm, setSearchTerm] = useState('');
+      const dropdownRef = useRef(null);
+
+      const sizeClasses = {
+        sm: 'py-1.5 px-3 text-sm',
+        md: 'py-2 px-4 text-base',
+        lg: 'py-3 px-5 text-lg',
+      };
+
+      const filteredOptions = searchable && searchTerm
+        ? options.filter(opt => opt.label.toLowerCase().includes(searchTerm.toLowerCase()))
+        : options;
+
+      const selectedOption = options.find(opt => opt.value === value);
+
+      useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+            setIsOpen(false);
+            setSearchTerm('');
+          }
+        };
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, [isOpen]);
+
+      return (
+        <div className="relative" ref={dropdownRef}>
+          {label && <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>}
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className={`w-full flex items-center justify-between ${sizeClasses[size]} bg-[#262421] border border-gray-600 rounded-lg hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-left`}
+          >
+            <span className={selectedOption ? 'text-gray-100' : 'text-gray-400'}>
+              {selectedOption?.label || placeholder}
+            </span>
+            <svg className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {isOpen && (
+            <div className="absolute z-10 w-full mt-1 bg-[#262421] border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden animate-slideDown">
+              {searchable && (
+                <div className="p-2 border-b border-gray-700">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search..."
+                    className="w-full px-3 py-2 text-sm border border-gray-600 rounded bg-[#312e2b] text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              )}
+              <div className="overflow-y-auto max-h-48">
+                {filteredOptions.length > 0 ? (
+                  filteredOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => { onChange?.(option.value); setIsOpen(false); setSearchTerm(''); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${option.value === value ? 'bg-green-900/30 text-green-400 font-medium' : 'text-gray-200'} hover:bg-gray-700 transition-colors`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{option.label}</span>
+                        {option.value === value && (
+                          <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-6 text-sm text-center text-gray-400">No options found</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ==================== NOTIFICATION ====================
+    const NotificationContext = createContext(null);
+
+    const Toast = ({ id, type, title, message, duration, onClose }) => {
+      const [isExiting, setIsExiting] = useState(false);
+
+      useEffect(() => {
+        if (duration > 0) {
+          const timer = setTimeout(() => {
+            setIsExiting(true);
+            setTimeout(() => onClose(id), 300);
+          }, duration);
+          return () => clearTimeout(timer);
+        }
+      }, [duration, id, onClose]);
+
+      const typeConfig = {
+        success: {
+          icon: '✓',
+          bgColor: 'bg-green-900/90',
+          borderColor: 'border-green-700',
+          iconColor: 'text-green-400',
+          titleColor: 'text-green-200',
+        },
+        error: {
+          icon: '✕',
+          bgColor: 'bg-red-900/90',
+          borderColor: 'border-red-700',
+          iconColor: 'text-red-400',
+          titleColor: 'text-red-200',
+        },
+        warning: {
+          icon: '⚠',
+          bgColor: 'bg-yellow-900/90',
+          borderColor: 'border-yellow-700',
+          iconColor: 'text-yellow-400',
+          titleColor: 'text-yellow-200',
+        },
+        info: {
+          icon: 'ℹ',
+          bgColor: 'bg-blue-900/90',
+          borderColor: 'border-blue-700',
+          iconColor: 'text-blue-400',
+          titleColor: 'text-blue-200',
+        },
+      };
+
+      const config = typeConfig[type] || typeConfig.info;
+
+      return (
+        <div className={`flex items-start gap-3 p-4 mb-3 rounded-lg border shadow-lg ${config.bgColor} ${config.borderColor} ${isExiting ? 'animate-slideOutRight' : 'animate-slideInRight'} backdrop-blur-sm`}>
+          <div className={`flex-shrink-0 font-bold text-xl ${config.iconColor}`}>{config.icon}</div>
+          <div className="flex-1 min-w-0">
+            {title && <h4 className={`font-semibold ${config.titleColor} mb-1`}>{title}</h4>}
+            {message && <p className="text-sm text-gray-300">{message}</p>}
+          </div>
+          <button onClick={() => { setIsExiting(true); setTimeout(() => onClose(id), 300); }} className="text-gray-400 hover:text-gray-200">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      );
+    };
+
+    const NotificationProvider = ({ children }) => {
+      const [notifications, setNotifications] = useState([]);
+
+      const showNotification = ({ type = 'info', title, message, duration = 5000 }) => {
+        const id = Date.now().toString() + Math.random().toString(36);
+        setNotifications(prev => [...prev, { id, type, title, message, duration }]);
+      };
+
+      const removeNotification = (id) => {
+        setNotifications(prev => prev.filter(n => n.id !== id));
+      };
+
+      return (
+        <NotificationContext.Provider value={{ showNotification }}>
+          {children}
+          <div className="fixed top-4 right-4 z-50 w-full max-w-sm">
+            {notifications.map(notif => (
+              <Toast key={notif.id} {...notif} onClose={removeNotification} />
+            ))}
+          </div>
+        </NotificationContext.Provider>
+      );
+    };
+
+    const useNotification = () => useContext(NotificationContext);
+
+    // ==================== DEMO APP ====================
+    const DemoApp = () => {
+      const { showNotification } = useNotification();
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [selectedValue, setSelectedValue] = useState('');
+
+      const dropdownOptions = [
+        { value: '1', label: 'Beginner (< 1200 ELO)' },
+        { value: '2', label: 'Intermediate (1200-1800)' },
+        { value: '3', label: 'Advanced (1800-2200)' },
+        { value: '4', label: 'Master (> 2200)' },
+      ];
+
+      return (
+        <div className="min-h-screen p-4 md:p-8">
+          <div className="max-w-6xl mx-auto space-y-6">
+            {/* Header - Chess.com style */}
+            <div className="relative overflow-hidden rounded-2xl p-8 md:p-12 text-center" style={{background: 'linear-gradient(135deg, #769656 0%, #5a7a42 100%)'}}>
+              <div className="chess-pattern"></div>
+              <div className="relative z-10">
+                <h1 className="text-5xl md:text-6xl font-bold text-white mb-3 drop-shadow-lg">♟️ ChessWeb</h1>
+                <h2 className="text-2xl md:text-3xl font-semibold text-green-100 mb-2">Common Components Library</h2>
+                <p className="text-green-50 text-lg">Inspired by Chess.com • No Build Required</p>
+                <div className="mt-6 flex gap-3 justify-center flex-wrap">
+                  <button className="btn-chess">Get Started</button>
+                  <button className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-lg border border-white/30 transition-all">Learn More</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats - Chess.com style */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="card-chess text-center">
+                <div className="text-3xl font-bold text-green-400">4</div>
+                <div className="text-sm text-gray-400 mt-1">Components</div>
+              </div>
+              <div className="card-chess text-center">
+                <div className="text-3xl font-bold text-green-400">0</div>
+                <div className="text-sm text-gray-400 mt-1">Dependencies</div>
+              </div>
+              <div className="card-chess text-center">
+                <div className="text-3xl font-bold text-green-400">100%</div>
+                <div className="text-sm text-gray-400 mt-1">Responsive</div>
+              </div>
+              <div className="card-chess text-center">
+                <div className="text-3xl font-bold text-green-400">∞</div>
+                <div className="text-sm text-gray-400 mt-1">Possibilities</div>
+              </div>
+            </div>
+
+            {/* SPINNER */}
+            <section className="card-chess">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-100 flex items-center gap-3">
+                <span className="text-3xl">⚡</span>
+                Spinner Loading
+              </h2>
+              <div className="flex gap-8 items-center p-6 bg-[#312e2b] rounded-lg">
+                <div><p className="text-sm text-gray-400 mb-2">Small</p><Spinner size="sm" /></div>
+                <div><p className="text-sm text-gray-400 mb-2">Medium</p><Spinner size="md" text="Loading..." /></div>
+                <div><p className="text-sm text-gray-400 mb-2">Large</p><Spinner size="lg" /></div>
+              </div>
+            </section>
+
+            {/* SKELETON */}
+            <section className="card-chess">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-100 flex items-center gap-3">
+                <span className="text-3xl">📦</span>
+                Skeleton Loader
+              </h2>
+              <div className="space-y-4 p-6 bg-[#312e2b] rounded-lg">
+                <div><p className="text-sm text-gray-400 mb-2">Text Lines</p><Skeleton variant="text" count={3} /></div>
+                <div><p className="text-sm text-gray-400 mb-2">Title</p><Skeleton variant="title" width="60%" /></div>
+                <div className="flex gap-4">
+                  <div><p className="text-sm text-gray-400 mb-2">Avatar</p><Skeleton variant="avatar" /></div>
+                  <div><p className="text-sm text-gray-400 mb-2">Circle</p><Skeleton circle height="60px" /></div>
+                </div>
+                <div><p className="text-sm text-gray-400 mb-2">Thumbnail</p><Skeleton variant="thumbnail" /></div>
+              </div>
+            </section>
+
+            {/* MODAL */}
+            <section className="card-chess">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-100 flex items-center gap-3">
+                <span className="text-3xl">🎯</span>
+                Modal Dialog
+              </h2>
+              <button onClick={() => setIsModalOpen(true)} className="btn-chess">
+                Open Modal
+              </button>
+              <Modal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                title="Example Modal"
+                size="md"
+                footer={
+                  <>
+                    <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-300 hover:bg-gray-700 rounded-lg transition-colors">Cancel</button>
+                    <button onClick={() => { showNotification({ type: 'success', title: 'Success!', message: 'Modal action completed' }); setIsModalOpen(false); }} className="btn-chess">Confirm</button>
+                  </>
+                }
+              >
+                <p className="text-gray-300 mb-3">This is a reusable modal component with:</p>
+                <ul className="list-disc list-inside space-y-1 text-gray-400">
+                  <li>Backdrop click to close</li>
+                  <li>ESC key to close</li>
+                  <li>Smooth animations</li>
+                  <li>Custom footer with actions</li>
+                </ul>
+              </Modal>
+            </section>
+
+            {/* DROPDOWN */}
+            <section className="card-chess">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-100 flex items-center gap-3">
+                <span className="text-3xl">📋</span>
+                Dropdown Select
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Dropdown
+                  label="Basic Dropdown"
+                  options={dropdownOptions}
+                  value={selectedValue}
+                  onChange={setSelectedValue}
+                  placeholder="Select your ELO level"
+                />
+                <Dropdown
+                  label="Searchable Dropdown"
+                  options={dropdownOptions}
+                  value={selectedValue}
+                  onChange={setSelectedValue}
+                  searchable
+                  placeholder="Search level..."
+                />
+              </div>
+              {selectedValue && (
+                <div className="mt-4 p-4 bg-green-900/20 border border-green-700 rounded-lg">
+                  <p className="text-green-400 font-medium flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Selected: {dropdownOptions.find(o => o.value === selectedValue)?.label}
+                  </p>
+                </div>
+              )}
+            </section>
+
+            {/* NOTIFICATIONS */}
+            <section className="card-chess">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-100 flex items-center gap-3">
+                <span className="text-3xl">🔔</span>
+                Toast Notifications
+              </h2>
+              <p className="text-gray-400 mb-4">Click buttons to show different notification types:</p>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={() => showNotification({ type: 'success', title: 'Success!', message: 'Action completed successfully.', duration: 5000 })} className="px-5 py-2.5 bg-green-700 hover:bg-green-600 text-white font-semibold rounded-lg transition-all">Success</button>
+                <button onClick={() => showNotification({ type: 'error', title: 'Error!', message: 'Something went wrong.', duration: 5000 })} className="px-5 py-2.5 bg-red-700 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">Error</button>
+                <button onClick={() => showNotification({ type: 'warning', title: 'Warning!', message: 'Please check your input.', duration: 5000 })} className="px-5 py-2.5 bg-yellow-700 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">Warning</button>
+                <button onClick={() => showNotification({ type: 'info', title: 'Info', message: 'Here is some information.', duration: 5000 })} className="px-5 py-2.5 bg-blue-700 hover:bg-blue-600 text-white font-semibold rounded-lg transition-all">Info</button>
+              </div>
+            </section>
+
+            {/* FOOTER */}
+            <div className="card-chess text-center">
+              <p className="text-gray-400 text-sm">ChessWeb © 2026 | Common Components Demo</p>
+              <p className="text-gray-500 text-xs mt-2">Inspired by Chess.com UI Design</p>
+              <p className="text-green-500 text-sm mt-3 font-medium">📄 Open directly in browser - No build tools required!</p>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ==================== RENDER ====================
+    const App = () => (
+      <NotificationProvider>
+        <DemoApp />
+      </NotificationProvider>
+    );
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>

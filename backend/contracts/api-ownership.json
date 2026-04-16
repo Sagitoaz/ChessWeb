@@ -1,0 +1,46 @@
+﻿{
+  "member1_identity_core": [
+    "POST /auth/login",
+    "POST /auth/register",
+    "POST /auth/logout",
+    "POST /auth/refresh",
+    "POST /auth/forgot-password",
+    "POST /auth/reset-password",
+    "POST /auth/check-username",
+    "POST /auth/check-email",
+    "GET /auth/me"
+  ],
+  "member2_profile_user_data": [
+    "POST /auth/verify-email",
+    "POST /auth/resend-verification",
+    "GET /users/profile",
+    "PUT /users/profile",
+    "PUT /users/password",
+    "POST /users/avatar",
+    "GET /users/stats",
+    "GET /users/leaderboard",
+    "GET /games"
+  ],
+  "member3_ranked_tournament_core": [
+    "POST /ranked/queue/join",
+    "POST /ranked/queue/leave",
+    "GET /ranked/matches/:id",
+    "GET /ranked/history",
+    "GET /ranked/stats",
+    "GET /tournaments",
+    "POST /tournaments",
+    "GET /tournaments/:id",
+    "POST /games"
+  ],
+  "member4_room_tournament_participation_bot": [
+    "POST /rooms",
+    "POST /rooms/:code/join",
+    "GET /rooms/:code",
+    "POST /rooms/:code/leave",
+    "POST /tournaments/:id/join",
+    "POST /tournaments/:id/withdraw",
+    "POST /bot/games",
+    "POST /bot/move",
+    "GET /games/:id"
+  ]
+}
