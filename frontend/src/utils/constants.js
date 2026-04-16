@@ -4,8 +4,11 @@
  */
 
 // API Configuration - Vite env variables
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8080'
+// In production, fallback to same-origin to avoid hard dependency on env injection.
+const DEFAULT_ORIGIN =
+  typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080'
+const API_URL = import.meta.env.VITE_API_URL || `${DEFAULT_ORIGIN}/api/v1`
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || DEFAULT_ORIGIN
 
 // Mock mode is force-disabled: frontend always uses real backend APIs.
 const USE_MOCK = false
