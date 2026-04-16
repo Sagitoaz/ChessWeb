@@ -22,11 +22,13 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const mongoService = app.get(MongoService);
-  await mongoService.connect();
-
   await app.listen(env.port, "0.0.0.0");
   console.log(`[server] NestJS backend listening on port ${env.port}`);
+
+  const mongoService = app.get(MongoService);
+  void mongoService.connect().catch((error) => {
+    console.error("[server] MongoDB connection failed after startup", error);
+  });
 }
 
 bootstrap().catch((error) => {
