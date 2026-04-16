@@ -35,6 +35,7 @@ export const env = {
   stockfishTimeoutMs: Number(process.env.STOCKFISH_TIMEOUT_MS || 5000),
   groqApiKey: (process.env.GROQ_API_KEY || "").trim(),
   groqModel: (process.env.GROQ_MODEL || "mixtral-8x7b-32768").trim(),
+  groqEnabled: (process.env.GROQ_API_KEY || "").trim().length > 0,
   port: Number(process.env.PORT || 8080),
   corsOrigins:
     configuredCorsOrigins.length > 0
