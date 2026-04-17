@@ -823,6 +823,84 @@ export class CompetitionService {
     };
   }
 
+  async completeRankedMatchByDisconnect(
+    matchId: string,
+    disconnectedUserId: string,
+  ): Promise<
+    | {
+        result: string;
+        finishedAt: string;
+        whitePlayerId: string;
+        blackPlayerId: string;
+      }
+    | null
+  > {
+    const query = ObjectId.isValid(matchId)
+      ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
+      : { matchId };
+
+    const rankedMatch = await this.matchesCollection().findOne(query, {
+      projection: {
+        _id: 1,
+        matchId: 1,
+        whitePlayerId: 1,
+        blackPlayerId: 1,
+      },
+    });
+
+    if (!rankedMatch) {
+      return null;
+    }
+
+    const whitePlayerId = String(rankedMatch.whitePlayerId || "");
+    const blackPlayerId = String(rankedMatch.blackPlayerId || "");
+
+    if (
+      disconnectedUserId !== whitePlayerId &&
+      disconnectedUserId !== blackPlayerId
+    ) {
+      return null;
+    }
+
+    const completion = await this.completeRankedMatch(
+      { userId: disconnectedUserId, roles: [] },
+      matchId,
+      {
+        reason: "forfeit",
+        result:
+          disconnectedUserId === whitePlayerId
+            ? RankedMatchCompletionResult.BLACK_WIN
+            : RankedMatchCompletionResult.WHITE_WIN,
+      },
+    );
+
+    const rawResult = String(completion?.result || "").toLowerCase();
+    let result = "Draw";
+    if (
+      rawResult === "1-0" ||
+      rawResult === "white_win" ||
+      rawResult === "whitewin"
+    ) {
+      result = "WhiteWin";
+    } else if (
+      rawResult === "0-1" ||
+      rawResult === "black_win" ||
+      rawResult === "blackwin"
+    ) {
+      result = "BlackWin";
+    }
+
+    return {
+      result,
+      finishedAt:
+        typeof completion?.finishedAt === "string"
+          ? completion.finishedAt
+          : new Date().toISOString(),
+      whitePlayerId,
+      blackPlayerId,
+    };
+  }
+
   async isUserInMatch(matchId: string, userId: string): Promise<boolean> {
     const participants = await this.getMatchParticipants(matchId);
     if (!participants) return false;

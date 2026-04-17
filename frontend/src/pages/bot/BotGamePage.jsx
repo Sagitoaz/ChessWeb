@@ -394,6 +394,7 @@ export default function BotGamePage() {
   // ── Navigate-away forfeit: block browser tab close/refresh ──
   const gameActive = gameState === 'InGame' || gameState === 'Paused'
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [pendingLeavePath, setPendingLeavePath] = useState(null)
   useEffect(() => {
     if (!gameActive) return
     const handler = (e) => {
@@ -404,7 +405,40 @@ export default function BotGamePage() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [gameActive])
 
+  useEffect(() => {
+    if (!gameActive) return
+
+    const handleDocumentNavigation = (event) => {
+      const anchor = event.target?.closest?.('a[href]')
+      if (!anchor) return
+
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        return
+      }
+
+      if (anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) {
+        return
+      }
+
+      const resolved = new URL(href, window.location.origin)
+      if (resolved.origin !== window.location.origin) return
+      const targetPath = `${resolved.pathname}${resolved.search}${resolved.hash}`
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      if (targetPath === currentPath) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingLeavePath(targetPath)
+      setShowLeaveConfirm(true)
+    }
+
+    document.addEventListener('click', handleDocumentNavigation, true)
+    return () => document.removeEventListener('click', handleDocumentNavigation, true)
+  }, [gameActive])
+
   const handleLeaveRequest = () => {
+    setPendingLeavePath('/bot')
     if (gameActive) {
       setShowLeaveConfirm(true)
     } else {
@@ -414,8 +448,10 @@ export default function BotGamePage() {
 
   const handleForfeitAndLeave = () => {
     // User requested: exiting an unfinished bot game should not be saved to history.
+    const destination = pendingLeavePath || '/bot'
     setShowLeaveConfirm(false)
-    navigate('/bot')
+    setPendingLeavePath(null)
+    navigate(destination)
   }
 
   if (!gameData)
@@ -482,7 +518,10 @@ export default function BotGamePage() {
             </p>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setShowLeaveConfirm(false)}
+                onClick={() => {
+                  setShowLeaveConfirm(false)
+                  setPendingLeavePath(null)
+                }}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm"
               >
                 Ở lại

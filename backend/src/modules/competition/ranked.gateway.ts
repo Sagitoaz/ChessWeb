@@ -72,6 +72,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server!: Server;
 
   private readonly socketsByUser = new Map<string, Set<string>>();
+  private readonly matchBySocketId = new Map<string, string>();
   private readonly matchmakingTickMs = 3000;
   private matchmakingTimer: NodeJS.Timeout | null = null;
   private readonly logger = new Logger(RankedGateway.name);
@@ -228,14 +229,50 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleDisconnect(client: Socket): Promise<void> {
     const user = client.data.user as SocketUser | undefined;
+    const activeMatchId = this.matchBySocketId.get(client.id) || null;
+    this.matchBySocketId.delete(client.id);
+
     if (!user?.userId) return;
 
     const socketSet = this.socketsByUser.get(user.userId);
     if (!socketSet) return;
 
     socketSet.delete(client.id);
+    const userStillConnected = socketSet.size > 0;
     if (socketSet.size === 0) {
       this.socketsByUser.delete(user.userId);
+    }
+
+    if (!userStillConnected && activeMatchId) {
+      try {
+        const completion =
+          await this.competitionService.completeRankedMatchByDisconnect(
+            activeMatchId,
+            user.userId,
+          );
+
+        if (completion) {
+          const payload: GameEndPayload = {
+            matchId: activeMatchId,
+            reason: "forfeit",
+            result: completion.result,
+            resignedByUserId: user.userId,
+            at: completion.finishedAt,
+          };
+          this.emitGameEnd(
+            activeMatchId,
+            {
+              whitePlayerId: completion.whitePlayerId,
+              blackPlayerId: completion.blackPlayerId,
+            },
+            payload,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Disconnect completion skipped for match=${activeMatchId}: ${(error as Error).message}`,
+        );
+      }
     }
 
     const waitingCount = await this.competitionService.getWaitingQueueCount();
@@ -334,6 +371,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     client.join(`match:${matchId}`);
+    this.matchBySocketId.set(client.id, matchId);
   }
 
   @SubscribeMessage("game:move")
@@ -348,6 +386,8 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!matchId || typeof matchId !== "string") {
       throw new UnauthorizedException("Missing matchId");
     }
+
+    this.matchBySocketId.set(client.id, matchId);
 
     if (!move?.from || !move?.to) {
       return;
@@ -385,6 +425,8 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!matchId || typeof matchId !== "string") {
       throw new UnauthorizedException("Missing matchId");
     }
+
+    this.matchBySocketId.set(client.id, matchId);
 
     const participants =
       await this.competitionService.getMatchParticipants(matchId);

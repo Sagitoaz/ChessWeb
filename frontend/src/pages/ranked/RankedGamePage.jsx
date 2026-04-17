@@ -1064,10 +1064,12 @@ const RankedGamePage = () => {
   }, [gamePhase, goToLobby])
 
   const handleForfeitAndLeave = useCallback(() => {
-    endGame('forfeit', 'lose')
+    if (gameSocket?.isConnected && matchId) {
+      gameSocket.resign()
+    }
     setShowLeaveConfirm(false)
     navigate('/ranked')
-  }, [endGame, navigate])
+  }, [gameSocket, matchId, navigate])
 
   // ═══════════════════════════════════════════
   // LOADING SCREEN

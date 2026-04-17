@@ -18,23 +18,38 @@ const formatTime = (seconds) => {
   return `${minutes}:${String(remaining).padStart(2, '0')}`
 }
 
+const normalizeId = (value) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') {
+    if (typeof value.$oid === 'string') return value.$oid
+    if (typeof value.id === 'string') return value.id
+    if (typeof value._id === 'string') return value._id
+  }
+  return String(value)
+}
+
 const normalizeRoom = (room, roomId) => {
   const members = Array.isArray(room?.members)
     ? room.members.map((member) => ({
         ...member,
-        userId: String(member?.userId || ''),
+        userId: normalizeId(member?.userId),
+        role: String(member?.role || '').toLowerCase(),
       }))
     : []
   const ownerMember = members.find((member) => member?.role === 'owner') || null
+  const ownerUserId = normalizeId(room?.ownerUserId || room?.host?.id || ownerMember?.userId)
+  const whitePlayerId = normalizeId(room?.whitePlayerId)
+  const blackPlayerId = normalizeId(room?.blackPlayerId)
 
   return {
     code: room?.code || roomId,
     name: room?.name || `Phòng ${roomId}`,
-    ownerUserId: room?.ownerUserId || room?.host?.id || ownerMember?.userId || null,
+    ownerUserId: ownerUserId || null,
     status: room?.status || 'waiting',
     activeGameId: room?.activeGameId || null,
-    whitePlayerId: room?.whitePlayerId || null,
-    blackPlayerId: room?.blackPlayerId || null,
+    whitePlayerId: whitePlayerId || null,
+    blackPlayerId: blackPlayerId || null,
     initialTimeSeconds: Number(room?.initialTimeSeconds || 600),
     isPrivate: room?.isPrivate ?? true,
     members,
@@ -80,19 +95,26 @@ export default function RoomPlayPage() {
   const activeGameId = room.activeGameId || location.state?.activeGameId || null
   const isOwner = Boolean(user?.id && room.ownerUserId && user.id === room.ownerUserId)
   const playerColor = useMemo(() => {
+    const normalizedUserId = normalizeId(user?.id)
     const memberOwner = room.members.find((member) => member?.role === 'owner')
-    const ownerUserId = room.ownerUserId || memberOwner?.userId || null
+    const ownerUserId = normalizeId(room.ownerUserId || memberOwner?.userId)
+    const whiteId = normalizeId(room.whitePlayerId)
+    const blackId = normalizeId(room.blackPlayerId)
 
-    if (!user?.id) return 'white'
-    if (room.whitePlayerId && user.id === room.whitePlayerId) return 'white'
-    if (room.blackPlayerId && user.id === room.blackPlayerId) return 'black'
+    if (!normalizedUserId) return 'white'
+    if (whiteId && normalizedUserId === whiteId) return 'white'
+    if (blackId && normalizedUserId === blackId) return 'black'
 
-    if (ownerUserId && user.id === ownerUserId) return 'white'
+    if (ownerUserId && normalizedUserId === ownerUserId) return 'white'
+
+    const meMember = room.members.find((member) => member?.userId === normalizedUserId)
+    if (meMember?.role === 'owner') return 'white'
+    if (meMember) return 'black'
 
     const otherMember = room.members.find(
       (member) => member?.userId && member.userId !== ownerUserId
     )
-    if (otherMember?.userId && user.id === otherMember.userId) return 'black'
+    if (otherMember?.userId && normalizedUserId === otherMember.userId) return 'black'
 
     return 'white'
   }, [room.blackPlayerId, room.members, room.ownerUserId, room.whitePlayerId, user?.id])
