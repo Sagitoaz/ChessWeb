@@ -14,6 +14,9 @@ export class GroqService {
 
   constructor() {
     if (!env.groqApiKey) {
+      console.warn(
+        "[GroqService] GROQ_API_KEY is missing; bot AI features will use fallback responses.",
+      );
       this.groq = null;
       this.modelCandidates = [];
       return;
@@ -23,6 +26,9 @@ export class GroqService {
       apiKey: env.groqApiKey,
     });
     this.modelCandidates = this.buildModelCandidates();
+    console.log(
+      `[GroqService] Groq enabled with model candidates: ${this.modelCandidates.join(", ")}`,
+    );
   }
 
   private buildModelCandidates(): string[] {

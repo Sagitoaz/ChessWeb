@@ -79,7 +79,7 @@ export default function TestLinksPage() {
                   email: 'test@example.com', avatarUrl: 'https://i.pravatar.cc/150?img=1',
                   rating: 1500, wins: 10, losses: 5, gamesPlayed: 18,
                 }))
-                window.location.href = '/test/auth/profile'
+                window.location.hash = '#/test/auth/profile'
               }}
               className="bg-green-500/40 hover:bg-green-500/60 rounded-lg p-3 text-sm transition border-2 border-green-400 font-bold col-span-2"
             >

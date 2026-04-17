@@ -2,6 +2,18 @@ import "dotenv/config";
 
 const requiredVars = ["MONGODB_URI", "MONGODB_DB_NAME"] as const;
 
+const parseCorsOrigins = (value: string | undefined): string[] => {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+};
+
+const configuredCorsOrigins = parseCorsOrigins(
+  process.env.CORS_ORIGINS || process.env.FRONTEND_URL,
+);
+
 for (const key of requiredVars) {
   if (!process.env[key]) {
     throw new Error(`[env] Missing required environment variable: ${key}`);
@@ -23,5 +35,10 @@ export const env = {
   stockfishTimeoutMs: Number(process.env.STOCKFISH_TIMEOUT_MS || 5000),
   groqApiKey: (process.env.GROQ_API_KEY || "").trim(),
   groqModel: (process.env.GROQ_MODEL || "mixtral-8x7b-32768").trim(),
+  groqEnabled: (process.env.GROQ_API_KEY || "").trim().length > 0,
   port: Number(process.env.PORT || 8080),
+  corsOrigins:
+    configuredCorsOrigins.length > 0
+      ? configuredCorsOrigins
+      : ["http://localhost:5173", "http://localhost:5174"],
 };

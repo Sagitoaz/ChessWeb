@@ -83,7 +83,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Refresh token failed, logout user
         clearAuthSession()
-        window.location.href = '/login'
+        window.location.hash = '#/login'
         return Promise.reject(refreshError)
       }
     }
