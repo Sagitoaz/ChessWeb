@@ -732,6 +732,97 @@ export class CompetitionService {
     };
   }
 
+  async completeRoomGameByResignation(
+    matchId: string,
+    resignedByUserId: string,
+  ): Promise<{ result: string; finishedAt: string } | null> {
+    const query = ObjectId.isValid(matchId)
+      ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
+      : { matchId };
+
+    const game = await this.gamesCollection().findOne(query, {
+      projection: {
+        _id: 1,
+        mode: 1,
+        whitePlayerId: 1,
+        blackPlayerId: 1,
+        result: 1,
+        finishedAt: 1,
+        status: 1,
+      },
+    });
+
+    if (!game || String(game.mode || "") !== "room") {
+      return null;
+    }
+
+    const whitePlayerId = String(game.whitePlayerId || "");
+    const blackPlayerId = String(game.blackPlayerId || "");
+    if (!whitePlayerId || !blackPlayerId) {
+      throw new BadRequestException("Room game participants are invalid");
+    }
+
+    if (
+      resignedByUserId !== whitePlayerId &&
+      resignedByUserId !== blackPlayerId
+    ) {
+      throw new BadRequestException(
+        "User is not a participant of this room game",
+      );
+    }
+
+    const toGatewayResult = (raw: unknown): string => {
+      const normalized = typeof raw === "string" ? raw.toLowerCase() : "";
+      if (
+        normalized === "1-0" ||
+        normalized === "white_win" ||
+        normalized === "whitewin"
+      ) {
+        return "WhiteWin";
+      }
+      if (
+        normalized === "0-1" ||
+        normalized === "black_win" ||
+        normalized === "blackwin"
+      ) {
+        return "BlackWin";
+      }
+      return "Draw";
+    };
+
+    if (game.finishedAt || game.status === "completed" || game.result) {
+      return {
+        result: toGatewayResult(game.result),
+        finishedAt: game.finishedAt
+          ? new Date(game.finishedAt).toISOString()
+          : new Date().toISOString(),
+      };
+    }
+
+    const persistedResult =
+      resignedByUserId === whitePlayerId ? "black_win" : "white_win";
+    const now = new Date();
+
+    await this.gamesCollection().updateOne(
+      { _id: game._id },
+      {
+        $set: {
+          result: persistedResult,
+          status: "completed",
+          state: "Finished",
+          endReason: "resignation",
+          updatedAt: now,
+          finishedAt: now,
+        },
+      },
+    );
+
+    return {
+      result: persistedResult === "white_win" ? "WhiteWin" : "BlackWin",
+      finishedAt: now.toISOString(),
+    };
+  }
+
   async isUserInMatch(matchId: string, userId: string): Promise<boolean> {
     const participants = await this.getMatchParticipants(matchId);
     if (!participants) return false;
@@ -1120,9 +1211,7 @@ export class CompetitionService {
       _id: string;
       username?: string | null;
       avatarUrl?: string | null;
-    }>(
-      "user_profiles",
-    );
+    }>("user_profiles");
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 10;
@@ -1190,7 +1279,11 @@ export class CompetitionService {
     const ratingMap = new Map<string, number>();
     for (const doc of ratingDocs) {
       const rating = Number(doc?.rating ?? 0);
-      if (typeof doc?._id === "string" && Number.isFinite(rating) && rating > 0) {
+      if (
+        typeof doc?._id === "string" &&
+        Number.isFinite(rating) &&
+        rating > 0
+      ) {
         ratingMap.set(doc._id, this.normalizeRating(rating));
       }
     }

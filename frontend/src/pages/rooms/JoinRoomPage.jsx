@@ -5,6 +5,13 @@ import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
 import { Users, Clock, Lock, Globe, ArrowLeft, CheckCircle2 } from 'lucide-react'
 
+const shortenDisplayName = (value, max = 18) => {
+  const text = String(value || '').trim()
+  if (!text) return 'Unknown'
+  if (text.length <= max) return text
+  return `${text.slice(0, max - 3)}...`
+}
+
 const normalizeRoomInfo = (room, code) => {
   const members = Array.isArray(room?.members) ? room.members : []
   const ownerMember = members.find((member) => member?.role === 'owner')
@@ -13,8 +20,9 @@ const normalizeRoomInfo = (room, code) => {
     room?.owner ||
     (ownerMember
       ? {
-          username:
-            ownerMember.username || ownerMember.displayName || ownerMember.userId || 'Unknown',
+          username: shortenDisplayName(
+            ownerMember.username || ownerMember.displayName || ownerMember.userId || 'Unknown'
+          ),
           avatar: ownerMember.avatarUrl || null,
         }
       : { username: 'Unknown', avatar: null })
@@ -239,13 +247,15 @@ export default function JoinRoomPage() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs text-gray-600 mb-1">Chủ phòng</p>
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
                             {roomInfo.host.username.charAt(0).toUpperCase()}
                           </div>
-                          <p className="font-medium text-gray-900">{roomInfo.host.username}</p>
+                          <p className="font-medium text-gray-900 truncate">
+                            {roomInfo.host.username}
+                          </p>
                         </div>
                       </div>
 

@@ -280,7 +280,7 @@ export default function CreateRoomPage() {
                 <div className="text-4xl font-bold tracking-widest text-blue-600 font-mono mb-4">
                   {roomCode}
                 </div>
-                <div className="flex gap-3 justify-center">
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Button variant="outline" onClick={handleCopyCode}>
                     {copiedCode ? <Check size={16} /> : <Copy size={16} />}
                     {copiedCode ? 'Đã sao chép!' : 'Sao chép mã'}
@@ -296,7 +296,7 @@ export default function CreateRoomPage() {
             {/* Room Settings Summary */}
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <h3 className="font-semibold text-gray-900 mb-3">Cài đặt phòng</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-gray-600">Tên phòng:</p>
                   <p className="font-semibold text-gray-900">{roomName || 'Không có tên'}</p>
@@ -337,7 +337,7 @@ export default function CreateRoomPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button variant="outline" onClick={handleCancel} fullWidth>
                 Hủy phòng
               </Button>

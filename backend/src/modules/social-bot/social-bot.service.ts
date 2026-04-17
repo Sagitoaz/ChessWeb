@@ -1241,7 +1241,41 @@ export class SocialBotService {
       throw new NotFoundException("Room not found");
     }
     const members = await this.repo.findRoomMembers(room._id);
-    return { ...room, members };
+
+    const memberUserIds = Array.from(
+      new Set(
+        members
+          .map((member: any) => String(member?.userId || ""))
+          .filter((userId: string) => userId.length > 0),
+      ),
+    );
+    const profiles = await this.repo.findUserProfilesByIds(memberUserIds);
+    const profileMap = new Map(
+      profiles.map((profile: any) => [String(profile._id || ""), profile]),
+    );
+
+    const normalizedMembers = members.map((member: any) => {
+      const userId = String(member?.userId || "");
+      const profile = profileMap.get(userId) || null;
+      return {
+        ...member,
+        userId,
+        username:
+          typeof profile?.username === "string" && profile.username.length > 0
+            ? profile.username
+            : userId,
+        avatarUrl:
+          typeof profile?.avatarUrl === "string" && profile.avatarUrl.length > 0
+            ? profile.avatarUrl
+            : null,
+      };
+    });
+
+    return {
+      ...room,
+      playerCount: Number(room?.playerCount || normalizedMembers.length || 0),
+      members: normalizedMembers,
+    };
   }
 
   async leaveRoom(userId: string, code: string) {

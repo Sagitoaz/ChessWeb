@@ -5,7 +5,6 @@ import { Chess } from 'chess.js'
 import { ChessBoard } from '@components/game'
 import { Avatar, Button, Card } from '@/components/common'
 import gameService from '@/services/gameService'
-import authService from '@/services/authService'
 import { useGameSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
 import { ArrowLeft, Clock, Flag, Play, Trophy, Users } from 'lucide-react'
@@ -19,18 +18,28 @@ const formatTime = (seconds) => {
   return `${minutes}:${String(remaining).padStart(2, '0')}`
 }
 
-const normalizeRoom = (room, roomId) => ({
-  code: room?.code || roomId,
-  name: room?.name || `Phòng ${roomId}`,
-  ownerUserId: room?.ownerUserId || room?.host?.id || null,
-  status: room?.status || 'waiting',
-  activeGameId: room?.activeGameId || null,
-  whitePlayerId: room?.whitePlayerId || null,
-  blackPlayerId: room?.blackPlayerId || null,
-  initialTimeSeconds: Number(room?.initialTimeSeconds || 600),
-  isPrivate: room?.isPrivate ?? true,
-  members: Array.isArray(room?.members) ? room.members : [],
-})
+const normalizeRoom = (room, roomId) => {
+  const members = Array.isArray(room?.members)
+    ? room.members.map((member) => ({
+        ...member,
+        userId: String(member?.userId || ''),
+      }))
+    : []
+  const ownerMember = members.find((member) => member?.role === 'owner') || null
+
+  return {
+    code: room?.code || roomId,
+    name: room?.name || `Phòng ${roomId}`,
+    ownerUserId: room?.ownerUserId || room?.host?.id || ownerMember?.userId || null,
+    status: room?.status || 'waiting',
+    activeGameId: room?.activeGameId || null,
+    whitePlayerId: room?.whitePlayerId || null,
+    blackPlayerId: room?.blackPlayerId || null,
+    initialTimeSeconds: Number(room?.initialTimeSeconds || 600),
+    isPrivate: room?.isPrivate ?? true,
+    members,
+  }
+}
 
 const toLocalResultFromAbsolute = (absoluteResult, playerColor) => {
   const normalized = typeof absoluteResult === 'string' ? absoluteResult.toLowerCase() : ''
@@ -50,8 +59,6 @@ export default function RoomPlayPage() {
   const location = useLocation()
   const user = useAuthStore((state) => state.user)
   const { showNotification } = useNotification()
-  const authToken = useAuthStore((state) => state.token)
-  const setAuthLogin = useAuthStore((state) => state.login)
 
   const [room, setRoom] = useState(() => normalizeRoom(location.state?.room || null, roomId))
   const [loading, setLoading] = useState(true)
@@ -73,11 +80,22 @@ export default function RoomPlayPage() {
   const activeGameId = room.activeGameId || location.state?.activeGameId || null
   const isOwner = Boolean(user?.id && room.ownerUserId && user.id === room.ownerUserId)
   const playerColor = useMemo(() => {
+    const memberOwner = room.members.find((member) => member?.role === 'owner')
+    const ownerUserId = room.ownerUserId || memberOwner?.userId || null
+
     if (!user?.id) return 'white'
     if (room.whitePlayerId && user.id === room.whitePlayerId) return 'white'
     if (room.blackPlayerId && user.id === room.blackPlayerId) return 'black'
-    return isOwner ? 'white' : 'black'
-  }, [isOwner, room.blackPlayerId, room.whitePlayerId, user?.id])
+
+    if (ownerUserId && user.id === ownerUserId) return 'white'
+
+    const otherMember = room.members.find(
+      (member) => member?.userId && member.userId !== ownerUserId
+    )
+    if (otherMember?.userId && user.id === otherMember.userId) return 'black'
+
+    return 'white'
+  }, [room.blackPlayerId, room.members, room.ownerUserId, room.whitePlayerId, user?.id])
   const myColorCode = playerColor === 'white' ? 'w' : 'b'
 
   const {
@@ -240,60 +258,6 @@ export default function RoomPlayPage() {
     }
   }, [gamePhase])
 
-  const persistCompletedGame = useCallback(
-    async (localResult) => {
-      if (!activeGameId || !user?.id) return
-
-      const absoluteResult =
-        localResult === 'draw'
-          ? 'Draw'
-          : localResult === 'win'
-            ? playerColor === 'white'
-              ? 'WhiteWin'
-              : 'BlackWin'
-            : playerColor === 'white'
-              ? 'BlackWin'
-              : 'WhiteWin'
-
-      try {
-        await gameService.saveGame(activeGameId, {
-          result: absoluteResult,
-          mode: 'room',
-          initialFEN: INITIAL_FEN,
-          moves: chessRef.current.history({ verbose: true }),
-          metadata: {
-            totalMoves: chessRef.current.history().length,
-            source: 'room-play-page',
-          },
-        })
-
-        const refreshed = await authService.getCurrentUser()
-        const refreshedUser = refreshed?.user ?? refreshed
-        if (refreshedUser && authToken) {
-          setAuthLogin(refreshedUser, authToken)
-          showNotification({
-            type: 'success',
-            title: 'Đã lưu ván đấu',
-            message: 'Ván chơi phòng đã được lưu vào lịch sử.',
-          })
-        }
-      } catch {
-        // Keep UI responsive even if persistence fails.
-        showNotification({
-          type: 'error',
-          title: 'Không thể lưu ván đấu',
-          message: 'Trận đã kết thúc nhưng lưu lịch sử thất bại.',
-        })
-      }
-    },
-    [activeGameId, authToken, playerColor, setAuthLogin, showNotification, user?.id]
-  )
-
-  useEffect(() => {
-    if (gamePhase !== 'ended' || !gameResult?.result) return
-    void persistCompletedGame(gameResult.result)
-  }, [gamePhase, gameResult?.result, persistCompletedGame])
-
   const checkGameEnd = useCallback(() => {
     if (chessRef.current.isCheckmate()) {
       const loserColor = chessRef.current.turn() === 'w' ? 'white' : 'black'
@@ -328,11 +292,11 @@ export default function RoomPlayPage() {
     const handleGameEnd = (payload) => {
       const rawResult = typeof payload?.result === 'string' ? payload.result.toLowerCase() : ''
       const localResult =
-        rawResult === 'whitewin' || rawResult === '1-0'
+        rawResult === 'whitewin' || rawResult === 'white_win' || rawResult === '1-0'
           ? playerColor === 'white'
             ? 'win'
             : 'lose'
-          : rawResult === 'blackwin' || rawResult === '0-1'
+          : rawResult === 'blackwin' || rawResult === 'black_win' || rawResult === '0-1'
             ? playerColor === 'black'
               ? 'win'
               : 'lose'
@@ -406,8 +370,19 @@ export default function RoomPlayPage() {
     setShowResignConfirm(false)
     if (activeGameId && isSocketConnected) {
       resign()
+      showNotification({
+        type: 'info',
+        title: 'Đang xử lý đầu hàng',
+        message: 'Vui lòng chờ đồng bộ kết quả ván đấu.',
+      })
+      return
     }
-    endGame('lose', 'resignation')
+
+    showNotification({
+      type: 'error',
+      title: 'Không thể đầu hàng lúc này',
+      message: 'Mất kết nối realtime. Vui lòng thử lại khi kết nối ổn định.',
+    })
   }
 
   const roomMembers = room.members || []
