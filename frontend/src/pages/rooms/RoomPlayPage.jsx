@@ -95,6 +95,14 @@ export default function RoomPlayPage() {
     try {
       const response = await gameService.getRoom(roomId)
       const data = response?.data ?? response
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug('[room:play] refresh room', {
+          roomId,
+          status: data?.status,
+          activeGameId: data?.activeGameId,
+        })
+      }
       setRoom(normalizeRoom(data, roomId))
     } catch (fetchError) {
       showNotification({
@@ -189,6 +197,14 @@ export default function RoomPlayPage() {
       return
     }
 
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.debug('[room:play] room entered playing state', {
+        roomId,
+        activeGameId: room.activeGameId,
+      })
+    }
+
     setGamePhase('playing')
     setWhiteTime(room.initialTimeSeconds || 600)
     setBlackTime(room.initialTimeSeconds || 600)
@@ -200,7 +216,7 @@ export default function RoomPlayPage() {
       setGameResult(null)
       loadedGameRef.current = room.activeGameId
     }
-  }, [room.activeGameId, room.initialTimeSeconds, room.status])
+  }, [room.activeGameId, room.initialTimeSeconds, room.status, roomId])
 
   useEffect(() => {
     if (gamePhase !== 'playing') return

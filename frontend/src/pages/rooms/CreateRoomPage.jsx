@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
 import { useAuthStore } from '@store'
+import { useWebSocket } from '@hooks/useWebSocket'
 import { Users, Clock, Lock, Globe, Copy, Check, Share2, ArrowLeft, Play } from 'lucide-react'
 
 // Time control options
@@ -25,6 +26,7 @@ export default function CreateRoomPage() {
   const user = useAuthStore((state) => state.user)
   const token = useAuthStore((state) => state.token)
   const { showNotification } = useNotification()
+  const { on, off } = useWebSocket()
 
   // Form state
   const [roomName, setRoomName] = useState('')
@@ -39,6 +41,48 @@ export default function CreateRoomPage() {
   const [copiedCode, setCopiedCode] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [waitingForPlayer, setWaitingForPlayer] = useState(false)
+  const [memberCount, setMemberCount] = useState(1)
+  const memberCountRef = useRef(1)
+
+  const refreshRoomSnapshot = useCallback(
+    async (code) => {
+      if (!code) return
+
+      try {
+        const response = await gameService.getRoom(code)
+        const room = response?.data ?? response
+        const members = Array.isArray(room?.members) ? room.members : []
+        const nextCount = Number(room?.playerCount ?? members.length ?? 0)
+
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.debug('[room:create] snapshot', { code, nextCount, members: members.length })
+        }
+
+        if (nextCount > memberCountRef.current) {
+          const joinedMember =
+            members.find((member) => member?.role !== 'owner') || members[members.length - 1]
+          if (joinedMember) {
+            showNotification({
+              type: 'success',
+              title: 'Đối thủ đã vào phòng',
+              message: `${joinedMember.username || 'Một người chơi'} vừa tham gia.`,
+            })
+          }
+        }
+
+        memberCountRef.current = nextCount || memberCountRef.current
+        setMemberCount(nextCount || 1)
+        setWaitingForPlayer((room?.status || 'waiting') !== 'playing')
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.debug('[room:create] snapshot failed', { code, error: error?.message })
+        }
+      }
+    },
+    [showNotification]
+  )
 
   const selectedControl =
     TIME_CONTROLS.find((option) => option.value === timeControl) || TIME_CONTROLS[1]
@@ -91,6 +135,13 @@ export default function CreateRoomPage() {
       setRoomCode(createdCode)
       setRoomCreated(true)
       setWaitingForPlayer(true)
+      setMemberCount(1)
+      memberCountRef.current = 1
+
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug('[room:create] room created', { createdCode })
+      }
     } catch (createError) {
       const message =
         createError?.response?.data?.message || createError?.message || 'Không thể tạo phòng'
@@ -120,10 +171,23 @@ export default function CreateRoomPage() {
   const handleStartGame = () => {
     if (!roomCode) return
 
+    if (memberCount < 2) {
+      showNotification({
+        type: 'warning',
+        title: 'Chưa đủ người chơi',
+        message: 'Cần ít nhất 2 người trước khi bắt đầu.',
+      })
+      return
+    }
+
     gameService
       .startRoomGame(roomCode)
       .then((response) => {
         const data = response?.data ?? response
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.debug('[room:create] start requested', { roomCode, gameId: data?.gameId })
+        }
         navigate(`/rooms/${roomCode}`, { state: { activeGameId: data?.gameId || null } })
       })
       .catch(() => {
@@ -137,6 +201,58 @@ export default function CreateRoomPage() {
     }
     navigate('/rooms')
   }
+
+  useEffect(() => {
+    if (!roomCreated || !roomCode) return undefined
+
+    let mounted = true
+    const sync = async () => {
+      if (!mounted) return
+      await refreshRoomSnapshot(roomCode)
+    }
+
+    void sync()
+    const interval = setInterval(() => {
+      void sync()
+    }, 2500)
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [refreshRoomSnapshot, roomCode, roomCreated])
+
+  useEffect(() => {
+    if (!roomCode) return undefined
+
+    const handlePlayerJoined = (payload) => {
+      const payloadCode = String(payload?.roomCode || payload?.code || '').toUpperCase()
+      if (payloadCode !== roomCode.toUpperCase()) return
+      if (payload?.userId && payload.userId === user?.id) return
+
+      const nextCount = Number(payload?.playerCount ?? memberCountRef.current + 1)
+      memberCountRef.current = nextCount || memberCountRef.current
+      setMemberCount(nextCount || 2)
+      setWaitingForPlayer(true)
+
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug('[room:create] player joined', payload)
+      }
+
+      showNotification({
+        type: 'success',
+        title: 'Có người vừa tham gia',
+        message: `${payload?.username || 'Đối thủ'} đã vào phòng ${roomCode}.`,
+      })
+    }
+
+    on('room:playerJoined', handlePlayerJoined)
+
+    return () => {
+      off('room:playerJoined', handlePlayerJoined)
+    }
+  }, [off, on, roomCode, showNotification, user?.id])
 
   // Waiting for player screen
   if (roomCreated && waitingForPlayer) {
@@ -209,10 +325,14 @@ export default function CreateRoomPage() {
             <div className="text-center mb-6">
               <div className="inline-flex items-center gap-2 bg-yellow-50 text-yellow-800 px-4 py-3 rounded-lg border border-yellow-200">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                <span className="font-medium">Đang chờ đối thủ tham gia...</span>
+                <span className="font-medium">
+                  {memberCount >= 2 ? 'Đối thủ đã tham gia phòng' : 'Đang chờ đối thủ tham gia...'}
+                </span>
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                Bạn bè có thể tham gia bằng cách nhập mã phòng
+                {memberCount >= 2
+                  ? 'Bạn có thể bắt đầu ván đấu ngay bây giờ'
+                  : 'Bạn bè có thể tham gia bằng cách nhập mã phòng'}
               </p>
             </div>
 

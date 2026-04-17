@@ -53,7 +53,7 @@ const ReplayViewerPage = lazy(() => import('@pages/replay/ReplayViewerPage'))
 // LOADING SPINNER — Hiển thị khi đang tải trang
 // =============================================================================
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-white">
+  <div className="min-h-screen flex items-center justify-center bg-[#e1edff]">
     <Loader size="lg" text="Đang tải..." />
   </div>
 )
@@ -62,7 +62,7 @@ const PageLoader = () => (
 // 404 PAGE
 // =============================================================================
 const NotFoundPage = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-100">
+  <div className="min-h-screen flex items-center justify-center bg-[#e1edff]">
     <div className="text-center">
       <p className="text-7xl mb-4">♟️</p>
       <h1 className="text-6xl font-bold text-gray-900 mb-4">404</h1>

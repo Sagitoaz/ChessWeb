@@ -12,8 +12,16 @@ const unwrapApiEnvelope = (payload) => payload?.data ?? payload
 
 const normalizeRankedResult = (result) => {
   const v = typeof result === 'string' ? result.toLowerCase() : ''
-  if (v === 'win' || v === 'white_win' || v === '1-0' || v === 'white') return 'win'
-  if (v === 'lose' || v === 'loss' || v === 'black_win' || v === '0-1' || v === 'black')
+  if (v === 'win' || v === 'white_win' || v === 'whitewin' || v === '1-0' || v === 'white')
+    return 'win'
+  if (
+    v === 'lose' ||
+    v === 'loss' ||
+    v === 'black_win' ||
+    v === 'blackwin' ||
+    v === '0-1' ||
+    v === 'black'
+  )
     return 'loss'
   return 'draw'
 }
@@ -36,7 +44,7 @@ const normalizeRankedHistory = (payload) => {
         item.whiteUsername ||
         item.opponentId ||
         'Unknown',
-      rating: Number(item.opponent?.rating || item.opponentRating || 1200),
+      rating: Number(item.opponent?.rating ?? item.opponentRating ?? item.rating ?? 1200),
       avatarUrl: item.opponent?.avatarUrl || item.opponentAvatarUrl || null,
     },
     result: normalizeRankedResult(item.result),
