@@ -1116,7 +1116,11 @@ export class CompetitionService {
     const db = this.mongoService.getDb();
     const games = db.collection("games");
     const rankedMatches = db.collection("ranked_matches");
-    const profiles = db.collection<{ _id: string; username?: string | null }>(
+    const profiles = db.collection<{
+      _id: string;
+      username?: string | null;
+      avatarUrl?: string | null;
+    }>(
       "user_profiles",
     );
 
@@ -1152,15 +1156,42 @@ export class CompetitionService {
         ? await profiles
             .find(
               { _id: { $in: playerIds } },
-              { projection: { _id: 1, username: 1 } },
+              { projection: { _id: 1, username: 1, avatarUrl: 1 } },
             )
             .toArray()
         : [];
 
     const usernameMap = new Map<string, string>();
+    const avatarMap = new Map<string, string | null>();
     for (const profile of usernames) {
       if (profile?._id && typeof profile.username === "string") {
         usernameMap.set(profile._id, profile.username);
+      }
+      if (profile?._id) {
+        avatarMap.set(
+          profile._id,
+          typeof profile.avatarUrl === "string" && profile.avatarUrl.length > 0
+            ? profile.avatarUrl
+            : null,
+        );
+      }
+    }
+
+    const ratingDocs =
+      playerIds.length > 0
+        ? await this.ratingsCollection()
+            .find(
+              { _id: { $in: playerIds } },
+              { projection: { _id: 1, rating: 1 } },
+            )
+            .toArray()
+        : [];
+
+    const ratingMap = new Map<string, number>();
+    for (const doc of ratingDocs) {
+      const rating = Number(doc?.rating ?? 0);
+      if (typeof doc?._id === "string" && Number.isFinite(rating) && rating > 0) {
+        ratingMap.set(doc._id, this.normalizeRating(rating));
       }
     }
 
@@ -1280,6 +1311,13 @@ export class CompetitionService {
             ? whiteAfter - whiteBefore
             : blackAfter - blackBefore;
 
+        const snapshotOpponentRating =
+          playerColor === "white" ? blackBefore : whiteBefore;
+        const opponentRating =
+          snapshotOpponentRating > 0
+            ? snapshotOpponentRating
+            : Number(ratingMap.get(opponentId) ?? 0);
+
         return {
           id: item._id?.toString?.() || item._id,
           gameId: item._id?.toString?.() || item._id,
@@ -1292,6 +1330,8 @@ export class CompetitionService {
           blackUsername: usernameMap.get(item.blackPlayerId) || null,
           opponentId,
           opponentUsername: usernameMap.get(opponentId) || "Unknown",
+          opponentAvatarUrl: avatarMap.get(opponentId) || null,
+          opponentRating: opponentRating > 0 ? opponentRating : null,
           createdAt: item.createdAt,
           finishedAt: item.finishedAt || null,
           ratingChange,

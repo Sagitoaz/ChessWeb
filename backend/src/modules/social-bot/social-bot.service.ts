@@ -1163,6 +1163,16 @@ export class SocialBotService {
           joinedAt: now,
         });
 
+        this.rankedGateway.emitRoomPlayerJoined({
+          roomCode,
+          code: roomCode,
+          userId,
+          username: null,
+          playerCount: 1,
+          maxPlayers: 2,
+          status: "waiting",
+        });
+
         return this.normalizeRoom(room);
       } catch (error: any) {
         if (error?.code === 11000 && attempt < 4) {
@@ -1202,6 +1212,26 @@ export class SocialBotService {
       joinedAt: new Date(),
     });
 
+    const profileRows = await this.repo.findUserProfilesByIds([userId]);
+    const profile = profileRows.find((row: any) => row._id === userId) as
+      | { username?: string | null }
+      | undefined;
+
+    await this.repo.updateRoomByCode(code, {
+      playerCount: Math.min(Number(room.maxPlayers || 2), members.length + 1),
+      updatedAt: new Date(),
+    });
+
+    this.rankedGateway.emitRoomPlayerJoined({
+      roomCode: String(room.roomCode || room.code || code),
+      code: String(room.roomCode || room.code || code),
+      userId,
+      username: profile?.username || null,
+      playerCount: members.length + 1,
+      maxPlayers: Number(room.maxPlayers || 2),
+      status: String(room.status || "waiting"),
+    });
+
     return room;
   }
 
@@ -1224,6 +1254,23 @@ export class SocialBotService {
     if (result.deletedCount === 0) {
       throw new BadRequestException("User is not a member of the room");
     }
+
+    const members = await this.repo.findRoomMembers(room._id);
+    await this.repo.updateRoomByCode(code, {
+      playerCount: members.length,
+      updatedAt: new Date(),
+    });
+
+    this.rankedGateway.emitRoomPlayerLeft({
+      roomCode: String(room.roomCode || room.code || code),
+      code: String(room.roomCode || room.code || code),
+      userId,
+      username: null,
+      playerCount: members.length,
+      maxPlayers: Number(room.maxPlayers || 2),
+      status: String(room.status || "waiting"),
+    });
+
     return { left: true };
   }
 
@@ -1297,6 +1344,15 @@ export class SocialBotService {
       blackPlayerId,
       startedAt: now,
       updatedAt: now,
+    });
+
+    this.rankedGateway.emitRoomGameStarted({
+      roomCode: String(room.roomCode || room.code || code),
+      code: String(room.roomCode || room.code || code),
+      gameId: String(game._id),
+      whitePlayerId,
+      blackPlayerId,
+      status: "playing",
     });
 
     return {

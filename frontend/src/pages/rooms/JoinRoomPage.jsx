@@ -61,6 +61,10 @@ export default function JoinRoomPage() {
       try {
         const response = await gameService.getRoom(normalizedCode)
         const room = response?.data ?? response
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.debug('[room:join] validate from url', { code: normalizedCode, room })
+        }
         setRoomInfo(normalizeRoomInfo(room, normalizedCode))
       } catch (err) {
         showNotification({
@@ -109,6 +113,10 @@ export default function JoinRoomPage() {
       const normalizedCode = code.toUpperCase()
       const response = await gameService.getRoom(normalizedCode)
       const room = response?.data ?? response
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug('[room:join] validate manual', { code: normalizedCode, room })
+      }
       setRoomInfo(normalizeRoomInfo(room, normalizedCode))
     } catch (err) {
       showNotification({
@@ -127,6 +135,11 @@ export default function JoinRoomPage() {
       const roomStarted = roomInfo?.status === 'playing' || Boolean(roomInfo?.activeGameId)
       if (!roomStarted) {
         await gameService.joinRoom(roomInfo.code)
+      }
+
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug('[room:join] join requested', { code: roomInfo.code, started: roomStarted })
       }
       navigate(`/rooms/${roomInfo.code}`)
     } catch (err) {
@@ -172,7 +185,7 @@ export default function JoinRoomPage() {
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">Mã phòng</label>
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Input
                     placeholder="Nhập mã (VD: ABC123)"
                     value={roomCode}
@@ -196,7 +209,7 @@ export default function JoinRoomPage() {
                     loading={isValidating}
                     variant="primary"
                     size="lg"
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
                   >
                     Kiểm tra
                   </Button>
@@ -225,7 +238,7 @@ export default function JoinRoomPage() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-600 mb-1">Chủ phòng</p>
                         <div className="flex items-center gap-2">
@@ -245,7 +258,7 @@ export default function JoinRoomPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-600 mb-1">Thời gian</p>
                         <p className="font-medium text-gray-900 flex items-center gap-1">

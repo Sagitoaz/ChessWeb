@@ -53,6 +53,14 @@ type GameDrawPayload = {
   matchId?: string;
 };
 
+type GameEndPayload = {
+  matchId: string;
+  reason: string;
+  result: string;
+  at: string;
+  resignedByUserId?: string;
+};
+
 @WebSocketGateway({
   cors: {
     origin: env.corsOrigins,
@@ -141,6 +149,56 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }): void {
     this.server.emit("tournament:completed", {
       ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitRoomPlayerJoined(payload: {
+    roomCode: string;
+    code?: string;
+    userId: string;
+    username?: string | null;
+    playerCount?: number;
+    maxPlayers?: number;
+    status?: string;
+  }): void {
+    this.server.emit("room:playerJoined", {
+      ...payload,
+      code: payload.code || payload.roomCode,
+      roomCode: payload.roomCode || payload.code,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitRoomPlayerLeft(payload: {
+    roomCode: string;
+    code?: string;
+    userId: string;
+    username?: string | null;
+    playerCount?: number;
+    maxPlayers?: number;
+    status?: string;
+  }): void {
+    this.server.emit("room:playerLeft", {
+      ...payload,
+      code: payload.code || payload.roomCode,
+      roomCode: payload.roomCode || payload.code,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitRoomGameStarted(payload: {
+    roomCode: string;
+    code?: string;
+    gameId: string;
+    whitePlayerId: string;
+    blackPlayerId: string;
+    status?: string;
+  }): void {
+    this.server.emit("room:gameStarted", {
+      ...payload,
+      code: payload.code || payload.roomCode,
+      roomCode: payload.roomCode || payload.code,
       at: new Date().toISOString(),
     });
   }
@@ -361,22 +419,24 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         completionPayload,
       );
 
-      this.server.to(`match:${matchId}`).emit("game:end", {
+      const payload: GameEndPayload = {
         matchId,
         reason: "resignation",
-        result: completion.result,
+        result: String(completion.result),
         resignedByUserId: user.userId,
         at: new Date().toISOString(),
-      });
+      };
+      this.emitGameEnd(matchId, participants, payload);
       return;
     } catch {
-      this.server.to(`match:${matchId}`).emit("game:end", {
+      const payload: GameEndPayload = {
         matchId,
         reason: "resignation",
         result,
         resignedByUserId: user.userId,
         at: new Date().toISOString(),
-      });
+      };
+      this.emitGameEnd(matchId, participants, payload);
     }
   }
 
@@ -442,6 +502,9 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       at: new Date().toISOString(),
     });
 
+    const participants =
+      await this.competitionService.getMatchParticipants(matchId);
+
     try {
       const completion = await this.competitionService.completeRankedMatch(
         { userId: user.userId, roles: user.roles || [] },
@@ -452,20 +515,22 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         },
       );
 
-      this.server.to(`match:${matchId}`).emit("game:end", {
+      const payload: GameEndPayload = {
         matchId,
         reason: "draw_agreement",
-        result: completion.result,
+        result: String(completion.result),
         at: new Date().toISOString(),
-      });
+      };
+      this.emitGameEnd(matchId, participants, payload);
       return;
     } catch {
-      this.server.to(`match:${matchId}`).emit("game:end", {
+      const payload: GameEndPayload = {
         matchId,
         reason: "draw_agreement",
         result: RankedMatchCompletionResult.DRAW,
         at: new Date().toISOString(),
-      });
+      };
+      this.emitGameEnd(matchId, participants, payload);
     }
   }
 
@@ -531,6 +596,27 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
           rating: match.white.rating,
         },
       });
+    }
+  }
+
+  private emitGameEnd(
+    matchId: string,
+    participants: { whitePlayerId: string; blackPlayerId: string } | null,
+    payload: GameEndPayload,
+  ): void {
+    this.server.to(`match:${matchId}`).emit("game:end", payload);
+
+    if (!participants) return;
+
+    const whiteSockets = this.socketsByUser.get(participants.whitePlayerId);
+    const blackSockets = this.socketsByUser.get(participants.blackPlayerId);
+
+    for (const socketId of whiteSockets || []) {
+      this.server.to(socketId).emit("game:end", payload);
+    }
+
+    for (const socketId of blackSockets || []) {
+      this.server.to(socketId).emit("game:end", payload);
     }
   }
 

@@ -32,7 +32,7 @@ const AppLayout = () => {
 
   if (!hasHydrated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-[#e1edff]">
         <Loader size="lg" text="Đang khôi phục phiên làm việc..." />
       </div>
     )
