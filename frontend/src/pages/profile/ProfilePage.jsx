@@ -187,7 +187,7 @@ const ProfilePage = () => {
                 <button
                   onClick={() => {
                     useAuthStore.getState().logout()
-                    window.location.href = '/login'
+                    window.location.hash = '#/login'
                   }}
                   className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-lg border border-red-200 transition"
                 >

@@ -8,7 +8,8 @@
 const DEFAULT_ORIGIN =
   typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080'
 const API_URL = import.meta.env.VITE_API_URL || `${DEFAULT_ORIGIN}/api/v1`
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || DEFAULT_ORIGIN
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL || new URL(API_URL, DEFAULT_ORIGIN).origin
 
 // Mock mode is force-disabled: frontend always uses real backend APIs.
 const USE_MOCK = false
