@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Avatar } from '@/components/common'
 import { useAuthStore } from '@/store'
 import authService from '@/services/authService'
-import gameService, { replayAPI } from '@/services/gameService'
+import gameService from '@/services/gameService'
 import { THEME } from '@/styles/theme'
 import {
   ArrowRight,
@@ -102,6 +102,42 @@ const normalizeResult = (rawResult, playerSide = null) => {
   return 'draw'
 }
 
+const normalizeHistoryPayload = (payload, username) => {
+  const data = payload?.data ?? payload ?? {}
+  const items = Array.isArray(data.items) ? data.items : []
+  const games = Array.isArray(data.games) ? data.games : []
+  const gamesById = new Map(games.map((item) => [String(item.id), item]))
+
+  return items
+    .map((item) => {
+      const replay = gamesById.get(String(item.gameId)) || gamesById.get(String(item.id)) || null
+      const mode = normalizeMode(item.mode || replay?.mode)
+      const opponent =
+        replay?.whitePlayer?.username && replay?.blackPlayer?.username
+          ? replay.whitePlayer.username === username
+            ? replay.blackPlayer.username
+            : replay.blackPlayer.username === username
+              ? replay.whitePlayer.username
+              : `${replay.whitePlayer.username} vs ${replay.blackPlayer.username}`
+          : item.playerSide === 'white'
+            ? replay?.blackPlayer?.username || 'Đối thủ'
+            : item.playerSide === 'black'
+              ? replay?.whitePlayer?.username || 'Đối thủ'
+              : replay?.whitePlayer?.username || replay?.blackPlayer?.username || 'Đối thủ'
+
+      return {
+        id: String(item.gameId || item.id || replay?.id || item._id || Math.random()),
+        mode,
+        result: normalizeResult(item.result, item.playerSide || null),
+        opponent,
+        playedAt: item.finishedAt || item.createdAt || replay?.createdAt || null,
+        duration: Number(replay?.metadata?.totalMoves || item.duration || item.durationSeconds || 0),
+        canAnalyze: Boolean(item.gameId || item.id || replay?.id || item._id),
+      }
+    })
+    .sort((a, b) => new Date(b.playedAt || 0) - new Date(a.playedAt || 0))
+}
+
 const resolvePlayerSide = (item, username) => {
   const explicit = String(item?.playerSide || item?.playerColor || '').toLowerCase()
   if (explicit === 'white' || explicit === 'black') return explicit
@@ -135,55 +171,6 @@ const resolveOpponent = (item, username) => {
   if (String(white).toLowerCase() === self) return black
   if (String(black).toLowerCase() === self) return white
   return `${white} vs ${black}`
-}
-
-const mergeMatches = ({ replayPayload, rankedPayload, username }) => {
-  const merged = []
-
-  const rankedMatches = Array.isArray(rankedPayload?.matches) ? rankedPayload.matches : []
-  for (const item of rankedMatches) {
-    merged.push({
-      id: String(item.id || item.gameId || item._id || `ranked-${Math.random()}`),
-      mode: 'ranked',
-      result: normalizeResult(item.result, String(item.playerColor || '').toLowerCase() || null),
-      opponent: item.opponent?.username || 'Đối thủ',
-      playedAt: item.playedAt || item.finishedAt || item.createdAt || null,
-      duration: Number(item.duration || 0),
-      canAnalyze: Boolean(item.id || item.gameId || item._id),
-    })
-  }
-
-  const replayGames = Array.isArray(replayPayload?.games)
-    ? replayPayload.games
-    : Array.isArray(replayPayload?.items)
-      ? replayPayload.items
-      : []
-
-  for (const item of replayGames) {
-    const mode = normalizeMode(item.mode)
-    const side = resolvePlayerSide(item, username)
-    merged.push({
-      id: String(item.id || item.gameId || item._id || `replay-${Math.random()}`),
-      mode,
-      result: normalizeResult(item.result, side),
-      opponent: resolveOpponent(item, username),
-      playedAt: item.createdAt || item.playedAt || item.finishedAt || null,
-      duration: Number(item.duration || item.durationSeconds || 0),
-      canAnalyze: Boolean(item.id || item.gameId || item._id),
-    })
-  }
-
-  const deduped = new Map()
-  for (const item of merged) {
-    const key = String(item.id)
-    if (!deduped.has(key)) deduped.set(key, item)
-  }
-
-  return [...deduped.values()].sort((a, b) => {
-    const aTs = new Date(a.playedAt || 0).getTime()
-    const bTs = new Date(b.playedAt || 0).getTime()
-    return bTs - aTs
-  })
 }
 
 const calcWinStreak = (matches) => {
@@ -269,25 +256,16 @@ export default function DashboardPage() {
     const load = async () => {
       setLoading(true)
 
-      const [profileResult, rankedResult, replayResult, rankedStatsResult] =
-        await Promise.allSettled([
-          authService.getCurrentUser(),
-          gameService.getRankedHistory(1, 80),
-          replayAPI.getGameHistory({ page: 1, pageSize: 120 }),
-          gameService.getRankedStats(),
-        ])
+      const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
+        authService.getCurrentUser(),
+        gameService.getUserGames({ page: 1, pageSize: 1000 }),
+        gameService.getRankedStats(),
+      ])
 
       if (!mounted) return
 
-      const rankedHistory =
-        rankedResult.status === 'fulfilled' ? rankedResult.value : { matches: [] }
-      const replayHistory = replayResult.status === 'fulfilled' ? replayResult.value : { games: [] }
-      const normalizedMatches = mergeMatches({
-        replayPayload: replayHistory,
-        rankedPayload: rankedHistory,
-        username: user?.username,
-      })
-      setMatches(normalizedMatches)
+      const gamesHistory = gamesResult.status === 'fulfilled' ? gamesResult.value : { items: [] }
+      setMatches(normalizeHistoryPayload(gamesHistory, user?.username))
 
       if (profileResult.status === 'fulfilled') {
         const profileData = profileResult.value?.data ?? profileResult.value
@@ -319,21 +297,10 @@ export default function DashboardPage() {
   }, [hasHydrated, setAuthLogin, token, user?.username])
 
   const analytics = useMemo(() => {
-    const totalGamesFromMatches = matches.length
-    const winsFromMatches = matches.filter((m) => m.result === 'win').length
-    const lossesFromMatches = matches.filter((m) => m.result === 'lose').length
-    const drawsFromMatches = matches.filter((m) => m.result === 'draw').length
-
-    const statsTotal = Number(rankedStats?.gamesPlayed ?? 0)
-    const statsWins = Number(rankedStats?.wins ?? 0)
-    const statsLosses = Number(rankedStats?.losses ?? 0)
-    const statsDraws = Number(rankedStats?.draws ?? 0)
-
-    const useStatsFallback = totalGamesFromMatches === 0 && statsTotal > 0
-    const totalGames = useStatsFallback ? statsTotal : totalGamesFromMatches
-    const wins = useStatsFallback ? statsWins : winsFromMatches
-    const losses = useStatsFallback ? statsLosses : lossesFromMatches
-    const draws = useStatsFallback ? statsDraws : drawsFromMatches
+    const totalGames = matches.length
+    const wins = matches.filter((m) => m.result === 'win').length
+    const losses = matches.filter((m) => m.result === 'lose').length
+    const draws = matches.filter((m) => m.result === 'draw').length
     const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0
     const winStreak = calcWinStreak(matches)
     const byMode = matches.reduce(
@@ -344,10 +311,6 @@ export default function DashboardPage() {
       },
       { ranked: 0, bot: 0, tournament: 0, friendly: 0 }
     )
-
-    if (useStatsFallback) {
-      byMode.ranked = totalGames
-    }
 
     return {
       totalGames,
