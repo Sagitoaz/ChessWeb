@@ -258,7 +258,7 @@ export default function DashboardPage() {
 
       const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
         authService.getCurrentUser(),
-        gameService.getUserGames({ page: 1, pageSize: 1000 }),
+        gameService.getAllUserGames(),
         gameService.getRankedStats(),
       ])
 

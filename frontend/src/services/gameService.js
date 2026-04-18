@@ -562,6 +562,40 @@ const gameService = {
     return unwrapApiEnvelope(response)
   },
 
+  getAllUserGames: async (filters = {}) => {
+    const pageSize = Math.min(Number(filters.pageSize ?? 100), 100)
+    const baseFilters = { ...filters, pageSize }
+    let page = Number(baseFilters.page ?? 1)
+    const allItems = []
+    const allGames = []
+    let total = 0
+    let pagesFetched = 0
+    const maxPages = Number(filters.maxPages ?? 100)
+
+    while (pagesFetched < maxPages) {
+      const response = await gameAPI.get('/games', { params: { ...baseFilters, page } })
+      const data = unwrapApiEnvelope(response)
+      const items = Array.isArray(data?.items) ? data.items : []
+      const games = Array.isArray(data?.games) ? data.games : []
+
+      allItems.push(...items)
+      allGames.push(...games)
+      total = Number(data?.total ?? total ?? allItems.length)
+      pagesFetched += 1
+
+      if (items.length < pageSize || allItems.length >= total) break
+      page += 1
+    }
+
+    return {
+      items: allItems,
+      games: allGames,
+      total: total || allItems.length,
+      page: 1,
+      pageSize,
+    }
+  },
+
   getUserModeStats: async (mode) => {
     const response = await gameAPI.get('/users/stats/by-mode', {
       params: mode ? { mode } : {},
