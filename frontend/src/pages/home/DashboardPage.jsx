@@ -1,50 +1,68 @@
-/**
- * DashboardPage - Trang dashboard sau khi login
- *
- * Hiển thị:
- * - User stats overview
- * - Recent games
- * - Quick access to game modes
- * - Upcoming tournaments
- *
- * Protected route - Requires authentication
- */
-
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Avatar } from '@/components/common'
 import { useAuthStore } from '@/store'
 import authService from '@/services/authService'
-import gameService from '@/services/gameService'
-import { THEME, STATUS_COLORS } from '@/styles/theme'
-import { Avatar } from '@/components/common'
+import gameService, { replayAPI } from '@/services/gameService'
+import { THEME } from '@/styles/theme'
 import {
+  ArrowRight,
+  Bot,
+  Flame,
+  Swords,
   Trophy,
   Users,
-  Swords,
-  Bot,
-  Clock,
-  Target,
-  PlayCircle,
-  Calendar,
-  ArrowRight,
-  Star,
   Zap,
+  Target,
+  BadgeCheck,
 } from 'lucide-react'
 
-const formatDuration = (seconds) => {
-  const safe = Math.max(0, Math.floor(Number(seconds) || 0))
-  const minutes = Math.floor(safe / 60)
-  const remaining = safe % 60
-  return `${minutes}:${String(remaining).padStart(2, '0')}`
+const DAY_MS = 24 * 60 * 60 * 1000
+const HEATMAP_DAYS = 30
+
+const MODE_META = {
+  ranked: {
+    label: 'Rank',
+    badge: 'bg-blue-100 text-blue-700 border-blue-200',
+  },
+  bot: {
+    label: 'Bot',
+    badge: 'bg-violet-100 text-violet-700 border-violet-200',
+  },
+  tournament: {
+    label: 'Tournament',
+    badge: 'bg-amber-100 text-amber-700 border-amber-200',
+  },
+  friendly: {
+    label: 'Friendly',
+    badge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  },
 }
 
-const formatRelativeTime = (value) => {
+const QUICK_ACTIONS = [
+  { to: '/ranked', label: 'Đấu Hạng', icon: Swords, color: 'bg-blue-600 hover:bg-blue-700' },
+  { to: '/bot', label: 'Đấu Bot', icon: Bot, color: 'bg-violet-600 hover:bg-violet-700' },
+  {
+    to: '/tournaments',
+    label: 'Giải Đấu',
+    icon: Trophy,
+    color: 'bg-amber-600 hover:bg-amber-700',
+  },
+  { to: '/rooms', label: 'Giao Hữu', icon: Users, color: 'bg-emerald-600 hover:bg-emerald-700' },
+]
+
+const toDateKey = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toISOString().slice(0, 10)
+}
+
+const relativeTime = (value) => {
   if (!value) return 'vừa xong'
   const ts = new Date(value).getTime()
   if (Number.isNaN(ts)) return 'vừa xong'
 
-  const diffMs = Date.now() - ts
-  const diffMin = Math.floor(diffMs / 60_000)
+  const diffMin = Math.floor((Date.now() - ts) / 60000)
   if (diffMin < 1) return 'vừa xong'
   if (diffMin < 60) return `${diffMin} phút trước`
 
@@ -55,375 +73,443 @@ const formatRelativeTime = (value) => {
   return `${diffDay} ngày trước`
 }
 
-const formatStreak = (stats) => {
-  const count = Number(stats?.currentStreak ?? 0)
-  const type = stats?.currentStreakType
-  if (!count || !type) return '0'
-  return `${count}${type === 'win' ? 'W' : 'L'}`
+const normalizeMode = (rawMode, fallback = 'friendly') => {
+  const value = String(rawMode || '').toLowerCase()
+  if (value.includes('rank')) return 'ranked'
+  if (value.includes('bot')) return 'bot'
+  if (value.includes('tour')) return 'tournament'
+  if (value.includes('room') || value.includes('friend') || value.includes('humanvshuman')) {
+    return 'friendly'
+  }
+  return fallback
 }
 
-const formatAverageOpponent = (value) => {
-  const rating = Number(value ?? 0)
-  return rating > 0 ? rating : '—'
+const normalizeResult = (rawResult, playerSide = null) => {
+  const v = String(rawResult || '').toLowerCase()
+  if (v === 'win' || v === 'lose' || v === 'loss' || v === 'draw') {
+    return v === 'loss' ? 'lose' : v
+  }
+  if (v === 'whitewin' || v === 'white_win' || v === '1-0') {
+    if (playerSide === 'white') return 'win'
+    if (playerSide === 'black') return 'lose'
+    return 'draw'
+  }
+  if (v === 'blackwin' || v === 'black_win' || v === '0-1') {
+    if (playerSide === 'black') return 'win'
+    if (playerSide === 'white') return 'lose'
+    return 'draw'
+  }
+  return 'draw'
 }
 
-// ==================== SUB-COMPONENTS ====================
+const resolvePlayerSide = (item, username) => {
+  const explicit = String(item?.playerSide || item?.playerColor || '').toLowerCase()
+  if (explicit === 'white' || explicit === 'black') return explicit
 
-/**
- * StatCard - Card hiển thị thống kê
- */
-const StatCard = ({ icon: Icon, label, value, change, trend }) => (
+  if (!username) return null
+
+  const whiteName = String(item?.whitePlayer?.username || '')
+    .trim()
+    .toLowerCase()
+  const blackName = String(item?.blackPlayer?.username || '')
+    .trim()
+    .toLowerCase()
+  const self = String(username).trim().toLowerCase()
+
+  if (whiteName && self === whiteName) return 'white'
+  if (blackName && self === blackName) return 'black'
+  return null
+}
+
+const resolveOpponent = (item, username) => {
+  const explicit =
+    item?.opponent?.username || item?.opponentUsername || item?.opponentId || item?.opponent || null
+  if (explicit) return explicit
+
+  const white = item?.whitePlayer?.username || item?.whitePlayerId || 'White'
+  const black = item?.blackPlayer?.username || item?.blackPlayerId || 'Black'
+
+  if (!username) return `${white} vs ${black}`
+
+  const self = String(username).toLowerCase()
+  if (String(white).toLowerCase() === self) return black
+  if (String(black).toLowerCase() === self) return white
+  return `${white} vs ${black}`
+}
+
+const mergeMatches = ({ replayPayload, rankedPayload, username }) => {
+  const merged = []
+
+  const rankedMatches = Array.isArray(rankedPayload?.matches) ? rankedPayload.matches : []
+  for (const item of rankedMatches) {
+    merged.push({
+      id: String(item.id || item.gameId || item._id || `ranked-${Math.random()}`),
+      mode: 'ranked',
+      result: normalizeResult(item.result, String(item.playerColor || '').toLowerCase() || null),
+      opponent: item.opponent?.username || 'Đối thủ',
+      playedAt: item.playedAt || item.finishedAt || item.createdAt || null,
+      duration: Number(item.duration || 0),
+      canAnalyze: Boolean(item.id || item.gameId || item._id),
+    })
+  }
+
+  const replayGames = Array.isArray(replayPayload?.games)
+    ? replayPayload.games
+    : Array.isArray(replayPayload?.items)
+      ? replayPayload.items
+      : []
+
+  for (const item of replayGames) {
+    const mode = normalizeMode(item.mode)
+    const side = resolvePlayerSide(item, username)
+    merged.push({
+      id: String(item.id || item.gameId || item._id || `replay-${Math.random()}`),
+      mode,
+      result: normalizeResult(item.result, side),
+      opponent: resolveOpponent(item, username),
+      playedAt: item.createdAt || item.playedAt || item.finishedAt || null,
+      duration: Number(item.duration || item.durationSeconds || 0),
+      canAnalyze: Boolean(item.id || item.gameId || item._id),
+    })
+  }
+
+  const deduped = new Map()
+  for (const item of merged) {
+    const key = String(item.id)
+    if (!deduped.has(key)) deduped.set(key, item)
+  }
+
+  return [...deduped.values()].sort((a, b) => {
+    const aTs = new Date(a.playedAt || 0).getTime()
+    const bTs = new Date(b.playedAt || 0).getTime()
+    return bTs - aTs
+  })
+}
+
+const calcWinStreak = (matches) => {
+  let streak = 0
+  for (const match of matches) {
+    if (match.result !== 'win') break
+    streak += 1
+  }
+  return streak
+}
+
+const calcHeatmap = (matches) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const dailyMap = new Map()
+  for (let i = 0; i < HEATMAP_DAYS; i += 1) {
+    const date = new Date(today.getTime() - (HEATMAP_DAYS - 1 - i) * DAY_MS)
+    const key = toDateKey(date)
+    dailyMap.set(key, 0)
+  }
+
+  for (const match of matches) {
+    const key = toDateKey(match.playedAt)
+    if (!key || !dailyMap.has(key)) continue
+    dailyMap.set(key, Number(dailyMap.get(key) || 0) + 1)
+  }
+
+  const cells = [...dailyMap.entries()].map(([date, count]) => ({ date, count }))
+  const max = Math.max(...cells.map((cell) => cell.count), 1)
+  return { cells, max }
+}
+
+const getHeatColor = (count, max) => {
+  if (!count) return '#e5e7eb'
+  const ratio = count / max
+  if (ratio < 0.25) return '#bfdbfe'
+  if (ratio < 0.5) return '#60a5fa'
+  if (ratio < 0.75) return '#2563eb'
+  return '#1e3a8a'
+}
+
+const StatCard = ({ icon: Icon, title, value, caption }) => (
   <div
-    className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-5`}
+    className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg`}
   >
-    <div className="flex items-start justify-between mb-3">
-      <div
-        className={`w-12 h-12 ${THEME.primary.light} ${THEME.rounded.DEFAULT} flex items-center justify-center`}
-      >
-        <Icon className={`w-6 h-6 ${THEME.primary.text}`} />
+    <div className="flex items-center justify-between mb-3">
+      <p className={`text-xs uppercase tracking-[0.14em] font-semibold ${THEME.text.muted}`}>
+        {title}
+      </p>
+      <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+        <Icon className="w-5 h-5" />
       </div>
-      {change && (
-        <div
-          className={`flex items-center text-sm font-semibold ${trend === 'up' ? STATUS_COLORS.win.icon : STATUS_COLORS.lose.icon}`}
-        >
-          {trend === 'up' ? '+' : ''}
-          {change}
-        </div>
-      )}
     </div>
-    <div className={`text-3xl font-bold ${THEME.text.primary} mb-1`}>{value}</div>
-    <div className={`text-sm ${THEME.text.secondary}`}>{label}</div>
+    <p className={`text-3xl font-black ${THEME.text.primary}`}>{value}</p>
+    <p className={`text-sm ${THEME.text.secondary} mt-1`}>{caption}</p>
   </div>
 )
 
-/**
- * QuickActionButton - Button hành động nhanh
- */
-const QuickActionButton = ({ icon: Icon, label, href, color = 'blue' }) => {
-  const colorMap = {
-    blue: `${THEME.primary.DEFAULT} ${THEME.primary.hover}`,
-    green: `${THEME.success.DEFAULT} ${THEME.success.hover}`,
-    purple: 'bg-purple-600 hover:bg-purple-700',
-    orange: 'bg-orange-600 hover:bg-orange-700',
-  }
-
+const MatchModeBadge = ({ mode }) => {
+  const meta = MODE_META[mode] || MODE_META.friendly
   return (
-    <Link
-      to={href}
-      className={`${colorMap[color]} ${THEME.text.inverse} ${THEME.rounded.lg} p-4 flex items-center justify-between transition-colors ${THEME.shadow.sm}`}
-    >
-      <div className="flex items-center gap-3">
-        <Icon className="w-6 h-6" />
-        <span className="font-semibold">{label}</span>
-      </div>
-      <ArrowRight className="w-5 h-5" />
-    </Link>
+    <span className={`px-2 py-1 text-xs rounded-full border font-semibold ${meta.badge}`}>
+      {meta.label}
+    </span>
   )
 }
-
-/**
- * RecentGameRow - Hiển thị một game gần đây
- */
-const RecentGameRow = ({ game }) => {
-  const resultConfig = {
-    win: { label: 'Thắng', color: STATUS_COLORS.win.icon },
-    lose: { label: 'Thua', color: STATUS_COLORS.lose.icon },
-    draw: { label: 'Hòa', color: STATUS_COLORS.draw.icon },
-  }
-  const normalizedResult = game.result === 'loss' ? 'lose' : game.result
-  const { label, color } = resultConfig[normalizedResult] || resultConfig.draw
-
-  return (
-    <div
-      className={`flex items-center justify-between py-3 border-b ${THEME.border.DEFAULT} last:border-0`}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 ${THEME.rounded.full} ${THEME.background.active} flex items-center justify-center font-bold ${THEME.text.secondary}`}
-        >
-          {(game.opponent || '?')[0]}
-        </div>
-        <div>
-          <div className={`font-medium ${THEME.text.primary}`}>{game.opponent}</div>
-          <div className={`text-xs ${THEME.text.muted}`}>
-            {game.mode} • {formatDuration(game.duration)}
-          </div>
-        </div>
-      </div>
-      <div className="text-right">
-        <div className={`font-bold ${color}`}>{label}</div>
-        {game.eloChange !== 0 && (
-          <div
-            className={`text-xs font-semibold ${game.eloChange > 0 ? STATUS_COLORS.win.icon : STATUS_COLORS.lose.icon}`}
-          >
-            {game.eloChange > 0 ? '+' : ''}
-            {game.eloChange} ELO
-          </div>
-        )}
-        <div className={`text-xs ${THEME.text.muted}`}>{formatRelativeTime(game.playedAt)}</div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * TournamentCard - Card giải đấu
- */
-const TournamentCard = ({ tournament }) => (
-  <Link
-    to={`/tournaments/${tournament.id}`}
-    className={`block ${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-4 ${THEME.background.hover} transition-colors`}
-  >
-    <div className="flex items-start justify-between mb-2">
-      <h4 className={`font-semibold ${THEME.text.primary}`}>{tournament.name}</h4>
-      <Trophy className={`w-5 h-5 ${THEME.warning.text}`} />
-    </div>
-    <div className={`text-sm ${THEME.text.secondary} space-y-1`}>
-      <div className="flex items-center gap-2">
-        <Users className="w-4 h-4" />
-        <span>{tournament.players} người chơi</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Calendar className="w-4 h-4" />
-        <span>Bắt đầu {tournament.startTime}</span>
-      </div>
-    </div>
-  </Link>
-)
-
-// ==================== MAIN COMPONENT ====================
 
 export default function DashboardPage() {
   const { user, hasHydrated } = useAuthStore()
   const token = useAuthStore((state) => state.token)
   const setAuthLogin = useAuthStore((state) => state.login)
-  const [recentGames, setRecentGames] = useState([])
-  const [upcomingTournaments, setUpcomingTournaments] = useState([])
+
+  const [loading, setLoading] = useState(true)
   const [rankedStats, setRankedStats] = useState(null)
+  const [matches, setMatches] = useState([])
 
   useEffect(() => {
     if (!hasHydrated || !token) return
 
     let mounted = true
-    const refresh = async () => {
-      const [profileResult, gamesResult, tournamentsResult, rankedStatsResult] =
+
+    const load = async () => {
+      setLoading(true)
+
+      const [profileResult, rankedResult, replayResult, rankedStatsResult] =
         await Promise.allSettled([
           authService.getCurrentUser(),
-          gameService.getRankedHistory(1, 4),
-          gameService.getTournaments({ status: 'registration', page: 1, pageSize: 4 }),
+          gameService.getRankedHistory(1, 80),
+          replayAPI.getGameHistory({ page: 1, pageSize: 120 }),
           gameService.getRankedStats(),
         ])
 
       if (!mounted) return
 
+      const rankedHistory =
+        rankedResult.status === 'fulfilled' ? rankedResult.value : { matches: [] }
+      const replayHistory = replayResult.status === 'fulfilled' ? replayResult.value : { games: [] }
+      const normalizedMatches = mergeMatches({
+        replayPayload: replayHistory,
+        rankedPayload: rankedHistory,
+        username: user?.username,
+      })
+      setMatches(normalizedMatches)
+
       if (profileResult.status === 'fulfilled') {
         const profileData = profileResult.value?.data ?? profileResult.value
         const nextUser = profileData?.user ?? profileData
-        if (nextUser) {
-          const rankedStats =
-            rankedStatsResult.status === 'fulfilled' ? rankedStatsResult.value : null
-          const statsData = rankedStats?.data ?? rankedStats
+        if (nextUser && token) {
+          const stats = rankedStatsResult.status === 'fulfilled' ? rankedStatsResult.value : null
           setAuthLogin(
             {
               ...nextUser,
-              rating: Number(statsData?.currentRating ?? nextUser.rating ?? 1200),
-              gamesPlayed: Number(statsData?.gamesPlayed ?? nextUser.gamesPlayed ?? 0),
-              wins: Number(statsData?.wins ?? nextUser.wins ?? 0),
-              losses: Number(statsData?.losses ?? nextUser.losses ?? 0),
-              draws: Number(statsData?.draws ?? nextUser.draws ?? 0),
+              rating: Number(stats?.currentRating ?? nextUser.rating ?? 1200),
             },
             token
           )
         }
       }
 
-      if (gamesResult.status === 'fulfilled') {
-        const history = gamesResult.value
-        const matches = Array.isArray(history?.matches) ? history.matches : []
-        const normalizedGames = matches.map((item) => ({
-          id: item.id,
-          opponent: item.opponent?.username || 'Đối thủ',
-          result: item.result === 'loss' ? 'lose' : item.result || 'draw',
-          eloChange: Number(item.ratingChange || 0),
-          mode: 'ranked',
-          duration: Number(item.duration || 0),
-          playedAt: item.playedAt || null,
-        }))
-        setRecentGames(normalizedGames)
-      }
-
-      if (tournamentsResult.status === 'fulfilled') {
-        const tournamentsData = tournamentsResult.value?.data ?? tournamentsResult.value
-        const tournaments = Array.isArray(tournamentsData?.tournaments)
-          ? tournamentsData.tournaments
-          : []
-        const normalizedTournaments = tournaments.map((tournament) => ({
-          id: tournament.id || tournament._id,
-          name: tournament.name || 'Giải đấu',
-          players: tournament.participants || tournament.currentPlayers || 0,
-          startTime:
-            tournament.startAt ||
-            tournament.startTime ||
-            tournament.start_date ||
-            new Date().toISOString(),
-        }))
-        setUpcomingTournaments(normalizedTournaments)
-      }
-
       if (rankedStatsResult.status === 'fulfilled') {
-        const stats = rankedStatsResult.value?.data ?? rankedStatsResult.value
-        setRankedStats(stats)
+        setRankedStats(rankedStatsResult.value)
       }
+
+      setLoading(false)
     }
-    void refresh()
+
+    void load()
 
     return () => {
       mounted = false
     }
-  }, [hasHydrated, setAuthLogin, token])
+  }, [hasHydrated, setAuthLogin, token, user?.username])
 
-  if (!hasHydrated) {
+  const analytics = useMemo(() => {
+    const totalGames = matches.length
+    const wins = matches.filter((m) => m.result === 'win').length
+    const losses = matches.filter((m) => m.result === 'lose').length
+    const draws = matches.filter((m) => m.result === 'draw').length
+    const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0
+    const winStreak = calcWinStreak(matches)
+    const byMode = matches.reduce(
+      (acc, match) => {
+        const mode = normalizeMode(match.mode)
+        acc[mode] += 1
+        return acc
+      },
+      { ranked: 0, bot: 0, tournament: 0, friendly: 0 }
+    )
+
+    return {
+      totalGames,
+      wins,
+      losses,
+      draws,
+      winRate,
+      winStreak,
+      byMode,
+    }
+  }, [matches])
+
+  const heatmap = useMemo(() => calcHeatmap(matches), [matches])
+  const currentRating = Number(rankedStats?.currentRating ?? user?.rating ?? 1200)
+  const recentMatches = matches.slice(0, 8)
+
+  if (!hasHydrated || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-sm text-gray-500">Đang tải dashboard...</div>
+      <div className="min-h-[70vh] flex items-center justify-center font-sans">
+        <div className="text-sm text-gray-500">Đang tải Dashboard...</div>
       </div>
     )
   }
 
-  const fallbackUser = {
-    username: 'Kỳ thủ',
-    displayName: 'Kỳ thủ',
-    avatarUrl: null,
-    rating: 1200,
-    gamesPlayed: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
-  }
-  const profile = user ?? fallbackUser
-  const displayedRating = Number(rankedStats?.currentRating ?? profile.rating ?? 1200)
-  const displayedWins = Number(rankedStats?.wins ?? profile.wins ?? 0)
-  const displayedGames = Number(rankedStats?.gamesPlayed ?? profile.gamesPlayed ?? 0)
-  const displayedStreak = formatStreak(rankedStats)
-  const displayedAvgOpponent = formatAverageOpponent(rankedStats?.avgOpponentRating)
-  const winRate =
-    displayedGames > 0
-      ? Math.round(
-          Number(
-            rankedStats?.winRate ??
-              (Number(rankedStats?.wins ?? profile.wins ?? 0) / displayedGames) * 100
-          )
-        )
-      : 0
-
   return (
-    <div className={`min-h-screen ${THEME.background.page} py-6`}>
+    <div className={`font-sans ${THEME.background.page} min-h-full py-6`}>
       <div className="max-w-7xl mx-auto px-4">
-        {/* Welcome Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-2">
-            <Avatar src={profile.avatarUrl} alt={profile.username} size="lg" />
-            <div>
-              <h1 className={`text-3xl font-bold ${THEME.text.primary}`}>
-                Xin chào, {profile.displayName || profile.username}! 👋
-              </h1>
-              <p className={THEME.text.secondary}>Sẵn sàng cho trận đấu tiếp theo?</p>
-            </div>
+        <div className="mb-8 flex items-center gap-4">
+          <Avatar src={user?.avatarUrl} alt={user?.username} size="lg" />
+          <div>
+            <h1 className="text-3xl font-black text-gray-900">Dashboard Tổng Hợp</h1>
+            <p className="text-gray-600">
+              Chào {user?.displayName || user?.username || 'Kỳ thủ'}, đây là toàn cảnh tất cả trận
+              của bạn.
+            </p>
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          <StatCard icon={Star} label="ELO Rating" value={displayedRating} />
-          <StatCard icon={Trophy} label="Thắng" value={displayedWins} />
-          <StatCard icon={Clock} label="Tổng Ván" value={displayedGames} />
-          <StatCard icon={Target} label="Tỷ Lệ Thắng" value={`${winRate}%`} />
-          <StatCard icon={Zap} label="Streak" value={displayedStreak} />
-          <StatCard icon={Users} label="AVG Opp" value={displayedAvgOpponent} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-7">
+          <StatCard
+            icon={Swords}
+            title="Tổng ván đấu"
+            value={analytics.totalGames}
+            caption={`Rank ${analytics.byMode.ranked} · Bot ${analytics.byMode.bot} · Tournament ${analytics.byMode.tournament} · Friendly ${analytics.byMode.friendly}`}
+          />
+          <StatCard
+            icon={BadgeCheck}
+            title="Elo hiện tại"
+            value={currentRating}
+            caption={
+              rankedStats?.peakRating ? `Peak ${rankedStats.peakRating}` : 'Xếp hạng hiện tại'
+            }
+          />
+          <StatCard
+            icon={Target}
+            title="Tỷ lệ thắng"
+            value={`${analytics.winRate}%`}
+            caption={`${analytics.wins} thắng · ${analytics.losses} thua · ${analytics.draws} hòa`}
+          />
+          <StatCard
+            icon={Flame}
+            title="Chuỗi thắng"
+            value={analytics.winStreak}
+            caption={analytics.winStreak > 0 ? 'Đang thăng hoa' : 'Hãy bắt đầu chuỗi mới'}
+          />
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <QuickActionButton icon={Swords} label="Ranked Match" href="/ranked" color="blue" />
-          <QuickActionButton icon={Users} label="Phòng Chơi" href="/rooms" color="green" />
-          <QuickActionButton icon={Trophy} label="Giải Đấu" href="/tournaments" color="purple" />
-          <QuickActionButton icon={Bot} label="Chơi Với Bot" href="/bot" color="orange" />
-        </div>
-
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Games - Takes 2 columns */}
-          <div className="lg:col-span-2">
-            <div
-              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-bold ${THEME.text.primary}`}>Ván Đấu Gần Đây</h2>
-                <Link
-                  to="/ranked/history"
-                  className={`text-sm ${THEME.primary.text} ${THEME.primary.textHover} font-medium`}
-                >
-                  Xem tất cả →
-                </Link>
-              </div>
-
-              <div>
-                {recentGames.map((game) => (
-                  <RecentGameRow key={game.id} game={game} />
-                ))}
-              </div>
-
-              {recentGames.length === 0 && (
-                <div className="text-center py-8">
-                  <PlayCircle className={`w-16 h-16 mx-auto mb-3 ${THEME.text.muted}`} />
-                  <p className={THEME.text.secondary}>Chưa có ván đấu nào</p>
-                </div>
-              )}
+          <section className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Activity Heatmap (30 ngày)</h2>
+              <span className="text-sm text-gray-500">Mật độ chơi cờ theo ngày</span>
             </div>
-          </div>
 
-          {/* Sidebar - Takes 1 column */}
-          <div className="space-y-6">
-            {/* Tournaments */}
-            <div
-              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className={`text-lg font-bold ${THEME.text.primary}`}>Giải Đấu Sắp Diễn Ra</h3>
-              </div>
+            <div className="grid grid-cols-10 sm:grid-cols-15 gap-2">
+              {heatmap.cells.map((cell) => (
+                <div
+                  key={cell.date}
+                  className="aspect-square rounded-md border border-white/40"
+                  style={{ backgroundColor: getHeatColor(cell.count, heatmap.max) }}
+                  title={`${cell.date}: ${cell.count} trận`}
+                />
+              ))}
+            </div>
 
+            <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+              <span>Ít</span>
+              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(0, 4) }} />
+              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(1, 4) }} />
+              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(2, 4) }} />
+              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(3, 4) }} />
+              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(4, 4) }} />
+              <span>Nhiều</span>
+            </div>
+          </section>
+
+          <aside className="space-y-6">
+            <section className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Lối tắt thi đấu</h3>
               <div className="space-y-3">
-                {upcomingTournaments.map((tournament) => (
-                  <TournamentCard key={tournament.id} tournament={tournament} />
+                {QUICK_ACTIONS.map((action) => (
+                  <Link
+                    key={action.to}
+                    to={action.to}
+                    className={`${action.color} text-white rounded-lg px-4 py-3 flex items-center justify-between transition-colors`}
+                  >
+                    <span className="flex items-center gap-2 font-semibold">
+                      <action.icon className="w-4 h-4" />
+                      {action.label}
+                    </span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
                 ))}
-                {upcomingTournaments.length === 0 && (
-                  <p className={`text-sm ${THEME.text.secondary}`}>Chưa có giải đấu sắp diễn ra.</p>
-                )}
               </div>
+            </section>
 
-              <Link
-                to="/tournaments"
-                className={`block text-center mt-4 text-sm ${THEME.primary.text} ${THEME.primary.textHover} font-medium`}
-              >
-                Xem tất cả giải đấu →
-              </Link>
-            </div>
-
-            {/* Quick Tips */}
-            <div
-              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6`}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Zap className={`w-5 h-5 ${THEME.warning.text}`} />
-                <h3 className={`text-lg font-bold ${THEME.text.primary}`}>Mẹo Hôm Nay</h3>
+            <section className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Tóm tắt nhanh</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Tổng thắng</span>
+                  <span className="font-bold text-green-600">{analytics.wins}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Tổng thua</span>
+                  <span className="font-bold text-red-600">{analytics.losses}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Tổng hòa</span>
+                  <span className="font-bold text-gray-700">{analytics.draws}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Chuỗi hiện tại</span>
+                  <span className="font-bold text-indigo-700">{analytics.winStreak} W</span>
+                </div>
               </div>
-              <p className={`text-sm ${THEME.text.secondary}`}>
-                Kiểm soát trung tâm bàn cờ là chìa khóa để dẫn dắt trận đấu. Cố gắng đặt quân ở các
-                ô d4, d5, e4, e5 ngay từ đầu game!
-              </p>
-            </div>
-          </div>
+            </section>
+          </aside>
         </div>
+
+        <section className="mt-6 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Recent Matches</h2>
+            <Link to="/replays" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+              Xem toàn bộ lịch sử
+            </Link>
+          </div>
+
+          {recentMatches.length === 0 ? (
+            <p className="text-sm text-gray-500">Chưa có trận nào để hiển thị.</p>
+          ) : (
+            <div className="space-y-2">
+              {recentMatches.map((match) => {
+                const resultClass =
+                  match.result === 'win'
+                    ? 'text-green-600 bg-green-50'
+                    : match.result === 'lose'
+                      ? 'text-red-600 bg-red-50'
+                      : 'text-gray-600 bg-gray-100'
+
+                return (
+                  <div
+                    key={`${match.id}-${match.playedAt}`}
+                    className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr_auto] items-center gap-3 px-3 py-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <MatchModeBadge mode={match.mode} />
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${resultClass}`}>
+                      {match.result.toUpperCase()}
+                    </span>
+                    <p className="text-sm text-gray-700 truncate">{match.opponent}</p>
+                    <p className="text-xs text-gray-500">{relativeTime(match.playedAt)}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )
