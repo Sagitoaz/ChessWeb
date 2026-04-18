@@ -558,7 +558,7 @@ const gameService = {
   },
 
   getUserGames: async (filters = {}) => {
-    const response = await gameAPI.get('/users/games', { params: filters })
+    const response = await gameAPI.get('/games', { params: filters })
     return unwrapApiEnvelope(response)
   },
 
