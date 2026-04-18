@@ -9,6 +9,8 @@ import api from './api'
 const gameAPI = api
 
 const unwrapApiEnvelope = (payload) => payload?.data ?? payload
+const USER_GAMES_CACHE_TTL_MS = 20000
+const userGamesCache = new Map()
 
 const normalizeRankedResult = (result) => {
   const v = typeof result === 'string' ? result.toLowerCase() : ''
@@ -564,36 +566,54 @@ const gameService = {
 
   getAllUserGames: async (filters = {}) => {
     const pageSize = Math.min(Number(filters.pageSize ?? 100), 100)
-    const baseFilters = { ...filters, pageSize }
-    let page = Number(baseFilters.page ?? 1)
-    const allItems = []
-    const allGames = []
-    let total = 0
-    let pagesFetched = 0
-    const maxPages = Number(filters.maxPages ?? 100)
-
-    while (pagesFetched < maxPages) {
-      const response = await gameAPI.get('/games', { params: { ...baseFilters, page } })
-      const data = unwrapApiEnvelope(response)
-      const items = Array.isArray(data?.items) ? data.items : []
-      const games = Array.isArray(data?.games) ? data.games : []
-
-      allItems.push(...items)
-      allGames.push(...games)
-      total = Number(data?.total ?? total ?? allItems.length)
-      pagesFetched += 1
-
-      if (items.length < pageSize || allItems.length >= total) break
-      page += 1
+    const maxPages = Math.max(1, Number(filters.maxPages ?? 20))
+    const cacheKey = JSON.stringify({ ...filters, pageSize, maxPages })
+    const cached = userGamesCache.get(cacheKey)
+    if (cached && Date.now() - cached.cachedAt < USER_GAMES_CACHE_TTL_MS) {
+      return cached.data
     }
 
-    return {
-      items: allItems,
-      games: allGames,
-      total: total || allItems.length,
-      page: 1,
+    const baseFilters = { ...filters, pageSize }
+    const firstPageNumber = Math.max(1, Number(baseFilters.page ?? 1))
+
+    const firstResponse = await gameAPI.get('/games', {
+      params: { ...baseFilters, page: firstPageNumber },
+    })
+    const firstData = unwrapApiEnvelope(firstResponse)
+    const firstItems = Array.isArray(firstData?.items) ? firstData.items : []
+    const firstGames = Array.isArray(firstData?.games) ? firstData.games : []
+    const total = Number(firstData?.total ?? firstItems.length)
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize))
+    const effectivePages = Math.min(totalPages, maxPages)
+
+    const nextPageRequests = []
+    for (let page = firstPageNumber + 1; page <= effectivePages; page += 1) {
+      nextPageRequests.push(gameAPI.get('/games', { params: { ...baseFilters, page } }))
+    }
+
+    const nextResponses = await Promise.all(nextPageRequests)
+    const nextData = nextResponses.map((response) => unwrapApiEnvelope(response))
+
+    const items = [
+      ...firstItems,
+      ...nextData.flatMap((entry) => (Array.isArray(entry?.items) ? entry.items : [])),
+    ]
+    const games = [
+      ...firstGames,
+      ...nextData.flatMap((entry) => (Array.isArray(entry?.games) ? entry.games : [])),
+    ]
+
+    const data = {
+      items,
+      games,
+      total,
+      page: firstPageNumber,
       pageSize,
     }
+
+    userGamesCache.set(cacheKey, { data, cachedAt: Date.now() })
+    return data
   },
 
   getUserModeStats: async (mode) => {

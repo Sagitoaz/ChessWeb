@@ -38,13 +38,17 @@ class SocketService {
     this.authToken = nextToken
 
     this.socket = io(SOCKET_URL, {
+      path: '/socket.io',
       auth: {
         token: nextToken,
       },
+      transports: ['websocket'],
+      upgrade: false,
+      timeout: 10000,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
     })
 
     this.socket.on('connect', () => {

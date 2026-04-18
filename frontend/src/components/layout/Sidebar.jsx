@@ -10,31 +10,31 @@ import { useUIStore } from '@/store'
 // Danh sách các mục điều hướng
 const NAV_ITEMS = [
   {
-    group: 'General',
+    group: 'Chung',
     items: [
       { path: '/dashboard', label: 'Dashboard', icon: '🏠' },
-      { path: '/profile', label: 'Profile', icon: '👤' },
-      { path: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
+      { path: '/profile', label: 'Hồ sơ', icon: '👤' },
+      { path: '/leaderboard', label: 'Bảng xếp hạng', icon: '🏆' },
     ],
   },
   {
-    group: 'Play',
+    group: 'Thi đấu',
     items: [
-      { path: '/ranked', label: 'Ranked Match', icon: '⚔️' },
-      { path: '/rooms', label: 'Friend Room', icon: '🚪' },
-      { path: '/bot', label: 'Play vs Bot', icon: '🤖' },
+      { path: '/ranked', label: 'Đấu hạng', icon: '⚔️' },
+      { path: '/rooms', label: 'Phòng giao hữu', icon: '🚪' },
+      { path: '/bot', label: 'Đấu với Bot', icon: '🤖' },
     ],
   },
   {
-    group: 'Tournament',
-    items: [{ path: '/tournaments', label: 'Tournaments', icon: '🥇' }],
+    group: 'Giải đấu',
+    items: [{ path: '/tournaments', label: 'Giải đấu', icon: '🥇' }],
   },
   {
-    group: 'History',
+    group: 'Lịch sử',
     items: [
-      { path: '/ranked/history', label: 'Match History', icon: '📋' },
-      { path: '/replays', label: 'Replays', icon: '▶️' },
-      { path: '/ranked/stats', label: 'Stats', icon: '📊' },
+      { path: '/ranked/history', label: 'Lịch sử đấu hạng', icon: '📋' },
+      { path: '/replays', label: 'Replay', icon: '▶️' },
+      { path: '/ranked/stats', label: 'Thống kê', icon: '📊' },
     ],
   },
 ]
@@ -84,7 +84,7 @@ const Sidebar = ({ collapsed = false }) => {
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-semibold text-gray-800 truncate">
-                {user?.displayName || user?.username || 'User'}
+                {user?.displayName || user?.username || 'Người chơi'}
               </p>
               {user?.rating && (
                 <p className="text-xs text-yellow-600 font-medium">⭐ {user.rating} ELO</p>
@@ -134,7 +134,7 @@ const Sidebar = ({ collapsed = false }) => {
       <div className="border-t border-gray-200 py-3 px-2">
         <button
           onClick={() => { logout(); navigate('/login') }}
-          title={collapsed ? 'Logout' : undefined}
+          title={collapsed ? 'Đăng xuất' : undefined}
           className={`
             w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
             text-red-600 hover:bg-red-50 transition-colors
@@ -142,7 +142,7 @@ const Sidebar = ({ collapsed = false }) => {
           `}
         >
           <span className="text-base">🚪</span>
-          {!collapsed && <span>Logout</span>}
+          {!collapsed && <span>Đăng xuất</span>}
         </button>
       </div>
     </aside>

@@ -1,12 +1,12 @@
 /**
  * HomePage - Trang chủ chính của ứng dụng
- * 
+ *
  * Hiển thị:
  * - Welcome banner
  * - Quick actions (Play, Tournaments, etc.)
  * - Recent games
  * - Leaderboard preview
- * 
+ *
  * Accessible by all users (logged in or not)
  */
 
@@ -14,10 +14,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { THEME } from '@/styles/theme'
 import { Button } from '@/components/common'
-import { 
-  Trophy, Users, Swords, Bot, PlayCircle, 
-  TrendingUp, Clock, Star 
-} from 'lucide-react'
+import { Trophy, Users, Swords, Bot, PlayCircle, TrendingUp, Clock, Star } from 'lucide-react'
 
 // ==================== SUB-COMPONENTS ====================
 
@@ -48,7 +45,9 @@ const QuickActionCard = ({ icon: Icon, title, description, href, color = 'blue' 
  * StatCard - Hiển thị một thống kê
  */
 const StatCard = ({ icon: Icon, label, value }) => (
-  <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-4 text-center`}>
+  <div
+    className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-4 text-center`}
+  >
     <Icon className={`w-8 h-8 mx-auto mb-2 ${THEME.primary.text}`} />
     <div className={`text-2xl font-bold ${THEME.text.primary}`}>{value}</div>
     <div className={`text-sm ${THEME.text.secondary}`}>{label}</div>
@@ -79,7 +78,7 @@ export default function HomePage() {
           <p className="text-xl mb-8 text-white/90">
             Nền tảng cờ vua trực tuyến - Thi đấu, học hỏi và kết nối
           </p>
-          
+
           <div className="flex flex-wrap justify-center gap-4">
             <Button
               size="lg"
@@ -89,7 +88,7 @@ export default function HomePage() {
               <Swords className="w-5 h-5 mr-2" />
               Chơi Ngay
             </Button>
-            
+
             {!user && (
               <Link to="/register">
                 <Button
@@ -107,22 +106,19 @@ export default function HomePage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-12">
-        
         {/* Quick Actions Grid */}
         <section className="mb-12">
-          <h2 className={`text-3xl font-bold ${THEME.text.primary} mb-6`}>
-            Bắt Đầu Chơi
-          </h2>
-          
+          <h2 className={`text-3xl font-bold ${THEME.text.primary} mb-6`}>Bắt Đầu Chơi</h2>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <QuickActionCard
               icon={Swords}
-              title="Ranked Match"
+              title="Đấu hạng"
               description="Thi đấu xếp hạng với các kỳ thủ cùng trình độ"
               href="/ranked"
               color="blue"
             />
-            
+
             <QuickActionCard
               icon={Users}
               title="Phòng Chơi"
@@ -130,7 +126,7 @@ export default function HomePage() {
               href="/rooms"
               color="green"
             />
-            
+
             <QuickActionCard
               icon={Trophy}
               title="Giải Đấu"
@@ -138,7 +134,7 @@ export default function HomePage() {
               href="/tournaments"
               color="purple"
             />
-            
+
             <QuickActionCard
               icon={Bot}
               title="Chơi Với Bot"
@@ -152,15 +148,17 @@ export default function HomePage() {
         {/* Stats Section */}
         {user && (
           <section className="mb-12">
-            <h2 className={`text-3xl font-bold ${THEME.text.primary} mb-6`}>
-              Thống Kê Của Bạn
-            </h2>
-            
+            <h2 className={`text-3xl font-bold ${THEME.text.primary} mb-6`}>Thống Kê Của Bạn</h2>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard icon={Star} label="ELO Rating" value={user.rating || 1200} />
+              <StatCard icon={Star} label="Điểm ELO" value={user.rating || 1200} />
               <StatCard icon={Trophy} label="Thắng" value={user.wins || 0} />
               <StatCard icon={Clock} label="Tổng Ván" value={user.gamesPlayed || 0} />
-              <StatCard icon={TrendingUp} label="Win Rate" value={`${user.wins && user.gamesPlayed ? Math.round((user.wins / user.gamesPlayed) * 100) : 0}%`} />
+              <StatCard
+                icon={TrendingUp}
+                label="Tỉ lệ thắng"
+                value={`${user.wins && user.gamesPlayed ? Math.round((user.wins / user.gamesPlayed) * 100) : 0}%`}
+              />
             </div>
           </section>
         )}
@@ -170,10 +168,14 @@ export default function HomePage() {
           <h2 className={`text-3xl font-bold ${THEME.text.primary} mb-6 text-center`}>
             Tính Năng Nổi Bật
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6 text-center`}>
-              <div className={`w-16 h-16 mx-auto mb-4 ${THEME.primary.light} ${THEME.rounded.full} flex items-center justify-center`}>
+            <div
+              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6 text-center`}
+            >
+              <div
+                className={`w-16 h-16 mx-auto mb-4 ${THEME.primary.light} ${THEME.rounded.full} flex items-center justify-center`}
+              >
                 <Swords className={`w-8 h-8 ${THEME.primary.text}`} />
               </div>
               <h3 className={`text-xl font-bold ${THEME.text.primary} mb-2`}>
@@ -184,20 +186,27 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6 text-center`}>
-              <div className={`w-16 h-16 mx-auto mb-4 ${THEME.success.light} ${THEME.rounded.full} flex items-center justify-center`}>
+            <div
+              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6 text-center`}
+            >
+              <div
+                className={`w-16 h-16 mx-auto mb-4 ${THEME.success.light} ${THEME.rounded.full} flex items-center justify-center`}
+              >
                 <Trophy className={`w-8 h-8 ${THEME.success.text}`} />
               </div>
-              <h3 className={`text-xl font-bold ${THEME.text.primary} mb-2`}>
-                Giải Đấu Đa Dạng
-              </h3>
+              <h3 className={`text-xl font-bold ${THEME.text.primary} mb-2`}>Giải Đấu Đa Dạng</h3>
               <p className={THEME.text.secondary}>
-                Tham gia các giải đấu với nhiều format: Single/Double Elimination, Round Robin, Swiss
+                Tham gia các giải đấu với nhiều format: Single/Double Elimination, Round Robin,
+                Swiss
               </p>
             </div>
 
-            <div className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6 text-center`}>
-              <div className={`w-16 h-16 mx-auto mb-4 ${THEME.warning.light} ${THEME.rounded.full} flex items-center justify-center`}>
+            <div
+              className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-6 text-center`}
+            >
+              <div
+                className={`w-16 h-16 mx-auto mb-4 ${THEME.warning.light} ${THEME.rounded.full} flex items-center justify-center`}
+              >
                 <PlayCircle className={`w-8 h-8 ${THEME.warning.text}`} />
               </div>
               <h3 className={`text-xl font-bold ${THEME.text.primary} mb-2`}>
@@ -212,13 +221,12 @@ export default function HomePage() {
 
         {/* CTA Section */}
         {!user && (
-          <section className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-12 text-center`}>
-            <h2 className={`text-3xl font-bold ${THEME.text.primary} mb-4`}>
-              Sẵn Sàng Bắt Đầu?
-            </h2>
+          <section
+            className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-12 text-center`}
+          >
+            <h2 className={`text-3xl font-bold ${THEME.text.primary} mb-4`}>Sẵn Sàng Bắt Đầu?</h2>
             <p className={`text-lg ${THEME.text.secondary} mb-6 max-w-2xl mx-auto`}>
-              Tham gia cộng đồng cờ vua với hàng nghìn kỳ thủ khác. 
-              Hoàn toàn miễn phí!
+              Tham gia cộng đồng cờ vua với hàng nghìn kỳ thủ khác. Hoàn toàn miễn phí!
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/register">
@@ -244,7 +252,7 @@ export default function HomePage() {
 
         {/* Developer Test Links - Visible to all */}
         <section className="mt-8">
-          <Link 
+          <Link
             to="/testlinks"
             className={`block bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white ${THEME.rounded.lg} p-6 text-center transition-all transform hover:scale-105 ${THEME.shadow.DEFAULT}`}
           >

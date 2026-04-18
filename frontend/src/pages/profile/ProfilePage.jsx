@@ -21,8 +21,8 @@ import { Bot, Swords, Trophy, Users, Brain, BarChart3 } from 'lucide-react'
 const MODE_META = {
   ranked: {
     key: 'ranked',
-    label: 'Đấu Hạng',
-    short: 'Rank',
+    label: 'Đấu hạng',
+    short: 'Hạng',
     color: '#2563eb',
     badge: 'bg-blue-100 text-blue-700 border-blue-200',
     icon: Swords,
@@ -37,16 +37,16 @@ const MODE_META = {
   },
   tournament: {
     key: 'tournament',
-    label: 'Đấu Giải',
-    short: 'Tour',
+    label: 'Giải đấu',
+    short: 'Giải',
     color: '#d97706',
     badge: 'bg-amber-100 text-amber-700 border-amber-200',
     icon: Trophy,
   },
   friendly: {
     key: 'friendly',
-    label: 'Giao Hữu',
-    short: 'Friendly',
+    label: 'Giao hữu',
+    short: 'Giao hữu',
     color: '#059669',
     badge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     icon: Users,
@@ -222,8 +222,12 @@ export default function ProfilePage() {
 
     const load = async () => {
       setLoading(true)
+      const profileTask = authUser?.id
+        ? Promise.resolve({ user: authUser })
+        : authService.getCurrentUser()
+
       const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
-        authService.getCurrentUser(),
+        profileTask,
         gameService.getAllUserGames(),
         gameService.getRankedStats(),
       ])
@@ -367,7 +371,7 @@ export default function ProfilePage() {
                 }}
                 className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold rounded-lg border border-red-200"
               >
-                Logout
+                Đăng xuất
               </button>
             </div>
           </div>
@@ -378,7 +382,7 @@ export default function ProfilePage() {
             <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 className="w-5 h-5 text-blue-600" />
-                <h2 className="text-xl font-bold text-gray-900">Match Distribution</h2>
+                <h2 className="text-xl font-bold text-gray-900">Phân bổ trận đấu</h2>
               </div>
 
               {analytics.pieData.length === 0 ? (
@@ -436,7 +440,7 @@ export default function ProfilePage() {
             <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <Brain className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-xl font-bold text-gray-900">Performance Radar</h2>
+                <h2 className="text-xl font-bold text-gray-900">Biểu đồ năng lực</h2>
               </div>
 
               <div className="h-80">
@@ -458,7 +462,7 @@ export default function ProfilePage() {
             </section>
 
             <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Matches</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Trận gần đây</h2>
 
               {recentMatches.length === 0 ? (
                 <p className="text-sm text-gray-500">Chưa có trận gần đây.</p>
@@ -496,14 +500,14 @@ export default function ProfilePage() {
                             onClick={() => navigate(`/replays/${match.id}`)}
                             className="px-3 py-1.5 text-xs rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100"
                           >
-                            AI Analysis
+                            Phân tích AI
                           </button>
                         ) : (
                           <button
                             disabled
                             className="px-3 py-1.5 text-xs rounded-md border border-gray-200 bg-gray-100 text-gray-400 font-semibold cursor-not-allowed"
                           >
-                            AI Analysis
+                            Phân tích AI
                           </button>
                         )}
                         <span className="text-xs text-gray-500">
@@ -567,7 +571,7 @@ export default function ProfilePage() {
                   to="/replays"
                   className="block text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
                 >
-                  Xem Replay Library
+                  Xem thư viện replay
                 </Link>
                 <Link
                   to="/ranked/stats"

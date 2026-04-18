@@ -22,19 +22,19 @@ const HEATMAP_DAYS = 30
 
 const MODE_META = {
   ranked: {
-    label: 'Rank',
+    label: 'Đấu hạng',
     badge: 'bg-blue-100 text-blue-700 border-blue-200',
   },
   bot: {
-    label: 'Bot',
+    label: 'Đấu Bot',
     badge: 'bg-violet-100 text-violet-700 border-violet-200',
   },
   tournament: {
-    label: 'Tournament',
+    label: 'Giải đấu',
     badge: 'bg-amber-100 text-amber-700 border-amber-200',
   },
   friendly: {
-    label: 'Friendly',
+    label: 'Giao hữu',
     badge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   },
 }
@@ -131,7 +131,9 @@ const normalizeHistoryPayload = (payload, username) => {
         result: normalizeResult(item.result, item.playerSide || null),
         opponent,
         playedAt: item.finishedAt || item.createdAt || replay?.createdAt || null,
-        duration: Number(replay?.metadata?.totalMoves || item.duration || item.durationSeconds || 0),
+        duration: Number(
+          replay?.metadata?.totalMoves || item.duration || item.durationSeconds || 0
+        ),
         canAnalyze: Boolean(item.gameId || item.id || replay?.id || item._id),
       }
     })
@@ -255,9 +257,10 @@ export default function DashboardPage() {
 
     const load = async () => {
       setLoading(true)
+      const profileTask = user?.id ? Promise.resolve({ user }) : authService.getCurrentUser()
 
       const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
-        authService.getCurrentUser(),
+        profileTask,
         gameService.getAllUserGames(),
         gameService.getRankedStats(),
       ])
@@ -354,14 +357,16 @@ export default function DashboardPage() {
             icon={Swords}
             title="Tổng ván đấu"
             value={analytics.totalGames}
-            caption={`Rank ${analytics.byMode.ranked} · Bot ${analytics.byMode.bot} · Tournament ${analytics.byMode.tournament} · Friendly ${analytics.byMode.friendly}`}
+            caption={`Đấu hạng ${analytics.byMode.ranked} · Bot ${analytics.byMode.bot} · Giải đấu ${analytics.byMode.tournament} · Giao hữu ${analytics.byMode.friendly}`}
           />
           <StatCard
             icon={BadgeCheck}
             title="Elo hiện tại"
             value={currentRating}
             caption={
-              rankedStats?.peakRating ? `Peak ${rankedStats.peakRating}` : 'Xếp hạng hiện tại'
+              rankedStats?.peakRating
+                ? `Elo cao nhất ${rankedStats.peakRating}`
+                : 'Xếp hạng hiện tại'
             }
           />
           <StatCard
@@ -381,7 +386,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <section className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Activity Heatmap (30 ngày)</h2>
+              <h2 className="text-xl font-bold text-gray-900">Biểu đồ hoạt động (30 ngày)</h2>
               <span className="text-sm text-gray-500">Mật độ chơi cờ theo ngày</span>
             </div>
 
@@ -453,7 +458,7 @@ export default function DashboardPage() {
 
         <section className="mt-6 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Recent Matches</h2>
+            <h2 className="text-xl font-bold text-gray-900">Trận gần đây</h2>
             <Link to="/replays" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
               Xem toàn bộ lịch sử
             </Link>

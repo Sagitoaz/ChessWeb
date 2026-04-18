@@ -24,32 +24,32 @@ const Footer = () => {
           {/* Quick Links */}
           <div>
             <h4 className="text-gray-900 text-sm font-semibold mb-3 uppercase tracking-wide">
-              Quick Links
+              Truy cập nhanh
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link to="/ranked" className="hover:text-green-600 transition-colors">
-                  Ranked Match
+                  Đấu hạng
                 </Link>
               </li>
               <li>
                 <Link to="/rooms" className="hover:text-green-600 transition-colors">
-                  Friend Rooms
+                  Phòng giao hữu
                 </Link>
               </li>
               <li>
                 <Link to="/tournaments" className="hover:text-green-600 transition-colors">
-                  Tournaments
+                  Giải đấu
                 </Link>
               </li>
               <li>
                 <Link to="/bot" className="hover:text-green-600 transition-colors">
-                  Play vs Bot
+                  Đấu với Bot
                 </Link>
               </li>
               <li>
                 <Link to="/leaderboard" className="hover:text-green-600 transition-colors">
-                  Leaderboard
+                  Bảng xếp hạng
                 </Link>
               </li>
             </ul>
@@ -58,27 +58,27 @@ const Footer = () => {
           {/* Account Links */}
           <div>
             <h4 className="text-gray-900 text-sm font-semibold mb-3 uppercase tracking-wide">
-              Account
+              Tài khoản
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link to="/login" className="hover:text-green-600 transition-colors">
-                  Login
+                  Đăng nhập
                 </Link>
               </li>
               <li>
                 <Link to="/register" className="hover:text-green-600 transition-colors">
-                  Register
+                  Đăng ký
                 </Link>
               </li>
               <li>
                 <Link to="/profile" className="hover:text-green-600 transition-colors">
-                  Profile
+                  Hồ sơ
                 </Link>
               </li>
               <li>
                 <Link to="/profile/edit" className="hover:text-green-600 transition-colors">
-                  Settings
+                  Cài đặt
                 </Link>
               </li>
             </ul>
@@ -87,8 +87,8 @@ const Footer = () => {
 
         {/* Bottom bar */}
         <div className="border-t border-gray-200 mt-8 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-gray-500">&copy; {year} ChessWeb. All rights reserved.</p>
-          <p className="text-xs text-gray-600">Built with ⚛️ React + ♟️ chess.js</p>
+          <p className="text-xs text-gray-500">&copy; {year} ChessWeb. Bảo lưu mọi quyền.</p>
+          <p className="text-xs text-gray-600">Xây dựng với ⚛️ React + ♟️ chess.js</p>
         </div>
       </div>
     </footer>

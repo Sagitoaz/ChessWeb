@@ -313,7 +313,7 @@ export default function CreateRoomPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Increment:</p>
+                  <p className="text-gray-600">Cộng thêm mỗi nước:</p>
                   <p className="font-semibold text-gray-900">
                     {increment > 0 ? `+${increment}s` : 'Không'}
                   </p>
@@ -348,7 +348,7 @@ export default function CreateRoomPage() {
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 <Play size={18} />
-                Bắt đầu (Test)
+                Bắt đầu ván
               </Button>
             </div>
           </div>

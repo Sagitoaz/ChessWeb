@@ -36,11 +36,22 @@ function ResultBadge({ result }) {
 }
 
 function ModeBadge({ mode }) {
+  const modeLabel =
+    mode === 'bot' || mode === 'HumanVsBot'
+      ? 'Đấu Bot'
+      : mode === 'ranked'
+        ? 'Đấu hạng'
+        : mode === 'tournament'
+          ? 'Giải đấu'
+          : mode === 'room' || mode === 'HumanVsHuman'
+            ? 'Giao hữu'
+            : 'Khác'
+
   return (
     <span
       className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${STATUS_COLORS.playing.bg} ${STATUS_COLORS.playing.text}`}
     >
-      {mode === 'HumanVsBot' ? '🤖 vs Bot' : mode === 'HumanVsHuman' ? '👤 vs Human' : mode}
+      {modeLabel}
     </span>
   )
 }
@@ -96,10 +107,17 @@ export default function ReplayListPage() {
             normalizePerspectiveResult(game?.result, playerSide) ||
             'draw'
 
+          const whiteName = game?.whitePlayer?.username || 'White'
+          const blackName = game?.blackPlayer?.username || 'Black'
+          const opponent =
+            playerSide === 'white' ? blackName : playerSide === 'black' ? whiteName : blackName
+
           return {
             ...game,
             id: gameId,
+            mode: item?.mode || game?.mode || 'room',
             result,
+            opponent,
           }
         })
       }
@@ -107,9 +125,15 @@ export default function ReplayListPage() {
       if (Array.isArray(payload?.items)) {
         return payload.items.map((item) => ({
           id: item.gameId || item.id,
-          mode: item.mode === 'bot' ? 'HumanVsBot' : 'HumanVsHuman',
+          mode: item.mode || 'room',
           result: normalizePerspectiveResult(item.result, item.playerSide) || 'draw',
           createdAt: item.createdAt,
+          opponent:
+            item.playerSide === 'white'
+              ? item.blackPlayerId || 'Đối thủ'
+              : item.playerSide === 'black'
+                ? item.whitePlayerId || 'Đối thủ'
+                : 'Đối thủ',
           whitePlayer: { username: item.whitePlayerId || 'White' },
           blackPlayer: { username: item.blackPlayerId || 'Black' },
           metadata: { totalMoves: null },
@@ -133,7 +157,7 @@ export default function ReplayListPage() {
         <div className="mb-8">
           <div className="text-6xl mb-4 text-center">📹</div>
           <h1 className={`text-3xl font-bold ${THEME.text.primary} mb-2 text-center`}>
-            Lịch Sử Ván Đấu
+            Lịch sử đấu & Replay
           </h1>
           <p className={`${THEME.text.secondary} text-center`}>Xem lại các ván đấu đã chơi</p>
         </div>
@@ -149,8 +173,10 @@ export default function ReplayListPage() {
               className={`${THEME.background.card} ${THEME.text.primary} border ${THEME.border.DEFAULT} ${THEME.rounded.DEFAULT} px-4 py-2 text-sm`}
             >
               <option value="">Tất cả chế độ</option>
-              <option value="HumanVsBot">vs Bot</option>
-              <option value="HumanVsHuman">vs Human</option>
+              <option value="bot">Đấu Bot</option>
+              <option value="ranked">Đấu hạng</option>
+              <option value="room">Giao hữu</option>
+              <option value="tournament">Giải đấu</option>
             </select>
             <select
               value={resultFilter}
@@ -197,25 +223,44 @@ export default function ReplayListPage() {
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className={`${THEME.text.primary} font-semibold`}>
-                      {game.whitePlayer.username} <span className={THEME.text.muted}>vs</span>{' '}
-                      {game.blackPlayer.username}
+                      Đối thủ: {game.opponent || game.blackPlayer.username}
                     </span>
                     <ModeBadge mode={game.mode} />
                     <ResultBadge result={game.result} />
                   </div>
                   <div className={`flex items-center gap-4 text-sm ${THEME.text.secondary}`}>
+                    <span>
+                      Chế độ:{' '}
+                      {game.mode === 'bot'
+                        ? 'Đấu Bot'
+                        : game.mode === 'ranked'
+                          ? 'Đấu hạng'
+                          : game.mode === 'tournament'
+                            ? 'Giải đấu'
+                            : 'Giao hữu'}
+                    </span>
+                    <span>
+                      Kết quả:{' '}
+                      {game.result === 'win' ? 'Thắng' : game.result === 'lose' ? 'Thua' : 'Hòa'}
+                    </span>
                     <span>{game.metadata?.totalMoves ?? '?'} nước</span>
                     {game.metadata?.opening && (
                       <span className="hidden md:inline truncate max-w-[160px]">
                         {game.metadata.opening}
                       </span>
                     )}
-                    <span>{new Date(game.createdAt).toLocaleDateString('vi-VN')}</span>
+                    <span>
+                      {new Date(game.createdAt).toLocaleDateString('vi-VN')}{' '}
+                      {new Date(game.createdAt).toLocaleTimeString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
                     <span
                       className={`${THEME.primary.text} group-hover:underline flex items-center gap-1`}
                     >
                       <PlayCircle className="w-4 h-4" />
-                      Replay
+                      Xem replay
                     </span>
                   </div>
                 </div>
