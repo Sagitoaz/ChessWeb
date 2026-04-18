@@ -293,13 +293,24 @@ export default function ProfilePage() {
   }
 
   const analytics = useMemo(() => {
-    const total = matches.length
-    const wins = matches.filter((m) => m.result === 'win').length
-    const losses = matches.filter((m) => m.result === 'lose').length
-    const draws = matches.filter((m) => m.result === 'draw').length
+    const totalFromMatches = matches.length
+    const winsFromMatches = matches.filter((m) => m.result === 'win').length
+    const lossesFromMatches = matches.filter((m) => m.result === 'lose').length
+    const drawsFromMatches = matches.filter((m) => m.result === 'draw').length
+
+    const statsTotal = Number(rankedStats?.gamesPlayed ?? 0)
+    const statsWins = Number(rankedStats?.wins ?? 0)
+    const statsLosses = Number(rankedStats?.losses ?? 0)
+    const statsDraws = Number(rankedStats?.draws ?? 0)
+
+    const useStatsFallback = totalFromMatches === 0 && statsTotal > 0
+    const total = useStatsFallback ? statsTotal : totalFromMatches
+    const wins = useStatsFallback ? statsWins : winsFromMatches
+    const losses = useStatsFallback ? statsLosses : lossesFromMatches
+    const draws = useStatsFallback ? statsDraws : drawsFromMatches
     const winRate = total > 0 ? Math.round((wins / total) * 100) : 0
     const avgDuration =
-      total > 0
+      totalFromMatches > 0
         ? Math.round(matches.reduce((acc, item) => acc + Number(item.duration || 0), 0) / total)
         : 0
 
@@ -311,6 +322,10 @@ export default function ProfilePage() {
       },
       { ranked: 0, bot: 0, tournament: 0, friendly: 0 }
     )
+
+    if (useStatsFallback) {
+      distributionRaw.ranked = total
+    }
 
     const pieData = Object.keys(distributionRaw)
       .map((key) => ({
@@ -553,6 +568,12 @@ export default function ProfilePage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tỷ lệ thắng</span>
                   <span className="font-bold text-green-700">{analytics.winRate}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Thắng / Thua / Hòa</span>
+                  <span className="font-bold text-gray-900">
+                    {analytics.wins} / {analytics.losses} / {analytics.draws}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Chuỗi thắng</span>

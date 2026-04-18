@@ -319,10 +319,21 @@ export default function DashboardPage() {
   }, [hasHydrated, setAuthLogin, token, user?.username])
 
   const analytics = useMemo(() => {
-    const totalGames = matches.length
-    const wins = matches.filter((m) => m.result === 'win').length
-    const losses = matches.filter((m) => m.result === 'lose').length
-    const draws = matches.filter((m) => m.result === 'draw').length
+    const totalGamesFromMatches = matches.length
+    const winsFromMatches = matches.filter((m) => m.result === 'win').length
+    const lossesFromMatches = matches.filter((m) => m.result === 'lose').length
+    const drawsFromMatches = matches.filter((m) => m.result === 'draw').length
+
+    const statsTotal = Number(rankedStats?.gamesPlayed ?? 0)
+    const statsWins = Number(rankedStats?.wins ?? 0)
+    const statsLosses = Number(rankedStats?.losses ?? 0)
+    const statsDraws = Number(rankedStats?.draws ?? 0)
+
+    const useStatsFallback = totalGamesFromMatches === 0 && statsTotal > 0
+    const totalGames = useStatsFallback ? statsTotal : totalGamesFromMatches
+    const wins = useStatsFallback ? statsWins : winsFromMatches
+    const losses = useStatsFallback ? statsLosses : lossesFromMatches
+    const draws = useStatsFallback ? statsDraws : drawsFromMatches
     const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0
     const winStreak = calcWinStreak(matches)
     const byMode = matches.reduce(
@@ -333,6 +344,10 @@ export default function DashboardPage() {
       },
       { ranked: 0, bot: 0, tournament: 0, friendly: 0 }
     )
+
+    if (useStatsFallback) {
+      byMode.ranked = totalGames
+    }
 
     return {
       totalGames,
