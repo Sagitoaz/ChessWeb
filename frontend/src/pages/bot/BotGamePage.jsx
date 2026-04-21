@@ -420,18 +420,28 @@ export default function BotGamePage() {
       if (!anchor) return
 
       const href = anchor.getAttribute('href')
-      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+      if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) {
         return
       }
+      if (href.startsWith('#') && !href.startsWith('#/')) return
 
       if (anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) {
         return
       }
 
-      const resolved = new URL(href, window.location.origin)
-      if (resolved.origin !== window.location.origin) return
-      const targetPath = `${resolved.pathname}${resolved.search}${resolved.hash}`
-      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      let targetPath = null
+      if (href.startsWith('#/')) {
+        targetPath = href.slice(1)
+      } else {
+        const resolved = new URL(href, window.location.origin)
+        if (resolved.origin !== window.location.origin) return
+        targetPath = resolved.hash?.startsWith('#/')
+          ? resolved.hash.slice(1)
+          : `${resolved.pathname}${resolved.search}${resolved.hash}`
+      }
+      const currentPath = window.location.hash?.startsWith('#/')
+        ? window.location.hash.slice(1)
+        : `${window.location.pathname}${window.location.search}${window.location.hash}`
       if (targetPath === currentPath) return
 
       event.preventDefault()

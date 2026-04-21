@@ -10,7 +10,12 @@ const gameAPI = api
 
 const unwrapApiEnvelope = (payload) => payload?.data ?? payload
 const USER_GAMES_CACHE_TTL_MS = 20000
+const PUBLIC_ROOMS_CACHE_TTL_MS = 10000
 const userGamesCache = new Map()
+const publicRoomsCache = new Map()
+const clearPublicRoomsCache = () => {
+  publicRoomsCache.clear()
+}
 
 const normalizeRankedResult = (result) => {
   const v = typeof result === 'string' ? result.toLowerCase() : ''
@@ -633,15 +638,59 @@ const gameService = {
     gameAPI.post(`/game/${matchId}/draw/respond`, { accept }),
 
   // Room APIs
-  createRoom: (settings) => gameAPI.post('/rooms', settings),
+  createRoom: async (settings) => {
+    const response = await gameAPI.post('/rooms', settings)
+    clearPublicRoomsCache()
+    return response
+  },
 
-  joinRoom: (roomCode) => gameAPI.post(`/rooms/${roomCode}/join`),
+  joinRoom: async (roomCode) => {
+    const response = await gameAPI.post(`/rooms/${roomCode}/join`)
+    clearPublicRoomsCache()
+    return response
+  },
 
-  leaveRoom: (roomCode) => gameAPI.post(`/rooms/${roomCode}/leave`),
+  leaveRoom: async (roomCode) => {
+    const response = await gameAPI.post(`/rooms/${roomCode}/leave`)
+    clearPublicRoomsCache()
+    return response
+  },
 
   getRoom: (roomCode) => gameAPI.get(`/rooms/${roomCode}`),
 
-  startRoomGame: (roomCode) => gameAPI.post(`/rooms/${roomCode}/start`),
+  getPublicRooms: async (filters = {}) => {
+    const status = typeof filters.status === 'string' ? filters.status : 'waiting'
+    const limit = Math.min(Math.max(Number(filters.limit || 30), 1), 100)
+    const forceRefresh = Boolean(filters.forceRefresh)
+    const cacheKey = JSON.stringify({ status, limit })
+    const cached = publicRoomsCache.get(cacheKey)
+
+    if (!forceRefresh && cached && Date.now() - cached.cachedAt < PUBLIC_ROOMS_CACHE_TTL_MS) {
+      return cached.data
+    }
+
+    const response = await gameAPI.get('/rooms', {
+      params: {
+        visibility: 'public',
+        status,
+        limit,
+      },
+    })
+    const data = unwrapApiEnvelope(response)
+    const items = Array.isArray(data?.items) ? data.items : Array.isArray(data?.rooms) ? data.rooms : []
+    const normalized = {
+      items,
+      total: Number(data?.total ?? items.length),
+    }
+    publicRoomsCache.set(cacheKey, { data: normalized, cachedAt: Date.now() })
+    return normalized
+  },
+
+  startRoomGame: async (roomCode) => {
+    const response = await gameAPI.post(`/rooms/${roomCode}/start`)
+    clearPublicRoomsCache()
+    return response
+  },
 
   saveGame: (gameId, data) => gameAPI.post(`/games/${gameId}/save`, data),
 

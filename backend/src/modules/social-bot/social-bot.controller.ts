@@ -70,6 +70,28 @@ export class SocialBotController {
     return successResponse(data, requestId || null);
   }
 
+  @Get("rooms")
+  async listRooms(
+    @Query("visibility") visibility?: string,
+    @Query("status") status?: string,
+    @Query("limit") limit?: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    if (String(visibility || "").toLowerCase() === "public") {
+      const numericLimit =
+        typeof limit === "string" && limit.trim().length > 0
+          ? Number(limit)
+          : undefined;
+      const data = await this.service.getPublicRooms({
+        status,
+        limit: Number.isFinite(Number(numericLimit)) ? Number(numericLimit) : undefined,
+      });
+      return successResponse(data, requestId || null);
+    }
+
+    return successResponse({ items: [], total: 0 }, requestId || null);
+  }
+
   @Get("rooms/:code")
   async getRoom(
     @Param("code") code: string,

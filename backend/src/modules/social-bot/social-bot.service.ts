@@ -1278,6 +1278,111 @@ export class SocialBotService {
     };
   }
 
+  async getPublicRooms(options?: { status?: string; limit?: number }) {
+    const statusRaw = String(options?.status || "waiting").toLowerCase();
+    const statuses =
+      statusRaw === "all"
+        ? ["waiting", "playing"]
+        : statusRaw === "playing"
+          ? ["playing"]
+          : ["waiting"];
+    const limit = Math.max(1, Math.min(100, Number(options?.limit || 30)));
+
+    const rooms = await this.repo.findPublicRooms({ statuses, limit });
+    if (!Array.isArray(rooms) || rooms.length === 0) {
+      return {
+        items: [],
+        total: 0,
+      };
+    }
+
+    const roomIds = rooms
+      .map((room: any) => room?._id)
+      .filter(
+        (roomId: unknown): roomId is ObjectId | string =>
+          roomId instanceof ObjectId || typeof roomId === "string",
+      );
+    const members = await this.repo.findRoomMembersByRoomIds(roomIds);
+
+    const membersByRoomId = new Map<string, Array<Record<string, unknown>>>();
+    for (const member of members) {
+      const roomId = String(member?.roomId || "");
+      if (!membersByRoomId.has(roomId)) {
+        membersByRoomId.set(roomId, []);
+      }
+      membersByRoomId.get(roomId)!.push(member);
+    }
+
+    const userIds = Array.from(
+      new Set(
+        rooms
+          .flatMap((room: any) => {
+            const roomId = String(room?._id || "");
+            const roomMembers = membersByRoomId.get(roomId) || [];
+            return [
+              String(room?.ownerUserId || ""),
+              ...roomMembers.map((member) => String(member?.userId || "")),
+            ];
+          })
+          .filter((userId) => userId.length > 0),
+      ),
+    );
+    const profiles = await this.repo.findUserProfilesByIds(userIds);
+    const profileMap = new Map(
+      profiles.map((profile: any) => [String(profile?._id || ""), profile]),
+    );
+
+    const items = rooms.map((room: any) => {
+      const roomId = String(room?._id || "");
+      const roomMembers = membersByRoomId.get(roomId) || [];
+      const ownerUserId = String(room?.ownerUserId || "");
+      const ownerProfile = profileMap.get(ownerUserId);
+      const playerCount = Number(
+        room?.playerCount || roomMembers.length || (ownerUserId ? 1 : 0),
+      );
+      const maxPlayers = Number(room?.maxPlayers || 2);
+      const status = String(room?.status || "waiting");
+      const roomCode = String(room?.roomCode || room?.code || "");
+
+      return {
+        id: roomId,
+        roomCode,
+        code: roomCode,
+        name:
+          typeof room?.name === "string" && room.name.trim().length > 0
+            ? room.name
+            : null,
+        status,
+        isPrivate: false,
+        timeControl: String(room?.timeControl || "rapid"),
+        initialTimeSeconds: Number(room?.initialTimeSeconds || 600),
+        playerCount,
+        maxPlayers,
+        canJoin: status === "waiting" && playerCount < maxPlayers,
+        host: {
+          userId: ownerUserId || null,
+          username:
+            typeof ownerProfile?.username === "string" &&
+            ownerProfile.username.length > 0
+              ? ownerProfile.username
+              : ownerUserId || "Chủ phòng",
+          avatarUrl:
+            typeof ownerProfile?.avatarUrl === "string" &&
+            ownerProfile.avatarUrl.length > 0
+              ? ownerProfile.avatarUrl
+              : null,
+        },
+        createdAt: room?.createdAt || null,
+        updatedAt: room?.updatedAt || null,
+      };
+    });
+
+    return {
+      items,
+      total: items.length,
+    };
+  }
+
   async leaveRoom(userId: string, code: string) {
     const room = await this.repo.findRoomByCode(code);
     if (!room) {

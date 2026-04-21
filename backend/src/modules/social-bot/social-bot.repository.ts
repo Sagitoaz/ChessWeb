@@ -26,6 +26,30 @@ export class SocialBotRepository {
     });
   }
 
+  async findPublicRooms(options?: { limit?: number; statuses?: string[] }) {
+    const limit = Math.max(1, Math.min(100, Number(options?.limit || 30)));
+    const statuses = Array.isArray(options?.statuses)
+      ? options.statuses.filter(
+          (status): status is string =>
+            typeof status === "string" && status.length > 0,
+        )
+      : [];
+
+    const query: Record<string, unknown> = {
+      isPrivate: false,
+    };
+    if (statuses.length > 0) {
+      query.status = { $in: statuses };
+    }
+
+    return this.db
+      .collection("rooms")
+      .find(query)
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
   async updateRoomByCode(roomCode: string, update: Record<string, unknown>) {
     return this.db
       .collection("rooms")
@@ -38,6 +62,16 @@ export class SocialBotRepository {
 
   async findRoomMembers(roomId: ObjectId | string) {
     return this.db.collection("room_members").find({ roomId }).toArray();
+  }
+
+  async findRoomMembersByRoomIds(roomIds: Array<ObjectId | string>) {
+    if (!Array.isArray(roomIds) || roomIds.length === 0) {
+      return [];
+    }
+    return this.db
+      .collection("room_members")
+      .find({ roomId: { $in: roomIds } })
+      .toArray();
   }
 
   async removeRoomMember(roomId: ObjectId | string, userId: string) {
@@ -103,12 +137,17 @@ export class SocialBotRepository {
   async findUserProfilesByIds(userIds: string[]) {
     if (userIds.length === 0) return [];
     return this.db
-      .collection<{ _id: string; username?: string; rating?: number }>(
+      .collection<{
+        _id: string;
+        username?: string;
+        rating?: number;
+        avatarUrl?: string;
+      }>(
         "user_profiles",
       )
       .find(
         { _id: { $in: userIds } },
-        { projection: { _id: 1, username: 1, rating: 1 } },
+        { projection: { _id: 1, username: 1, rating: 1, avatarUrl: 1 } },
       )
       .toArray();
   }

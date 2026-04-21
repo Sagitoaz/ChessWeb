@@ -7,6 +7,23 @@ import { useAuthStore } from '@store'
 import { useWebSocket } from '@hooks/useWebSocket'
 import { Users, Clock, Lock, Globe, Copy, Check, Share2, ArrowLeft, Play } from 'lucide-react'
 
+const RECENT_ROOMS_KEY = 'chessweb_recent_rooms'
+
+const saveRecentRoomCode = (code) => {
+  const normalized = String(code || '').trim().toUpperCase()
+  if (!normalized) return
+
+  try {
+    const raw = localStorage.getItem(RECENT_ROOMS_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    const list = Array.isArray(parsed) ? parsed : []
+    const next = [normalized, ...list.filter((item) => String(item).toUpperCase() !== normalized)].slice(0, 8)
+    localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(next))
+  } catch {
+    // Ignore storage failures for recent-room helper.
+  }
+}
+
 // Time control options
 const TIME_CONTROLS = [
   { value: 'blitz', label: '5 min', description: 'Blitz', initialTimeSeconds: 300 },
@@ -132,6 +149,7 @@ export default function CreateRoomPage() {
       if (!createdCode) {
         throw new Error('Không nhận được mã phòng từ máy chủ')
       }
+      saveRecentRoomCode(createdCode)
       setRoomCode(createdCode)
       setRoomCreated(true)
       setWaitingForPlayer(true)
@@ -162,7 +180,7 @@ export default function CreateRoomPage() {
   }
 
   const handleCopyLink = async () => {
-    const link = `${window.location.origin}/rooms/join?code=${roomCode}`
+    const link = `${window.location.origin}/#/rooms/join?code=${roomCode}`
     await navigator.clipboard.writeText(link)
     setCopiedLink(true)
     setTimeout(() => setCopiedLink(false), 2000)

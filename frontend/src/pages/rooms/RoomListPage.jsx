@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input, Loader } from '@/components/common'
-import { Users, Clock, Lock, Globe } from 'lucide-react'
+import gameService from '@/services/gameService'
+import { Users, Clock, Lock, Globe, RefreshCcw } from 'lucide-react'
+
+const RECENT_ROOMS_KEY = 'chessweb_recent_rooms'
 
 // Helper function to generate avatar from username
 const getAvatarColor = (username) => {
@@ -32,24 +36,126 @@ const UserAvatar = ({ username }) => {
   )
 }
 
+const normalizeRoomCode = (value) => String(value || '').trim().toUpperCase()
+
+const readRecentRoomCodes = () => {
+  try {
+    const raw = localStorage.getItem(RECENT_ROOMS_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((code) => normalizeRoomCode(code))
+      .filter((code) => code.length >= 4)
+      .slice(0, 8)
+  } catch {
+    return []
+  }
+}
+
+const saveRecentRoomCode = (code) => {
+  const normalized = normalizeRoomCode(code)
+  if (!normalized) return
+
+  const current = readRecentRoomCodes()
+  const next = [normalized, ...current.filter((item) => item !== normalized)].slice(0, 8)
+  localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(next))
+}
+
+const mapRoomCard = (room) => {
+  const members = Array.isArray(room?.members) ? room.members : []
+  const ownerMember = members.find((member) => String(member?.role || '').toLowerCase() === 'owner')
+  return {
+    id: String(room?.id || room?._id || room?.code || room?.roomCode || ''),
+    code: String(room?.code || room?.roomCode || ''),
+    name: room?.name || null,
+    status: room?.status || 'waiting',
+    playerCount: Number(room?.playerCount || members.length || 0),
+    maxPlayers: Number(room?.maxPlayers || 2),
+    isPrivate: Boolean(room?.isPrivate),
+    timeControl: room?.timeControl || 'rapid',
+    canJoin: Boolean(
+      room?.canJoin ??
+        (room?.status === 'waiting' &&
+          Number(room?.playerCount || members.length || 0) < Number(room?.maxPlayers || 2))
+    ),
+    host: {
+      username:
+        room?.host?.username || room?.owner?.username || ownerMember?.username || 'Chủ phòng',
+    },
+  }
+}
+
 export default function RoomListPage() {
   const navigate = useNavigate()
+  const { showNotification } = useNotification()
   const [roomCode, setRoomCode] = useState('')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [recentRooms, setRecentRooms] = useState([])
   const [publicRooms, setPublicRooms] = useState([])
   const [joiningRoom, setJoiningRoom] = useState(null)
+  const [loadError, setLoadError] = useState('')
 
-  // Simulate loading data
+  const loadRooms = useCallback(
+    async ({ forceRefresh = false } = {}) => {
+      if (!forceRefresh) {
+        setLoading(true)
+      } else {
+        setRefreshing(true)
+      }
+      setLoadError('')
+
+      try {
+        const [publicResult, recentCodes] = await Promise.all([
+          gameService.getPublicRooms({
+            status: 'waiting',
+            limit: 40,
+            forceRefresh,
+          }),
+          Promise.resolve(readRecentRoomCodes()),
+        ])
+
+        const publicItems = Array.isArray(publicResult?.items) ? publicResult.items : []
+        setPublicRooms(publicItems.map(mapRoomCard))
+
+        if (recentCodes.length > 0) {
+          const roomSnapshots = await Promise.all(
+            recentCodes.map((code) =>
+              gameService
+                .getRoom(code)
+                .then((response) => response?.data ?? response)
+                .catch(() => null)
+            )
+          )
+          const hydratedRecent = roomSnapshots
+            .filter(Boolean)
+            .map(mapRoomCard)
+            .filter((room) => room.code)
+          setRecentRooms(hydratedRecent)
+        } else {
+          setRecentRooms([])
+        }
+        return true
+      } catch (error) {
+        const message = error?.response?.data?.message || error?.message || 'Không thể tải danh sách phòng.'
+        setLoadError(String(message))
+        return false
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    []
+  )
+
   useEffect(() => {
-    const loadRooms = async () => {
-      setLoading(true)
-      setRecentRooms([])
-      setPublicRooms([])
-      setLoading(false)
-    }
-    loadRooms()
-  }, [])
+    void loadRooms()
+    const timer = setInterval(() => {
+      void loadRooms({ forceRefresh: true })
+    }, 10000)
+
+    return () => clearInterval(timer)
+  }, [loadRooms])
 
   const handleCreateRoom = () => {
     navigate('/rooms/create')
@@ -58,17 +164,34 @@ export default function RoomListPage() {
   const handleJoinByCode = async () => {
     if (!roomCode.trim()) return
 
-    setJoiningRoom(roomCode)
-    navigate(`/rooms/join?code=${roomCode.toUpperCase()}`)
+    const normalized = normalizeRoomCode(roomCode)
+    setJoiningRoom(normalized)
+    saveRecentRoomCode(normalized)
+    navigate(`/rooms/join?code=${normalized}`)
     setJoiningRoom(null)
   }
 
   const handleJoinRoom = (code) => {
-    navigate(`/rooms/join?code=${code}`)
+    const normalized = normalizeRoomCode(code)
+    saveRecentRoomCode(normalized)
+    navigate(`/rooms/join?code=${normalized}`)
   }
 
-  const handleRejoinRoom = (roomCode) => {
-    navigate(`/rooms/${roomCode}`)
+  const handleRejoinRoom = (code) => {
+    const normalized = normalizeRoomCode(code)
+    saveRecentRoomCode(normalized)
+    navigate(`/rooms/${normalized}`)
+  }
+
+  const handleRefreshRooms = async () => {
+    const ok = await loadRooms({ forceRefresh: true })
+    if (ok) {
+      showNotification({
+        type: 'success',
+        title: 'Đã làm mới',
+        message: 'Danh sách phòng công khai đã được cập nhật.',
+      })
+    }
   }
 
   const getStatusBadge = (status) => {
@@ -89,10 +212,28 @@ export default function RoomListPage() {
     <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">
       <div className="w-full max-w-5xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-3">
           <h1 className="text-5xl font-bold text-blue-600 mb-3">♟️ Phòng chơi</h1>
           <p className="text-xl text-gray-800">Tạo phòng riêng hoặc tham gia phòng của bạn bè</p>
         </div>
+        <div className="flex justify-center mb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshRooms}
+            loading={refreshing}
+            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+          >
+            <RefreshCcw size={14} />
+            Làm mới danh sách phòng
+          </Button>
+        </div>
+
+        {loadError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {loadError}
+          </div>
+        )}
 
         {/* Main Actions */}
         <Card
@@ -227,20 +368,32 @@ export default function RoomListPage() {
             )}
 
             {/* Public rooms */}
-            {publicRooms.length > 0 && (
-              <Card
-                variant="elevated"
-                padding="none"
-                className="bg-white shadow-md border-none rounded-xl overflow-hidden"
-              >
-                <div className="p-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-blue-400">Phòng công khai</h2>
-                    <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                      {publicRooms.length} phòng
-                    </span>
-                  </div>
+            <Card
+              variant="elevated"
+              padding="none"
+              className="bg-white shadow-md border-none rounded-xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-blue-400">Phòng công khai</h2>
+                  <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                    {publicRooms.length} phòng
+                  </span>
+                </div>
 
+                {publicRooms.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
+                    <p className="text-gray-600 mb-3">Hiện chưa có phòng công khai khả dụng.</p>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleCreateRoom}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      Tạo phòng công khai ngay
+                    </Button>
+                  </div>
+                ) : (
                   <div className="space-y-3">
                     {publicRooms.map((room) => (
                       <div
@@ -256,8 +409,9 @@ export default function RoomListPage() {
                               </div>
                               <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
                                 <Users size={12} />
-                                {room.playerCount}/2
+                                {room.playerCount}/{room.maxPlayers}
                               </span>
+                              {getStatusBadge(room.status)}
                             </div>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
                               <span className="flex items-center gap-1">
@@ -279,17 +433,18 @@ export default function RoomListPage() {
                             variant="primary"
                             size="sm"
                             onClick={() => handleJoinRoom(room.code)}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            disabled={!room.canJoin}
+                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-600"
                           >
-                            Tham gia
+                            {room.canJoin ? 'Tham gia' : 'Đã đầy'}
                           </Button>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              </Card>
-            )}
+                )}
+              </div>
+            </Card>
           </>
         )}
       </div>

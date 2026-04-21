@@ -6,6 +6,23 @@ import gameService from '@/services/gameService'
 import { useAuthStore } from '@/store'
 import { Users, Clock, Lock, Globe, ArrowLeft, CheckCircle2 } from 'lucide-react'
 
+const RECENT_ROOMS_KEY = 'chessweb_recent_rooms'
+
+const saveRecentRoomCode = (code) => {
+  const normalized = String(code || '').trim().toUpperCase()
+  if (!normalized) return
+
+  try {
+    const raw = localStorage.getItem(RECENT_ROOMS_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    const list = Array.isArray(parsed) ? parsed : []
+    const next = [normalized, ...list.filter((item) => String(item).toUpperCase() !== normalized)].slice(0, 8)
+    localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(next))
+  } catch {
+    // Ignore storage failures for recent-room helper.
+  }
+}
+
 const shortenDisplayName = (value, max = 18) => {
   const text = String(value || '').trim()
   if (!text) return 'Unknown'
@@ -167,6 +184,7 @@ export default function JoinRoomPage() {
         console.debug('[room:join] validate manual', { code: normalizedCode, room })
       }
       setRoomInfo(normalizeRoomInfo(room, normalizedCode))
+      saveRecentRoomCode(normalizedCode)
     } catch (err) {
       showNotification({
         type: 'error',
@@ -194,6 +212,7 @@ export default function JoinRoomPage() {
       if (!alreadyJoined && !roomStarted) {
         await gameService.joinRoom(roomInfo.code)
       }
+      saveRecentRoomCode(roomInfo.code)
 
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
