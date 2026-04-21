@@ -93,6 +93,18 @@ const toLocalResultFromServer = (playerColor, serverResult) => {
   return 'draw'
 }
 
+const normalizeId = (value) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') {
+    if (typeof value.id === 'string') return value.id
+    if (typeof value._id === 'string') return value._id
+    if (typeof value.userId === 'string') return value.userId
+    if (typeof value.sub === 'string') return value.sub
+  }
+  return String(value)
+}
+
 // ─────────────────────────────────────────────────────
 // FALLBACK DATA
 // ─────────────────────────────────────────────────────
@@ -220,6 +232,7 @@ const EndGameModal = ({
   opponent,
   onBackToLobby,
   onViewHistory,
+  playerColorLabel = 'Trắng',
 }) => {
   if (!isOpen) return null
 
@@ -289,7 +302,7 @@ const EndGameModal = ({
 
         {/* Rating change */}
         <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100">
-          <p className="text-xs text-gray-500 mb-1">Thay đổi ELO (Trắng)</p>
+          <p className="text-xs text-gray-500 mb-1">Thay đổi ELO (Bạn - {playerColorLabel})</p>
           <div className="flex items-center justify-center gap-3">
             <span className="text-gray-500 text-lg">{player.rating}</span>
             <span className="text-gray-400">→</span>
@@ -499,7 +512,7 @@ const RankedGamePage = () => {
     () =>
       storeUser
         ? {
-            id: storeUser.id,
+            id: normalizeId(storeUser.id || storeUser.userId || storeUser._id || storeUser.sub),
             username: storeUser.username,
             rating: Number(rankedStats?.currentRating ?? storeUser.rating ?? DEFAULT_PLAYER.rating),
             avatarUrl: storeUser.avatarUrl || DEFAULT_PLAYER.avatarUrl,
@@ -539,8 +552,9 @@ const RankedGamePage = () => {
   const [showEndModal, setShowEndModal] = useState(false)
   const [persistedResultData, setPersistedResultData] = useState(null)
   const endedRef = useRef(false)
-  const currentUserId =
-    storeUser?.id || storeUser?.userId || storeUser?._id || storeUser?.sub || null
+  const currentUserId = normalizeId(
+    storeUser?.id || storeUser?.userId || storeUser?._id || storeUser?.sub
+  )
 
   // ─── Draw / Resign ───
   const [drawOffer, setDrawOffer] = useState(null) // null | 'sent' | 'received'
@@ -672,6 +686,46 @@ const RankedGamePage = () => {
   }, [locationMatchData])
 
   useEffect(() => {
+    if (!matchId || !currentUserId) return
+
+    let mounted = true
+    void gameService
+      .getMatch(matchId)
+      .then((response) => {
+        if (!mounted) return
+
+        const data = response?.data ?? response
+        const whiteId = normalizeId(data?.whitePlayerId || data?.white?.userId || data?.white?.id)
+        const blackId = normalizeId(data?.blackPlayerId || data?.black?.userId || data?.black?.id)
+
+        if (currentUserId === whiteId) {
+          setPlayerColor('white')
+        } else if (currentUserId === blackId) {
+          setPlayerColor('black')
+        }
+
+        const whiteUser = data?.white || null
+        const blackUser = data?.black || null
+        const isMeWhite = currentUserId === whiteId
+        const opp = isMeWhite ? blackUser : whiteUser
+        if (opp) {
+          setOpponent((prev) => ({
+            ...prev,
+            id: normalizeId(opp.id || opp.userId) || prev.id,
+            username: opp.username || prev.username,
+            rating: Number(opp.rating ?? prev.rating),
+            avatarUrl: opp.avatarUrl || prev.avatarUrl,
+          }))
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      mounted = false
+    }
+  }, [currentUserId, matchId])
+
+  useEffect(() => {
     let mounted = true
     void gameService
       .getRankedStats()
@@ -740,14 +794,14 @@ const RankedGamePage = () => {
   useEffect(() => {
     const t = setTimeout(() => {
       setGamePhase(GAME_PHASE.PLAYING)
+      const whiteStarterName = playerColor === 'white' ? player.username : opponent.username
       setChatMessages((prev) => [
         ...prev,
-        { text: `Trận đấu bắt đầu! ${player.username} (Trắng) đi trước.`, isSystem: true },
+        { text: `Trận đấu bắt đầu! ${whiteStarterName} (Trắng) đi trước.`, isSystem: true },
       ])
     }, 800)
     return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [opponent.username, player.username, playerColor])
 
   // ═══════════════════════════════════════════
   // CLOCK INTERVAL
@@ -999,12 +1053,14 @@ const RankedGamePage = () => {
       ])
       return
     }
-    const side = gameRef.current.turn() === 'w' ? player.username : opponent.username
+    const whiteName = playerColor === 'white' ? player.username : opponent.username
+    const blackName = playerColor === 'black' ? player.username : opponent.username
+    const side = gameRef.current.turn() === 'w' ? whiteName : blackName
     setChatMessages((prev) => [
       ...prev,
       { text: `${side} đề nghị hòa. Chấp nhận hay từ chối?`, isSystem: true },
     ])
-  }, [drawOffer, gameSocket, matchId, player.username, opponent.username])
+  }, [drawOffer, gameSocket, matchId, opponent.username, player.username, playerColor])
 
   const handleAcceptDraw = useCallback(() => {
     if (gameSocket?.isConnected && matchId) {
@@ -1026,10 +1082,9 @@ const RankedGamePage = () => {
 
   const handleSendChat = useCallback(
     (text) => {
-      const side = gameRef.current.turn() === 'w' ? player.username : opponent.username
-      setChatMessages((prev) => [...prev, { sender: side, text, isMine: true }])
+      setChatMessages((prev) => [...prev, { sender: player.username, text, isMine: true }])
     },
-    [player.username, opponent.username]
+    [player.username]
   )
 
   // ═══════════════════════════════════════════
@@ -1043,6 +1098,7 @@ const RankedGamePage = () => {
   // block browser tab close/refresh; in-app back button shows confirm
   // ═══════════════════════════════════════════
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [pendingLeavePath, setPendingLeavePath] = useState(null)
   useEffect(() => {
     if (gamePhase !== GAME_PHASE.PLAYING) return
     const handler = (e) => {
@@ -1053,21 +1109,56 @@ const RankedGamePage = () => {
     return () => window.removeEventListener('beforeunload', handler)
   }, [gamePhase])
 
+  useEffect(() => {
+    if (gamePhase !== GAME_PHASE.PLAYING) return
+
+    const handleDocumentNavigation = (event) => {
+      const anchor = event.target?.closest?.('a[href]')
+      if (!anchor) return
+
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        return
+      }
+      if (anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return
+
+      const resolved = new URL(href, window.location.origin)
+      if (resolved.origin !== window.location.origin) return
+
+      const targetPath = `${resolved.pathname}${resolved.search}${resolved.hash}`
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingLeavePath(targetPath)
+      setShowLeaveConfirm(true)
+    }
+
+    document.addEventListener('click', handleDocumentNavigation, true)
+    return () => document.removeEventListener('click', handleDocumentNavigation, true)
+  }, [gamePhase])
+
   const handleBackClick = useCallback(() => {
     if (gamePhase === GAME_PHASE.PLAYING) {
+      setPendingLeavePath('/ranked')
       setShowLeaveConfirm(true)
     } else {
       goToLobby()
     }
   }, [gamePhase, goToLobby])
 
-  const handleForfeitAndLeave = useCallback(() => {
-    if (gameSocket?.isConnected && matchId) {
-      gameSocket.resign()
+  const handleForfeitAndLeave = useCallback(async () => {
+    const destination = pendingLeavePath || '/ranked'
+
+    if (gamePhase === GAME_PHASE.PLAYING && !endedRef.current) {
+      if (gameSocket?.isConnected && matchId) {
+        gameSocket.resign()
+      }
+      await persistRankedResult('resignation', 'lose')
     }
+
     setShowLeaveConfirm(false)
-    navigate('/ranked')
-  }, [gameSocket, matchId, navigate])
+    setPendingLeavePath(null)
+    navigate(destination)
+  }, [gamePhase, gameSocket, matchId, navigate, pendingLeavePath, persistRankedResult])
 
   // ═══════════════════════════════════════════
   // LOADING SCREEN
@@ -1112,8 +1203,10 @@ const RankedGamePage = () => {
   const botCapColor = isWhite ? 'b' : 'w'
 
   // Status text
+  const whiteSideName = isWhite ? player.username : opponent.username
+  const blackSideName = isWhite ? opponent.username : player.username
   const currentPlayerName =
-    currentTurn === 'w' ? `${player.username} (Trắng)` : `${opponent.username} (Đen)`
+    currentTurn === 'w' ? `${whiteSideName} (Trắng)` : `${blackSideName} (Đen)`
   const statusText =
     gamePhase === GAME_PHASE.ENDED
       ? endResult?.result === 'win'
@@ -1140,7 +1233,10 @@ const RankedGamePage = () => {
             </p>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setShowLeaveConfirm(false)}
+                onClick={() => {
+                  setShowLeaveConfirm(false)
+                  setPendingLeavePath(null)
+                }}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm"
               >
                 Ở lại
@@ -1344,6 +1440,7 @@ const RankedGamePage = () => {
         newRating={newRating}
         player={player}
         opponent={opponent}
+        playerColorLabel={playerColor === 'white' ? 'Trắng' : 'Đen'}
         onBackToLobby={goToLobby}
         onViewHistory={goToHistory}
       />

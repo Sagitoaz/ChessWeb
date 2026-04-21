@@ -54,6 +54,9 @@ export default function TournamentMatchPlayPage() {
   const [matchIdInBracket, setMatchIdInBracket] = useState('')
   const [participantStatus, setParticipantStatus] = useState(null)
   const [submittingResign, setSubmittingResign] = useState(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [pendingLeavePath, setPendingLeavePath] = useState(null)
+  const [submittingLeave, setSubmittingLeave] = useState(false)
 
   const chessRef = useRef(new Chess(INITIAL_FEN))
 
@@ -238,6 +241,103 @@ export default function TournamentMatchPlayPage() {
   const mySideLabel = playerColor === 'white' ? 'Trắng' : 'Đen'
   const myOpponentName = playerColor === 'white' ? blackName : whiteName
   const canResign = !isFinished && !submittingResign
+  const isInLiveMatch = !isFinished && Boolean(gameId) && Boolean(whitePlayerId && blackPlayerId)
+
+  const handleLeaveRequest = useCallback(
+    (destination = `/tournaments/${tournamentId}`) => {
+      if (isInLiveMatch) {
+        setPendingLeavePath(destination)
+        setShowLeaveConfirm(true)
+        return
+      }
+      navigate(destination)
+    },
+    [isInLiveMatch, navigate, tournamentId]
+  )
+
+  const handleForfeitAndLeave = useCallback(async () => {
+    const destination = pendingLeavePath || `/tournaments/${tournamentId}`
+
+    setSubmittingLeave(true)
+    try {
+      if (isInLiveMatch && tournamentId && gameId) {
+        const targetMatchId = matchIdInBracket || gameId
+        await gameService.resignTournamentMatch(tournamentId, targetMatchId)
+        if (isSocketConnected) {
+          resign()
+        }
+        showNotification({
+          type: 'info',
+          title: 'Rời trận',
+          message: 'Bạn đã rời trận giữa chừng và bị tính thua.',
+        })
+      }
+    } catch (submitError) {
+      const message =
+        submitError?.response?.data?.message ||
+        submitError?.message ||
+        'Không thể cập nhật kết quả đầu hàng trước khi rời trận.'
+      showNotification({
+        type: 'error',
+        title: 'Rời trận thất bại',
+        message: String(message),
+      })
+    } finally {
+      setSubmittingLeave(false)
+      setShowLeaveConfirm(false)
+      setPendingLeavePath(null)
+      navigate(destination)
+    }
+  }, [
+    gameId,
+    isInLiveMatch,
+    isSocketConnected,
+    matchIdInBracket,
+    navigate,
+    pendingLeavePath,
+    resign,
+    showNotification,
+    tournamentId,
+  ])
+
+  useEffect(() => {
+    if (!isInLiveMatch) return
+
+    const handler = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isInLiveMatch])
+
+  useEffect(() => {
+    if (!isInLiveMatch) return
+
+    const handleDocumentNavigation = (event) => {
+      const anchor = event.target?.closest?.('a[href]')
+      if (!anchor) return
+
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        return
+      }
+      if (anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return
+
+      const resolved = new URL(href, window.location.origin)
+      if (resolved.origin !== window.location.origin) return
+
+      const targetPath = `${resolved.pathname}${resolved.search}${resolved.hash}`
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingLeavePath(targetPath)
+      setShowLeaveConfirm(true)
+    }
+
+    document.addEventListener('click', handleDocumentNavigation, true)
+    return () => document.removeEventListener('click', handleDocumentNavigation, true)
+  }, [isInLiveMatch])
+
   const handleResign = useCallback(async () => {
     if (!tournamentId || !gameId || isFinished || submittingResign) return
 
@@ -316,7 +416,7 @@ export default function TournamentMatchPlayPage() {
               <Button
                 variant="outline"
                 className="mt-3"
-                onClick={() => navigate(`/tournaments/${tournamentId}`)}
+                onClick={() => handleLeaveRequest(`/tournaments/${tournamentId}`)}
               >
                 <ArrowLeft className="w-4 h-4" />
                 Quay lại giải đấu
@@ -330,12 +430,43 @@ export default function TournamentMatchPlayPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-4 space-y-4">
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Rời trận khi đang đấu?</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              Nếu rời trận tournament giữa chừng, hệ thống sẽ tính bạn thua.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowLeaveConfirm(false)
+                  setPendingLeavePath(null)
+                }}
+                fullWidth
+              >
+                Ở lại
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleForfeitAndLeave}
+                loading={submittingLeave}
+                fullWidth
+              >
+                Rời và nhận thua
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white px-5 py-4 shadow-md">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
-              onClick={() => navigate(`/tournaments/${tournamentId}`)}
+              onClick={() => handleLeaveRequest(`/tournaments/${tournamentId}`)}
               size="sm"
               className="bg-white/15 hover:bg-white/25 text-white"
             >

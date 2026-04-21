@@ -103,27 +103,40 @@ export class GroqService {
       sideToMove && sideToMove !== playerColor ? -numericScore : numericScore;
     const scoreBand = this.mapScoreBand(playerPerspectiveScore);
 
-    const prompt = `Bạn là đại kiện tướng cờ vua.
-Phân tích từ góc nhìn bên ${perspectiveLabel} vừa đi quân.
-FEN hiện tại là sau nước đi của người chơi; lượt tiếp theo thuộc về đối thủ.
-Mục tiêu: chỉ ra đúng sai chiến thuật, rủi ro tức thời, và kế hoạch sửa trong 2-3 nước kế tiếp.
-BẮT BUỘC trả lời tiếng Việt có dấu, ngắn gọn, thực dụng, tối đa 5 dòng.
-Mỗi dòng bắt đầu đúng một nhãn dưới đây (không thêm nhãn khác):
+    const prompt = `Bạn là HLV cờ vua trình độ đại kiện tướng, chuyên phân tích sau từng nước đi.
+Ngữ cảnh:
+- Người chơi vừa đi quân bên ${perspectiveLabel}.
+- FEN là vị trí SAU nước đi của người chơi, đến lượt đối thủ.
+- Điểm số theo góc nhìn người chơi: ${playerPerspectiveScore} cp (${scoreBand}).
+
+Nhiệm vụ:
+1) Đánh giá nước vừa đi có đúng ý tưởng hay sai ý tưởng chiến thuật.
+2) Chỉ ra rủi ro khẩn cấp nhất trong 1-2 nước tới (nếu có).
+3) Đưa kế hoạch thực chiến 2-3 nước cho người chơi, ưu tiên tính an toàn của vua và quân treo.
+4) So sánh nhanh với nước tốt nhất của Stockfish.
+
+Định dạng bắt buộc:
+- Trả lời TIẾNG VIỆT có dấu.
+- ĐÚNG 5 dòng, không thêm dòng.
+- Mỗi dòng bắt đầu chính xác một nhãn sau:
 1) Tổng quan:
-2) Lỗi chính:
-3) Kế hoạch 2-3 nước:
-4) Nước gợi ý:
-5) Cần tránh:
-Yêu cầu chất lượng:
-- Không nói chung chung; phải nêu đúng ý tưởng chiến thuật/cấu trúc quân.
-- Ưu tiên lời khuyên có thể áp dụng ngay ở ván này.
-- Nếu nước đi vẫn ổn, ghi rõ điểm tốt trước rồi mới nêu cải thiện nhỏ.
+2) Điểm mạnh/yếu:
+3) Rủi ro ngay:
+4) Kế hoạch 2-3 nước:
+5) Nước ứng viên:
+
+Ràng buộc chất lượng:
+- Tuyệt đối tránh câu chung chung kiểu "cải thiện vị trí".
+- Nêu motif cụ thể khi có thể: ghim, xiên, đôi, quá tải, đòn đổi quân có lợi, lộ vua, ô yếu.
+- Nếu userMove gần tối ưu thì ghi rõ vì sao tốt, sau đó nêu cải thiện nhỏ.
+- Không phán bừa khi dữ liệu chưa đủ: dùng câu "chưa thấy đòn chiến thuật tức thời" nếu phù hợp.
+
+Dữ liệu:
 FEN: ${fen}
 Nước đi người chơi: ${userMove}
 Nước đi tốt nhất Stockfish: ${stockfishBestMove}
 Điểm số thô (cp): ${numericScore}
-Điểm số theo góc nhìn người chơi (cp): ${playerPerspectiveScore}
-Mức đánh giá nhanh: ${scoreBand}`;
+Điểm số theo góc nhìn người chơi (cp): ${playerPerspectiveScore}`;
 
     const candidates = this.activeModelName
       ? [
@@ -161,6 +174,10 @@ Mức đánh giá nhanh: ${scoreBand}`;
     pgn: string,
     detailLevel: "quick" | "detailed" = "detailed",
     stockfishBestMove?: string,
+    perspective?: {
+      playerColor?: "white" | "black";
+      playerSide?: string;
+    },
   ): Promise<string> {
     if (!this.groq) {
       return stockfishBestMove && stockfishBestMove !== "N/A"
@@ -174,19 +191,38 @@ Mức đánh giá nhanh: ${scoreBand}`;
     }
 
     const isDetailed = detailLevel === "detailed";
-    const hintLength = isDetailed ? "4-6 câu" : "2-4 câu";
+    const hintLength = isDetailed ? "4-6 câu" : "2-3 câu";
+    const normalizedColor =
+      perspective?.playerColor === "black" ? "Đen" : "Trắng";
+    const sideLabel = String(perspective?.playerSide || "").trim();
+    const perspectiveLine = sideLabel
+      ? `Người dùng đang cầm quân ${sideLabel} (${normalizedColor}).`
+      : `Người dùng đang cầm quân ${normalizedColor}.`;
     const stockfishLine =
       stockfishBestMove && stockfishBestMove !== "N/A"
-        ? `Nếu có Stockfish, nhắc ngắn gọn nước hay nhất là ${stockfishBestMove}.`
+        ? `Có Stockfish best move: ${stockfishBestMove}. Chỉ coi đây là nước ứng viên, giải thích ý tưởng thay vì ép đi đúng nước.`
         : "";
 
-    const prompt = `Bạn là gia sư cờ vua.
-Đầu vào là PGN của ván đấu.
-BẮT BUỘC trả lời bằng tiếng Việt có dấu, ngắn gọn, không lan man.
-Không nêu nước đi cụ thể theo tọa độ nếu không cần thiết.
-Độ dài: ${hintLength}.
+    const prompt = `Bạn là gia sư cờ vua thực chiến, ưu tiên lời khuyên có thể áp dụng ngay trong ván.
+${perspectiveLine}
+Đầu vào là PGN hiện tại của ván đấu.
+Yêu cầu trả lời:
+- Tiếng Việt có dấu, ngắn gọn, không lan man.
+- Độ dài ${hintLength}.
+- Không viết kiểu lý thuyết dài dòng.
+- Không liệt kê quá 1 nước đi tọa độ; thay vào đó nói ý tưởng và kế hoạch.
 ${stockfishLine}
-Tập trung vào: trung tâm, an toàn vua, quân treo, cột mở, ô yếu, và ý tưởng chiến thuật ngắn gọn.
+
+Định dạng bắt buộc:
+1) Ưu tiên ngay:
+2) Cạm bẫy cần tránh:
+3) Kế hoạch kế tiếp:
+
+Trọng tâm đánh giá:
+- An toàn vua, quân treo, nước chiếu/đòn chiến thuật 1-2 nước.
+- Tranh chấp trung tâm, cột mở, ô yếu quanh vua.
+- Quy đổi quân có lợi hay bất lợi trong ngắn hạn.
+
 PGN: ${sanitizedPgn}`;
 
     const candidates = this.activeModelName

@@ -16,4 +16,14 @@ export class BotTacticalHintDto {
   @IsString()
   @IsIn(["quick", "detailed"])
   detailLevel?: "quick" | "detailed";
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["white", "black", "White", "Black"])
+  playerColor?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  playerSide?: string;
 }

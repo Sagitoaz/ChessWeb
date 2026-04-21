@@ -82,6 +82,7 @@ export default function RoomPlayPage() {
   const [showStartBusy, setShowStartBusy] = useState(false)
   const [showResignConfirm, setShowResignConfirm] = useState(false)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [pendingLeavePath, setPendingLeavePath] = useState(null)
   const [gameResult, setGameResult] = useState(null)
   const [moveHistory, setMoveHistory] = useState([])
   const [whiteTime, setWhiteTime] = useState(600)
@@ -95,9 +96,10 @@ export default function RoomPlayPage() {
   const loadedGameRef = useRef(null)
 
   const activeGameId = room.activeGameId || location.state?.activeGameId || null
-  const isOwner = Boolean(user?.id && room.ownerUserId && user.id === room.ownerUserId)
+  const currentUserId = normalizeId(user?.id || user?.userId || user?._id || user?.sub)
+  const isOwner = Boolean(currentUserId && room.ownerUserId && currentUserId === room.ownerUserId)
   const playerColor = useMemo(() => {
-    const normalizedUserId = normalizeId(user?.id)
+    const normalizedUserId = normalizeId(user?.id || user?.userId || user?._id || user?.sub)
     const memberOwner = room.members.find((member) => member?.role === 'owner')
     const ownerUserId = normalizeId(room.ownerUserId || memberOwner?.userId)
     const whiteId = normalizeId(room.whitePlayerId)
@@ -119,7 +121,7 @@ export default function RoomPlayPage() {
     if (otherMember?.userId && normalizedUserId === otherMember.userId) return 'black'
 
     return 'white'
-  }, [room.blackPlayerId, room.members, room.ownerUserId, room.whitePlayerId, user?.id])
+  }, [room.blackPlayerId, room.members, room.ownerUserId, room.whitePlayerId, user])
   const myColorCode = playerColor === 'white' ? 'w' : 'b'
 
   const {
@@ -409,41 +411,142 @@ export default function RoomPlayPage() {
     })
   }
 
-  const requestLeaveRoom = useCallback(() => {
-    if (gamePhase === 'playing' && !endedRef.current) {
-      setShowLeaveConfirm(true)
-      return
-    }
-    navigate('/rooms')
-  }, [gamePhase, navigate])
+  const persistLeaveForfeit = useCallback(async () => {
+    if (!activeGameId || endedRef.current) return
 
-  const confirmLeaveRoom = useCallback(() => {
+    const members = Array.isArray(room.members) ? room.members : []
+    const opponent = members.find(
+      (member) => member?.userId && normalizeId(member.userId) !== currentUserId
+    )
+    const meName = user?.username || user?.displayName || 'Bạn'
+    const oppName = opponent?.username || 'Đối thủ'
+    const whiteName = playerColor === 'white' ? meName : oppName
+    const blackName = playerColor === 'black' ? meName : oppName
+    const loseResult = playerColor === 'white' ? 'BlackWin' : 'WhiteWin'
+
+    await gameService.saveGame(activeGameId, {
+      result: loseResult,
+      state: 'Saved',
+      mode: 'room',
+      initialFEN: INITIAL_FEN,
+      moves: chessRef.current.history({ verbose: true }),
+      whitePlayer: { username: whiteName, isBot: false },
+      blackPlayer: { username: blackName, isBot: false },
+      metadata: {
+        endReason: 'forfeit_leave',
+        roomCode: room.code || roomId,
+        forfeit: true,
+      },
+    })
+  }, [activeGameId, currentUserId, playerColor, room.code, room.members, roomId, user])
+
+  const leaveRoomViaApi = useCallback(async () => {
+    if (!room.code) return
+    try {
+      await gameService.leaveRoom(room.code)
+    } catch {
+      // Ignore leave-room errors because user might have already been removed.
+    }
+  }, [room.code])
+
+  const requestLeaveRoom = useCallback(
+    (destination = '/rooms') => {
+      if (gamePhase === 'playing' && !endedRef.current) {
+        setPendingLeavePath(destination)
+        setShowLeaveConfirm(true)
+        return
+      }
+      void leaveRoomViaApi().finally(() => navigate(destination))
+    },
+    [gamePhase, leaveRoomViaApi, navigate]
+  )
+
+  const confirmLeaveRoom = useCallback(async () => {
+    const destination = pendingLeavePath || '/rooms'
     setShowLeaveConfirm(false)
+    setPendingLeavePath(null)
 
-    if (gamePhase === 'playing' && !endedRef.current && activeGameId && isSocketConnected) {
-      resign()
-      showNotification({
-        type: 'info',
-        title: 'Rời phòng',
-        message: 'Bạn rời trận giữa chừng và sẽ bị tính thua.',
-      })
-      setTimeout(() => {
-        navigate('/rooms')
-      }, 180)
-      return
+    if (gamePhase === 'playing' && !endedRef.current) {
+      try {
+        if (activeGameId && isSocketConnected) {
+          resign()
+        }
+        await persistLeaveForfeit()
+        showNotification({
+          type: 'info',
+          title: 'Rời phòng',
+          message: 'Bạn rời trận giữa chừng và bị tính thua.',
+        })
+      } catch {
+        showNotification({
+          type: 'error',
+          title: 'Lỗi lưu kết quả',
+          message: 'Không thể lưu kết quả thua khi rời phòng.',
+        })
+      }
     }
 
-    navigate('/rooms')
-  }, [activeGameId, gamePhase, isSocketConnected, navigate, resign, showNotification])
+    await leaveRoomViaApi()
+    navigate(destination)
+  }, [
+    activeGameId,
+    gamePhase,
+    isSocketConnected,
+    leaveRoomViaApi,
+    navigate,
+    pendingLeavePath,
+    persistLeaveForfeit,
+    resign,
+    showNotification,
+  ])
+
+  useEffect(() => {
+    if (gamePhase !== 'playing' || endedRef.current) return
+
+    const handler = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [gamePhase])
+
+  useEffect(() => {
+    if (gamePhase !== 'playing' || endedRef.current) return
+
+    const handleDocumentNavigation = (event) => {
+      const anchor = event.target?.closest?.('a[href]')
+      if (!anchor) return
+
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        return
+      }
+      if (anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return
+
+      const resolved = new URL(href, window.location.origin)
+      if (resolved.origin !== window.location.origin) return
+
+      const targetPath = `${resolved.pathname}${resolved.search}${resolved.hash}`
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingLeavePath(targetPath)
+      setShowLeaveConfirm(true)
+    }
+
+    document.addEventListener('click', handleDocumentNavigation, true)
+    return () => document.removeEventListener('click', handleDocumentNavigation, true)
+  }, [gamePhase])
 
   const roomMembers = room.members || []
   const host = roomMembers.find((member) => member.role === 'owner') || roomMembers[0]
-  const opponentMember = roomMembers.find((member) => member.userId !== user?.id) || null
+  const opponentMember =
+    roomMembers.find((member) => normalizeId(member.userId) !== currentUserId) || null
   const isPlayerTurn =
     gamePhase === 'playing' && chessRef.current.turn() === myColorCode && !endedRef.current
   const boardDisabled = gamePhase !== 'playing' || !activeGameId || !isPlayerTurn
   const opponentName = opponentMember?.username || 'Đang chờ đối thủ'
-  const playerName = user?.username || 'Bạn'
+  const playerName = user?.username || user?.displayName || 'Bạn'
 
   if (loading && !room.code) {
     return (
@@ -684,7 +787,14 @@ export default function RoomPlayPage() {
               Nếu rời lúc trận chưa kết thúc, hệ thống sẽ tính bạn thua.
             </p>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setShowLeaveConfirm(false)} fullWidth>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowLeaveConfirm(false)
+                  setPendingLeavePath(null)
+                }}
+                fullWidth
+              >
                 Ở lại
               </Button>
               <Button variant="danger" onClick={confirmLeaveRoom} fullWidth>

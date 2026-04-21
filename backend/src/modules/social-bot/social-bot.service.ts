@@ -2484,10 +2484,20 @@ export class SocialBotService {
       stockfishBestMove = stockfishMove?.bestMoveUci || "N/A";
     }
 
+    const playerColor =
+      String(dto.playerColor || "").toLowerCase() === "black"
+        ? "black"
+        : "white";
+    const playerSide = String(dto.playerSide || "").trim();
+
     const hint = await this.groqService.getTacticalCoachHint(
       pgn,
       detailLevel,
       stockfishBestMove,
+      {
+        playerColor,
+        playerSide,
+      },
     );
 
     return {
@@ -2495,6 +2505,7 @@ export class SocialBotService {
       hint,
       detailLevel,
       stockfishBestMove,
+      playerColor,
       source: "groq+stockfish",
     };
   }

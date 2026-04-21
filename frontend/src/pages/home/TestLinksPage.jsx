@@ -5,6 +5,8 @@
  * mà không cần login hoặc authentication
  */
 
+import { Link } from 'react-router-dom'
+
 export default function TestLinksPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
@@ -13,51 +15,50 @@ export default function TestLinksPage() {
         <p className="text-2xl mb-8">Development & Testing Links</p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          <a href="/" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
+          <Link to="/" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
             <div className="text-3xl mb-2">🏠</div>
             <div>Home</div>
-          </a>
-          <a href="/test/auth/login" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
+          </Link>
+          <Link to="/test/auth/login" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
             <div className="text-3xl mb-2">🔐</div>
             <div>Login</div>
-          </a>
-          <a href="/test/auth/register" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
+          </Link>
+          <Link to="/test/auth/register" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
             <div className="text-3xl mb-2">📝</div>
             <div>Register</div>
-          </a>
-          <a
-            href="/logout"
+          </Link>
+          <Link to="/logout"
             className="bg-red-500/30 hover:bg-red-500/50 rounded-lg p-4 transition border-2 border-red-400"
           >
             <div className="text-3xl mb-2">🚪</div>
             <div>Logout / Clear</div>
-          </a>
-          <a href="/ranked" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
+          </Link>
+          <Link to="/ranked" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
             <div className="text-3xl mb-2">🏆</div>
             <div>Ranked</div>
-          </a>
-          <a href="/rooms" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
+          </Link>
+          <Link to="/rooms" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
             <div className="text-3xl mb-2">👥</div>
             <div>Rooms</div>
-          </a>
-          <a href="/tournaments" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
+          </Link>
+          <Link to="/tournaments" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
             <div className="text-3xl mb-2">🎯</div>
             <div>Tournaments</div>
-          </a>
-          <a href="/bot" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
+          </Link>
+          <Link to="/bot" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
             <div className="text-3xl mb-2">🤖</div>
             <div>vs Bot</div>
-          </a>
-          <a href="/replays" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
+          </Link>
+          <Link to="/replays" className="bg-white/10 hover:bg-white/20 rounded-lg p-4 transition">
             <div className="text-3xl mb-2">📹</div>
             <div>Replays</div>
-          </a>
+          </Link>
         </div>
         
         <div className="flex flex-wrap justify-center gap-4 mb-8">
-          <a href="/demo" className="inline-flex items-center gap-2 bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
+          <Link to="/demo" className="inline-flex items-center gap-2 bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
             🎮 Demo Hub
-          </a>
+          </Link>
         </div>
 
         {/* TEST ROUTES - Member 1 */}
@@ -66,11 +67,11 @@ export default function TestLinksPage() {
             🧪 Test Pages — Member 1: Auth &amp; Profile (No Login Required)
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <a href="/test/auth/login" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Login Page</a>
-            <a href="/test/auth/register" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Register Page</a>
-            <a href="/test/auth/profile" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Profile</a>
-            <a href="/test/auth/profile/edit" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Edit Profile</a>
-            <a href="/leaderboard" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Leaderboard</a>
+            <Link to="/test/auth/login" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Login Page</Link>
+            <Link to="/test/auth/register" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Register Page</Link>
+            <Link to="/test/auth/profile" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Profile</Link>
+            <Link to="/test/auth/profile/edit" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Edit Profile</Link>
+            <Link to="/leaderboard" className="bg-blue-500/30 hover:bg-blue-500/50 rounded-lg p-3 text-sm transition border border-blue-400">Leaderboard</Link>
             <button
               onClick={() => {
                 localStorage.setItem('token', 'dev-fake-token')
@@ -92,10 +93,10 @@ export default function TestLinksPage() {
         <div className="mt-8 pt-8 border-t border-white/20">
           <p className="text-sm mb-3 text-white/80">🧪 Test Pages — Member 2: Ranked Match</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <a href="/test/ranked" className="bg-orange-500/30 hover:bg-orange-500/50 rounded-lg p-3 text-sm transition border border-orange-400">Ranked Lobby</a>
-            <a href="/test/ranked/game" className="bg-orange-500/30 hover:bg-orange-500/50 rounded-lg p-3 text-sm transition border border-orange-400">Ranked Game</a>
-            <a href="/test/ranked/history" className="bg-orange-500/30 hover:bg-orange-500/50 rounded-lg p-3 text-sm transition border border-orange-400">Ranked History</a>
-            <a href="/test/ranked/stats" className="bg-orange-500/30 hover:bg-orange-500/50 rounded-lg p-3 text-sm transition border border-orange-400">Ranked Stats</a>
+            <Link to="/test/ranked" className="bg-orange-500/30 hover:bg-orange-500/50 rounded-lg p-3 text-sm transition border border-orange-400">Ranked Lobby</Link>
+            <Link to="/test/ranked/game" className="bg-orange-500/30 hover:bg-orange-500/50 rounded-lg p-3 text-sm transition border border-orange-400">Ranked Game</Link>
+            <Link to="/test/ranked/history" className="bg-orange-500/30 hover:bg-orange-500/50 rounded-lg p-3 text-sm transition border border-orange-400">Ranked History</Link>
+            <Link to="/test/ranked/stats" className="bg-orange-500/30 hover:bg-orange-500/50 rounded-lg p-3 text-sm transition border border-orange-400">Ranked Stats</Link>
           </div>
         </div>
 
@@ -103,14 +104,14 @@ export default function TestLinksPage() {
         <div className="mt-8 pt-8 border-t border-white/20">
           <p className="text-sm mb-4 text-white/80">🧪 Test Pages — Member 3: Rooms &amp; Tournaments</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <a href="/test/rooms" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">Rooms List</a>
-            <a href="/test/rooms/create" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">Create Room</a>
-            <a href="/test/rooms/join" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">Join Room</a>
-            <a href="/test/rooms/game" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">Room Game</a>
-            <a href="/test/tournaments" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Tournaments</a>
-            <a href="/test/tournaments/create" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Create Tournament</a>
-            <a href="/test/tournaments/detail" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Tournament Detail</a>
-            <a href="/test/tournaments/bracket" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Tournament Bracket</a>
+            <Link to="/test/rooms" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">Rooms List</Link>
+            <Link to="/test/rooms/create" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">Create Room</Link>
+            <Link to="/test/rooms/join" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">Join Room</Link>
+            <Link to="/test/rooms/game" className="bg-green-500/30 hover:bg-green-500/50 rounded-lg p-3 text-sm transition border border-green-400">Room Game</Link>
+            <Link to="/test/tournaments" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Tournaments</Link>
+            <Link to="/test/tournaments/create" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Create Tournament</Link>
+            <Link to="/test/tournaments/detail" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Tournament Detail</Link>
+            <Link to="/test/tournaments/bracket" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Tournament Bracket</Link>
           </div>
         </div>
 
@@ -118,10 +119,10 @@ export default function TestLinksPage() {
         <div className="mt-8 pt-8 border-t border-white/20">
           <p className="text-sm mb-4 text-white/80">🧪 Test Pages — Member 4: Bot &amp; Replay</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <a href="/test/bot" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Bot Select</a>
-            <a href="/test/bot/game" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Bot Game</a>
-            <a href="/test/replays" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Replay List</a>
-            <a href="/test/replays/viewer" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Replay Viewer</a>
+            <Link to="/test/bot" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Bot Select</Link>
+            <Link to="/test/bot/game" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Bot Game</Link>
+            <Link to="/test/replays" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Replay List</Link>
+            <Link to="/test/replays/viewer" className="bg-purple-500/30 hover:bg-purple-500/50 rounded-lg p-3 text-sm transition border border-purple-400">Replay Viewer</Link>
           </div>
         </div>
       </div>
