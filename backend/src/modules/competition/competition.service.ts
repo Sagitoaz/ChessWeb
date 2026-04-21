@@ -1531,7 +1531,7 @@ export class CompetitionService {
     const db = this.mongoService.getDb();
     const games = db.collection("games");
 
-    const trackedModes = [CompetitionGameMode.RANKED, "tournament"];
+    const trackedModes = [CompetitionGameMode.RANKED];
     const completedResults = [
       "1-0",
       "0-1",
@@ -1701,6 +1701,7 @@ export class CompetitionService {
     return {
       userId: user.userId,
       currentRating,
+      gamesPlayed: totalGames,
       totalGames,
       wins,
       losses,
@@ -1800,9 +1801,21 @@ export class CompetitionService {
   ): Promise<Record<string, unknown>> {
     const startAt = new Date(payload.startAt);
     const endAt = new Date(payload.endAt);
+    const registrationDeadline = payload.registrationDeadline
+      ? new Date(payload.registrationDeadline)
+      : startAt;
+
+    if (Number.isNaN(registrationDeadline.getTime())) {
+      throw new BadRequestException("registrationDeadline khong hop le");
+    }
 
     if (startAt.getTime() >= endAt.getTime()) {
       throw new BadRequestException("startAt phai nho hon endAt");
+    }
+    if (registrationDeadline.getTime() >= startAt.getTime()) {
+      throw new BadRequestException(
+        "registrationDeadline phai nho hon startAt",
+      );
     }
 
     const db = this.mongoService.getDb();
@@ -1818,7 +1831,7 @@ export class CompetitionService {
       timeControl: payload.timeControl || "10+0",
       startAt,
       endAt,
-      registrationDeadline: startAt,
+      registrationDeadline,
       maxParticipants: payload.maxParticipants,
       createdBy: user.userId,
       status: "registration",
@@ -1835,6 +1848,7 @@ export class CompetitionService {
       ...document,
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
+      registrationDeadline: registrationDeadline.toISOString(),
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     };

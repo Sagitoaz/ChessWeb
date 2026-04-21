@@ -36,6 +36,7 @@ export const env = {
   groqApiKey: (process.env.GROQ_API_KEY || "").trim(),
   groqModel: (process.env.GROQ_MODEL || "mixtral-8x7b-32768").trim(),
   groqEnabled: (process.env.GROQ_API_KEY || "").trim().length > 0,
+  googleClientId: (process.env.GOOGLE_CLIENT_ID || "").trim(),
   port: Number(process.env.PORT || 8080),
   corsOrigins:
     configuredCorsOrigins.length > 0

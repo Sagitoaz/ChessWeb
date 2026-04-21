@@ -244,6 +244,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     if (!userStillConnected && activeMatchId) {
+      let didEmitGameEnd = false;
       try {
         const completion =
           await this.competitionService.completeRankedMatchByDisconnect(
@@ -267,11 +268,40 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
             },
             payload,
           );
+          didEmitGameEnd = true;
         }
       } catch (error) {
         this.logger.warn(
           `Disconnect completion skipped for match=${activeMatchId}: ${(error as Error).message}`,
         );
+      }
+
+      if (!didEmitGameEnd) {
+        try {
+          const roomCompletion =
+            await this.competitionService.completeRoomGameByResignation(
+              activeMatchId,
+              user.userId,
+            );
+          if (roomCompletion) {
+            const participants =
+              await this.competitionService.getMatchParticipants(activeMatchId);
+
+            const payload: GameEndPayload = {
+              matchId: activeMatchId,
+              reason: "disconnect_forfeit",
+              result: roomCompletion.result,
+              resignedByUserId: user.userId,
+              at: roomCompletion.finishedAt,
+            };
+
+            this.emitGameEnd(activeMatchId, participants, payload);
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Room disconnect completion skipped for match=${activeMatchId}: ${(error as Error).message}`,
+          );
+        }
       }
     }
 

@@ -8,6 +8,7 @@ import { useNotification } from '@/components/common/Notification'
 import { useAuthStore } from '@/store'
 import gameService from '@/services/gameService'
 import { useGameSocket } from '@/hooks/useWebSocket'
+import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -288,14 +289,11 @@ export default function TournamentMatchPlayPage() {
   const hasValidPlayers = Boolean(whitePlayerId && blackPlayerId)
 
   const movePairs = useMemo(() => {
-    const pairs = []
-    for (let index = 0; index < moveHistory.length; index += 2) {
-      const fullMove = Math.floor(index / 2) + 1
-      const whiteMove = moveHistory[index]?.san || ''
-      const blackMove = moveHistory[index + 1]?.san || ''
-      pairs.push({ fullMove, whiteMove, blackMove })
-    }
-    return pairs
+    return buildMovePairs(moveHistory).map((pair) => ({
+      fullMove: pair.fullMove,
+      whiteMove: getMoveLabel(pair.white),
+      blackMove: getMoveLabel(pair.black),
+    }))
   }, [moveHistory])
 
   if (loading) {

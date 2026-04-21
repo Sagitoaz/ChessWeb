@@ -125,6 +125,10 @@ export class CreateTournamentDto {
   @IsDateString()
   endAt!: string;
 
+  @IsOptional()
+  @IsDateString()
+  registrationDeadline?: string;
+
   @Type(() => Number)
   @IsInt()
   @Min(2)

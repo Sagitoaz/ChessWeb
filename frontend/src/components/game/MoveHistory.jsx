@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { clsx } from 'clsx'
+import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 
 /**
  * MoveHistory Component
@@ -16,16 +17,13 @@ const MoveHistory = ({
   const historyRef = useRef(null)
   const currentMoveRef = useRef(null)
 
-  const movePairs = []
-  for (let i = 0; i < moves.length; i += 2) {
-    movePairs.push({
-      moveNumber: Math.floor(i / 2) + 1,
-      white: moves[i],
-      black: moves[i + 1] || null,
-      whiteIndex: i,
-      blackIndex: i + 1,
-    })
-  }
+  const movePairs = buildMovePairs(moves).map((pair) => ({
+    moveNumber: pair.fullMove,
+    white: pair.white,
+    black: pair.black,
+    whiteIndex: pair.whiteIndex,
+    blackIndex: pair.blackIndex,
+  }))
 
   useEffect(() => {
     if (currentMoveRef.current && scrollBehavior !== 'none') {
@@ -76,7 +74,7 @@ const MoveHistory = ({
                 'text-gray-900 dark:text-gray-100': currentMoveIndex !== pair.whiteIndex,
               })}
             >
-              {pair.white?.san || ''}
+              {getMoveLabel(pair.white)}
             </button>
 
             {pair.black && (
@@ -93,7 +91,7 @@ const MoveHistory = ({
                   'text-gray-900 dark:text-gray-100': currentMoveIndex !== pair.blackIndex,
                 })}
               >
-                {pair.black.san}
+                {getMoveLabel(pair.black)}
               </button>
             )}
           </div>
@@ -106,9 +104,13 @@ const MoveHistory = ({
 MoveHistory.propTypes = {
   moves: PropTypes.arrayOf(
     PropTypes.shape({
-      san: PropTypes.string.isRequired,
+      san: PropTypes.string,
+      notation: PropTypes.string,
+      lan: PropTypes.string,
+      uci: PropTypes.string,
       from: PropTypes.string,
       to: PropTypes.string,
+      promotion: PropTypes.string,
     })
   ),
   currentMoveIndex: PropTypes.number,

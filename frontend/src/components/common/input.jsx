@@ -33,6 +33,7 @@ const Input = forwardRef(
 
     const isPassword = type === 'password'
     const inputType = isPassword && showPassword ? 'text' : type
+    const hasNativePicker = inputType === 'date' || inputType === 'time' || inputType === 'datetime-local'
 
     // Base styles
     const baseStyles =
@@ -104,7 +105,7 @@ const Input = forwardRef(
           ) : null}
 
           {/* Error Icon */}
-          {error && !isPassword && !rightIcon && (
+          {error && !isPassword && !rightIcon && !hasNativePicker && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500">
               <AlertCircle size={18} />
             </div>

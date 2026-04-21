@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input } from '@/components/common'
 import gameService from '@/services/gameService'
+import { useAuthStore } from '@/store'
 import { Users, Clock, Lock, Globe, ArrowLeft, CheckCircle2 } from 'lucide-react'
 
 const shortenDisplayName = (value, max = 18) => {
@@ -12,8 +13,24 @@ const shortenDisplayName = (value, max = 18) => {
   return `${text.slice(0, max - 3)}...`
 }
 
+const normalizeId = (value) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') {
+    if (typeof value.$oid === 'string') return value.$oid
+    if (typeof value.id === 'string') return value.id
+    if (typeof value._id === 'string') return value._id
+  }
+  return String(value)
+}
+
 const normalizeRoomInfo = (room, code) => {
-  const members = Array.isArray(room?.members) ? room.members : []
+  const members = Array.isArray(room?.members)
+    ? room.members.map((member) => ({
+        ...member,
+        userId: normalizeId(member?.userId),
+      }))
+    : []
   const ownerMember = members.find((member) => member?.role === 'owner')
   const host =
     room?.host ||
@@ -31,12 +48,17 @@ const normalizeRoomInfo = (room, code) => {
     code: room?.code || code,
     name: room?.name || `Phòng ${code}`,
     host,
+    members,
     settings: {
       timeControl: room?.settings?.timeControl || room?.timeControl || '10+0',
       increment: room?.settings?.increment || room?.increment || 0,
       isPrivate: room?.settings?.isPrivate ?? room?.isPrivate ?? true,
     },
-    playerCount: room?.playerCount || room?.members?.length || room?.players?.length || 0,
+    playerCount: Math.max(
+      Number(room?.playerCount || 0),
+      members.length,
+      Number(room?.players?.length || 0)
+    ),
     maxPlayers: room?.maxPlayers || 2,
     status: room?.status || 'waiting',
     activeGameId: room?.activeGameId || null,
@@ -49,11 +71,30 @@ export default function JoinRoomPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { showNotification } = useNotification()
+  const user = useAuthStore((state) => state.user)
+  const currentUserId = normalizeId(user?.id || user?.userId || user?._id || user?.sub)
 
   const [roomCode, setRoomCode] = useState('')
   const [isValidating, setIsValidating] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
   const [roomInfo, setRoomInfo] = useState(null)
+
+  const alreadyJoined = Boolean(
+    roomInfo?.members?.some((member) => normalizeId(member?.userId) === currentUserId)
+  )
+  const roomStarted = roomInfo?.status === 'playing' || Boolean(roomInfo?.activeGameId)
+  const roomFull = Number(roomInfo?.playerCount || 0) >= Number(roomInfo?.maxPlayers || 2)
+  const canJoinRoom = Boolean(roomInfo) && (!roomStarted || alreadyJoined) && (!roomFull || alreadyJoined)
+
+  const roomStatusText = !roomInfo
+    ? ''
+    : alreadyJoined
+      ? 'Bạn đã tham gia phòng này.'
+      : roomStarted
+        ? 'Trận đang diễn ra, chỉ người đã tham gia mới vào lại được.'
+        : roomFull
+          ? 'Phòng đã đủ người chơi.'
+          : 'Bạn có thể tham gia phòng này.'
 
   // Get code from URL query params if exists
   useEffect(() => {
@@ -138,16 +179,30 @@ export default function JoinRoomPage() {
   }
 
   const handleJoinRoom = async () => {
+    if (!roomInfo) return
+    if (!canJoinRoom) {
+      showNotification({
+        type: 'warning',
+        title: 'Không thể tham gia',
+        message: roomStatusText || 'Phòng không khả dụng để tham gia.',
+      })
+      return
+    }
+
     setIsJoining(true)
     try {
-      const roomStarted = roomInfo?.status === 'playing' || Boolean(roomInfo?.activeGameId)
-      if (!roomStarted) {
+      if (!alreadyJoined && !roomStarted) {
         await gameService.joinRoom(roomInfo.code)
       }
 
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.debug('[room:join] join requested', { code: roomInfo.code, started: roomStarted })
+        console.debug('[room:join] join requested', {
+          code: roomInfo.code,
+          started: roomStarted,
+          alreadyJoined,
+          roomFull,
+        })
       }
       navigate(`/rooms/${roomInfo.code}`)
     } catch (err) {
@@ -234,7 +289,7 @@ export default function JoinRoomPage() {
                     <CheckCircle2 size={24} className="text-green-600 flex-shrink-0" />
                     <div>
                       <h3 className="font-bold text-green-900 text-lg">Phòng hợp lệ!</h3>
-                      <p className="text-sm text-green-700">Bạn có thể tham gia phòng này</p>
+                      <p className="text-sm text-green-700">{roomStatusText}</p>
                     </div>
                   </div>
 
@@ -309,13 +364,26 @@ export default function JoinRoomPage() {
                   <Button
                     onClick={handleJoinRoom}
                     loading={isJoining}
+                    disabled={!canJoinRoom || isJoining}
                     variant="primary"
                     size="lg"
                     fullWidth
-                    className="mt-4 bg-green-600 hover:bg-green-700 py-3"
+                    className={`mt-4 py-3 ${
+                      canJoinRoom
+                        ? 'bg-green-600 hover:bg-green-700'
+                        : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                    }`}
                   >
                     <Users size={18} />
-                    {roomInfo.status === 'playing' ? 'Vào phòng đang chơi' : 'Tham gia phòng'}
+                    {alreadyJoined
+                      ? roomStarted
+                        ? 'Bạn đã tham gia - Vào lại'
+                        : 'Bạn đã tham gia - Vào phòng'
+                      : roomFull
+                        ? 'Phòng đã đầy'
+                        : roomStarted
+                          ? 'Không thể vào phòng đang chơi'
+                          : 'Tham gia phòng'}
                   </Button>
                 </div>
               )}

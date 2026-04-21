@@ -27,6 +27,46 @@ import gameService from '@services/gameService'
 import { RANKS } from '@utils/constants'
 import { THEME } from '@/styles/theme'
 
+const DAY_MS = 24 * 60 * 60 * 1000
+const HEATMAP_DAYS = 30
+
+const toDateKey = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toISOString().slice(0, 10)
+}
+
+const calcHeatmap = (games) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const dailyMap = new Map()
+  for (let i = 0; i < HEATMAP_DAYS; i += 1) {
+    const date = new Date(today.getTime() - (HEATMAP_DAYS - 1 - i) * DAY_MS)
+    const key = toDateKey(date)
+    dailyMap.set(key, 0)
+  }
+
+  for (const game of games) {
+    const key = toDateKey(game?.finishedAt || game?.createdAt)
+    if (!key || !dailyMap.has(key)) continue
+    dailyMap.set(key, Number(dailyMap.get(key) || 0) + 1)
+  }
+
+  const cells = [...dailyMap.entries()].map(([date, count]) => ({ date, count }))
+  const max = Math.max(...cells.map((cell) => cell.count), 1)
+  return { cells, max }
+}
+
+const getHeatColor = (count, max) => {
+  if (!count) return '#e5e7eb'
+  const ratio = count / max
+  if (ratio < 0.25) return '#bfdbfe'
+  if (ratio < 0.5) return '#60a5fa'
+  if (ratio < 0.75) return '#2563eb'
+  return '#1e3a8a'
+}
+
 // ─────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────
@@ -383,18 +423,21 @@ const RankedStatsPage = () => {
   // ─── Data ───
   const [stats, setStats] = useState(null)
   const [botStats, setBotStats] = useState({ games: 0, wins: 0, losses: 0, draws: 0, winRate: 0 })
+  const [rankedGames, setRankedGames] = useState([])
   const [loading, setLoading] = useState(true)
 
   const ratingHistory = Array.isArray(stats?.ratingHistory) ? stats.ratingHistory : []
   const monthlyPerf = Array.isArray(stats?.monthlyPerformance) ? stats.monthlyPerformance : []
+  const heatmap = useMemo(() => calcHeatmap(rankedGames), [rankedGames])
 
   // ─── Fetch stats ───
   const fetchStats = useCallback(async () => {
     setLoading(true)
     try {
-      const [data, botModeStats] = await Promise.all([
+      const [data, botModeStats, rankedGamesResponse] = await Promise.all([
         gameService.getRankedStats(),
         gameService.getUserModeStats('bot'),
+        gameService.getAllUserGames({ mode: 'ranked', pageSize: 100, maxPages: 10 }),
       ])
 
       setStats(data)
@@ -405,6 +448,7 @@ const RankedStatsPage = () => {
         draws: Number(botModeStats?.draws || 0),
         winRate: Number(botModeStats?.winRate || 0),
       })
+      setRankedGames(Array.isArray(rankedGamesResponse?.items) ? rankedGamesResponse.items : [])
     } catch (err) {
       showNotification({
         type: 'error',
@@ -687,6 +731,41 @@ const RankedStatsPage = () => {
                 Chưa có dữ liệu theo time control.
               </p>
             )}
+          </div>
+        </div>
+
+        <div
+          className={`${THEME.background.card} rounded-lg p-4 border ${THEME.border.DEFAULT} ${THEME.shadow.sm} mb-6`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[#81b64c]" />
+              <h3 className={`text-sm font-semibold ${THEME.text.primary} uppercase tracking-wider`}>
+                Mật độ chơi theo ngày
+              </h3>
+            </div>
+            <span className={`text-xs ${THEME.text.muted}`}>30 ngày gần nhất</span>
+          </div>
+
+          <div className="grid grid-cols-10 sm:grid-cols-15 gap-2">
+            {heatmap.cells.map((cell) => (
+              <div
+                key={cell.date}
+                className="aspect-square rounded-md border border-white/40"
+                style={{ backgroundColor: getHeatColor(cell.count, heatmap.max) }}
+                title={`${cell.date}: ${cell.count} trận`}
+              />
+            ))}
+          </div>
+
+          <div className={`mt-4 flex items-center gap-2 text-xs ${THEME.text.muted}`}>
+            <span>Ít</span>
+            <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(0, 4) }} />
+            <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(1, 4) }} />
+            <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(2, 4) }} />
+            <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(3, 4) }} />
+            <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(4, 4) }} />
+            <span>Nhiều</span>
           </div>
         </div>
 

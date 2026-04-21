@@ -98,6 +98,32 @@ export const useAuth = () => {
   )
 
   /**
+   * Đăng nhập/đăng ký bằng Google.
+   * @param {string} idToken
+   */
+  const googleAuth = useCallback(
+    async (idToken) => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const response = await authService.googleAuth(idToken)
+        const normalized = await normalizeAuthPayload(response)
+        setLogin(normalized.user, normalized.token)
+        socketService.connect(normalized.token)
+
+        return normalized.user
+      } catch (err) {
+        setError(err.message || 'Google authentication failed')
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [normalizeAuthPayload, setLogin]
+  )
+
+  /**
    * Đăng xuất
    */
   const logout = useCallback(async () => {
@@ -252,6 +278,7 @@ export const useAuth = () => {
     // Methods
     login,
     register,
+    googleAuth,
     logout,
     forgotPassword,
     resetPassword,

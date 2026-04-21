@@ -192,6 +192,54 @@ const authService = {
   },
 
   /**
+   * Update profile fields supported by backend.
+   * @param {{displayName?: string}} payload
+   */
+  async updateProfile(payload) {
+    try {
+      const response = await apiCall('PUT', API_ENDPOINTS.UPDATE_PROFILE, payload)
+      return this.unwrapApiData(response)
+    } catch (error) {
+      throw this.handleError(error)
+    }
+  },
+
+  /**
+   * Upload avatar via URL payload.
+   * @param {{avatarUrl: string, avatarPublicId?: string, mimeType?: string, fileSize?: number}} payload
+   */
+  async uploadAvatar(payload) {
+    try {
+      const response = await apiCall('POST', API_ENDPOINTS.UPLOAD_AVATAR, payload)
+      return this.unwrapApiData(response)
+    } catch (error) {
+      throw this.handleError(error)
+    }
+  },
+
+  /**
+   * Login/Register with Google ID token.
+   * @param {string} idToken
+   */
+  async googleAuth(idToken) {
+    try {
+      const response = await apiCall('POST', '/auth/google', { idToken })
+      const data = this.unwrapApiData(response)
+
+      if (data?.token) {
+        localStorage.setItem('token', data.token)
+      }
+      if (data?.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken)
+      }
+
+      return data
+    } catch (error) {
+      throw this.handleError(error)
+    }
+  },
+
+  /**
    * Kiểm tra username có available không
    * @param {string} username - Username cần check
    * @returns {Promise<{available: boolean}>}

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useNotification, Card, Button, Input } from '@/components/common'
+import { requestGoogleCredential } from '@/utils/googleAuth'
 
 const loginSchema = z.object({
   identifier: z
@@ -65,7 +66,7 @@ GoogleButton.propTypes = {
 
 const LoginPage = () => {
   const navigate = useNavigate()
-  const { login, loading, error, clearError } = useAuth()
+  const { login, googleAuth, loading, error, clearError } = useAuth()
   const { showNotification } = useNotification()
 
   const defaultValues = useMemo(
@@ -133,7 +134,15 @@ const LoginPage = () => {
   }
 
   const onGoogleLogin = async () => {
-    notifyError('Google login chưa hỗ trợ', 'Hệ thống hiện chỉ hỗ trợ đăng nhập bằng username/email và mật khẩu.')
+    try {
+      clearError?.()
+      const credential = await requestGoogleCredential()
+      const user = await googleAuth(credential)
+      notifySuccess('Google đăng nhập thành công', `Chào mừng ${user?.displayName || user?.username || 'bạn'} quay lại!`)
+      navigate('/', { replace: true })
+    } catch (err) {
+      notifyError('Google đăng nhập thất bại', err?.message || 'Vui lòng thử lại.')
+    }
   }
 
   return (

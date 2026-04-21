@@ -701,27 +701,35 @@ export const botGameAPI = {
    */
   startBotGame: async (level) => {
     const difficultyMap = {
-      1: 'beginner',
-      2: 'intermediate',
-      3: 'advanced',
-      4: 'expert',
+      1: 'easy',
+      2: 'normal',
+      3: 'hard',
+      4: 'super_hard',
     }
 
     const difficultyLabelMap = {
-      beginner: 'Easy',
-      intermediate: 'Medium',
-      advanced: 'Hard',
-      expert: 'Expert',
+      easy: 'Dễ',
+      normal: 'Bình thường',
+      hard: 'Khó',
+      super_hard: 'Siêu cấp khó',
+      beginner: 'Dễ',
+      intermediate: 'Bình thường',
+      advanced: 'Khó',
+      expert: 'Siêu cấp khó',
     }
 
     const difficultyRatingMap = {
+      easy: 700,
+      normal: 1250,
+      hard: 1900,
+      super_hard: 3200,
       beginner: 700,
-      intermediate: 1100,
-      advanced: 1750,
-      expert: 2350,
+      intermediate: 1250,
+      advanced: 1900,
+      expert: 3200,
     }
 
-    const requestedDifficulty = difficultyMap[level] || 'intermediate'
+    const requestedDifficulty = difficultyMap[level] || 'normal'
 
     const response = await gameAPI.post('/bot/games', {
       difficulty: requestedDifficulty,
@@ -742,7 +750,7 @@ export const botGameAPI = {
       },
       config: {
         ...(data?.config || {}),
-        difficulty: difficultyLabelMap[effectiveDifficulty] || 'Medium',
+        difficulty: difficultyLabelMap[effectiveDifficulty] || 'Bình thường',
         difficultyCode: effectiveDifficulty,
         timeLimitMs: data?.config?.timeLimitMs ?? 500,
       },

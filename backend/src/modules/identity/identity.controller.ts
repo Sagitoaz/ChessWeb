@@ -5,6 +5,7 @@ import {
   CheckEmailDto,
   CheckUsernameDto,
   ForgotPasswordDto,
+  GoogleAuthDto,
   LoginDto,
   LogoutDto,
   RefreshTokenDto,
@@ -65,6 +66,31 @@ export class IdentityController {
     }>
   > {
     return this.identityService.register(dto, requestId || null)
+  }
+
+  @HttpCode(200)
+  @Post('google')
+  googleAuth(
+    @Body() dto: GoogleAuthDto,
+    @Headers('x-request-id') requestId?: string
+  ): Promise<
+    ApiResponse<{
+      user: {
+        id: string
+        username: string
+        email: string | null
+        displayName: string | null
+        isActive: boolean
+        isVerified: boolean
+        role: string
+        createdAt: string
+        updatedAt: string
+      }
+      token: string
+      refreshToken: string
+    }>
+  > {
+    return this.identityService.googleAuth(dto, requestId || null)
   }
 
   @HttpCode(200)

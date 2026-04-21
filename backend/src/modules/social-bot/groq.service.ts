@@ -68,6 +68,23 @@ export class GroqService {
     }
   }
 
+  private extractSideToMove(fen: string): "white" | "black" | null {
+    const token = String(fen || "")
+      .trim()
+      .split(/\s+/)[1];
+    if (token === "w") return "white";
+    if (token === "b") return "black";
+    return null;
+  }
+
+  private mapScoreBand(score: number): string {
+    if (score >= 200) return "rất tốt cho người chơi";
+    if (score >= 80) return "hơi tốt cho người chơi";
+    if (score > -80) return "cân bằng";
+    if (score > -200) return "hơi bất lợi cho người chơi";
+    return "rất bất lợi cho người chơi";
+  }
+
   async analyzeMoveWithAI(
     fen: string,
     userMove: string,
@@ -80,19 +97,33 @@ export class GroqService {
     }
 
     const perspectiveLabel = playerColor === "black" ? "Đen" : "Trắng";
+    const sideToMove = this.extractSideToMove(fen);
+    const numericScore = Number.isFinite(score) ? score : 0;
+    const playerPerspectiveScore =
+      sideToMove && sideToMove !== playerColor ? -numericScore : numericScore;
+    const scoreBand = this.mapScoreBand(playerPerspectiveScore);
+
     const prompt = `Bạn là đại kiện tướng cờ vua.
-Phân tích từ góc nhìn bên ${perspectiveLabel} vừa đi quân; FEN là sau nước đi đó, nên nước Stockfish là phản đòn tốt nhất của bên còn lại.
-BẮT BUỘC trả lời bằng tiếng Việt có dấu, rất ngắn gọn: tối đa 4 dòng, mỗi dòng 1 câu.
-Dùng đúng 4 nhãn sau và không thêm nhãn khác:
-1) Nhận xét:
-2) Vì sao chưa tốt:
-3) Nên chơi gì tiếp:
-4) Stockfish:
-Không viết lan man, không giải thích dài, không nói ngoài chủ đề.
+Phân tích từ góc nhìn bên ${perspectiveLabel} vừa đi quân.
+FEN hiện tại là sau nước đi của người chơi; lượt tiếp theo thuộc về đối thủ.
+Mục tiêu: chỉ ra đúng sai chiến thuật, rủi ro tức thời, và kế hoạch sửa trong 2-3 nước kế tiếp.
+BẮT BUỘC trả lời tiếng Việt có dấu, ngắn gọn, thực dụng, tối đa 5 dòng.
+Mỗi dòng bắt đầu đúng một nhãn dưới đây (không thêm nhãn khác):
+1) Tổng quan:
+2) Lỗi chính:
+3) Kế hoạch 2-3 nước:
+4) Nước gợi ý:
+5) Cần tránh:
+Yêu cầu chất lượng:
+- Không nói chung chung; phải nêu đúng ý tưởng chiến thuật/cấu trúc quân.
+- Ưu tiên lời khuyên có thể áp dụng ngay ở ván này.
+- Nếu nước đi vẫn ổn, ghi rõ điểm tốt trước rồi mới nêu cải thiện nhỏ.
 FEN: ${fen}
 Nước đi người chơi: ${userMove}
 Nước đi tốt nhất Stockfish: ${stockfishBestMove}
-Điểm số đánh giá (cp): ${score}`;
+Điểm số thô (cp): ${numericScore}
+Điểm số theo góc nhìn người chơi (cp): ${playerPerspectiveScore}
+Mức đánh giá nhanh: ${scoreBand}`;
 
     const candidates = this.activeModelName
       ? [
@@ -107,7 +138,7 @@ Nước đi tốt nhất Stockfish: ${stockfishBestMove}
 
     for (const model of candidates) {
       try {
-        const text = await this.generateWithModel(model, prompt, 260, 0.45);
+        const text = await this.generateWithModel(model, prompt, 340, 0.25);
         this.activeModelName = model;
         return text || this.fallback;
       } catch (error) {

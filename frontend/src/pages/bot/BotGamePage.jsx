@@ -8,6 +8,7 @@ import { Avatar, Button } from '@components/common'
 import { MainLayout } from '@components/layout'
 import { Flag, List, ArrowLeft, Trophy, Lightbulb, RefreshCcw } from 'lucide-react'
 import { THEME } from '@/styles/theme'
+import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 
 // ─── Inline MoveListPanel (same style as RankedGamePage) ───
 const MoveListPanel = ({ moves }) => {
@@ -24,10 +25,13 @@ const MoveListPanel = ({ moves }) => {
     )
   }
 
-  const pairs = []
-  for (let i = 0; i < moves.length; i += 2) {
-    pairs.push({ n: Math.floor(i / 2) + 1, w: moves[i], b: moves[i + 1] || null, wi: i, bi: i + 1 })
-  }
+  const pairs = buildMovePairs(moves).map((pair) => ({
+    n: pair.fullMove,
+    w: pair.white,
+    b: pair.black,
+    wi: pair.whiteIndex,
+    bi: pair.blackIndex,
+  }))
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -42,7 +46,7 @@ const MoveListPanel = ({ moves }) => {
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              {p.w?.san || ''}
+              {getMoveLabel(p.w)}
             </span>
             {p.b ? (
               <span
@@ -52,7 +56,7 @@ const MoveListPanel = ({ moves }) => {
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {p.b.san}
+                {getMoveLabel(p.b)}
               </span>
             ) : (
               <span className="flex-1" />
@@ -131,27 +135,30 @@ export default function BotGamePage() {
     gameData?.config?.difficultyCode || gameData?.difficulty || gameData?.config?.difficulty || ''
   ).toLowerCase()
 
-  const difficultyCode =
-    difficultyRaw === 'expert' || difficultyRaw === 'hard' || difficultyRaw === 'advanced'
-      ? difficultyRaw === 'expert'
-        ? 'expert'
-        : 'advanced'
-      : difficultyRaw === 'medium' || difficultyRaw === 'intermediate'
-        ? 'intermediate'
-        : 'beginner'
+  const difficultyCode = (() => {
+    if (difficultyRaw === 'easy' || difficultyRaw === 'beginner') return 'easy'
+    if (difficultyRaw === 'normal' || difficultyRaw === 'medium' || difficultyRaw === 'intermediate') {
+      return 'normal'
+    }
+    if (difficultyRaw === 'hard' || difficultyRaw === 'advanced') return 'hard'
+    if (difficultyRaw === 'super_hard' || difficultyRaw === 'superhard' || difficultyRaw === 'expert') {
+      return 'super_hard'
+    }
+    return 'normal'
+  })()
 
   const difficultyLabel = {
-    beginner: 'Easy',
-    intermediate: 'Medium',
-    advanced: 'Hard',
-    expert: 'Expert',
+    easy: 'Dễ',
+    normal: 'Bình thường',
+    hard: 'Khó',
+    super_hard: 'Siêu cấp khó',
   }[difficultyCode]
 
   const difficultyBadgeClass = {
-    beginner: 'bg-green-100 text-green-700 border-green-200',
-    intermediate: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    advanced: 'bg-orange-100 text-orange-700 border-orange-200',
-    expert: 'bg-red-100 text-red-700 border-red-200',
+    easy: 'bg-green-100 text-green-700 border-green-200',
+    normal: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    hard: 'bg-orange-100 text-orange-700 border-orange-200',
+    super_hard: 'bg-red-100 text-red-700 border-red-200',
   }[difficultyCode]
 
   // Redirect nếu không có gameData

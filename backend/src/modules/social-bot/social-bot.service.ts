@@ -1191,17 +1191,17 @@ export class SocialBotService {
       throw new NotFoundException("Room not found");
     }
 
-    if (room.status === "playing") {
-      throw new BadRequestException("Room already started");
-    }
-
     const members = await this.repo.findRoomMembers(room._id);
     const alreadyJoined = members.some((m: any) => m.userId === userId);
+    if (room.status === "playing" && !alreadyJoined) {
+      throw new BadRequestException("Room already started");
+    }
     if (alreadyJoined) {
-      return room;
+      return this.getRoom(code);
     }
 
-    if (members.length >= 2) {
+    const maxPlayers = Number(room.maxPlayers || 2);
+    if (members.length >= maxPlayers) {
       throw new BadRequestException("Room is full");
     }
 
@@ -1228,11 +1228,11 @@ export class SocialBotService {
       userId,
       username: profile?.username || null,
       playerCount: members.length + 1,
-      maxPlayers: Number(room.maxPlayers || 2),
+      maxPlayers,
       status: String(room.status || "waiting"),
     });
 
-    return room;
+    return this.getRoom(code);
   }
 
   async getRoom(code: string) {
@@ -2430,7 +2430,7 @@ export class SocialBotService {
 
     // Fetch bot session to get difficulty level
     const session = await this.repo.findBotSessionById(dto.sessionId);
-    const difficulty = session?.difficulty || "intermediate";
+    const difficulty = session?.difficulty || "normal";
 
     const stockfishMove = await this.stockfishService.getBestMove(
       dto.fen,
@@ -2479,7 +2479,7 @@ export class SocialBotService {
     if (fen) {
       const stockfishMove = await this.stockfishService.getBestMove(
         fen,
-        "advanced",
+        "hard",
       );
       stockfishBestMove = stockfishMove?.bestMoveUci || "N/A";
     }

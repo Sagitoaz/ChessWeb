@@ -6,6 +6,7 @@ import { useReplayControls } from '@hooks'
 import { replayAPI } from '@services/gameService'
 import { Loader } from '@components/common'
 import { THEME } from '@/styles/theme'
+import { getMoveLabel } from '@/utils/moveNotation'
 
 export default function ReplayViewerPage() {
   const navigate = useNavigate()
@@ -120,7 +121,8 @@ export default function ReplayViewerPage() {
       return
     }
 
-    const cacheKey = `${gameId}::${currentFEN}::${currentMove.san || `${currentMove.from}-${currentMove.to}`}`
+    const currentMoveLabel = getMoveLabel(currentMove) || `${currentMove.from}-${currentMove.to}`
+    const cacheKey = `${gameId}::${currentFEN}::${currentMoveLabel}`
     const forceRefresh = forceAiRefreshRef.current
     forceAiRefreshRef.current = false
 
@@ -141,7 +143,7 @@ export default function ReplayViewerPage() {
       replayAPI
         .getGame(gameId, {
           fen: currentFEN,
-          userMove: currentMove.san || `${currentMove.from}-${currentMove.to}`,
+          userMove: currentMoveLabel,
           score: 0,
           refreshAi: forceRefresh,
           playerColor: currentMove.color === 'w' ? 'white' : 'black',
@@ -306,7 +308,7 @@ export default function ReplayViewerPage() {
 
             {currentMove && (
               <div className={`mt-3 text-center text-sm ${THEME.text.secondary}`}>
-                Nước {currentMove.ply}: <strong>{currentMove.san}</strong>
+                Nước {currentMove.ply}: <strong>{getMoveLabel(currentMove) || '-'}</strong>
                 {currentMove.isCheck && !currentMove.isCheckmate && ' +'}
                 {currentMove.isCheckmate && ' # (Chiếu hết)'}
               </div>

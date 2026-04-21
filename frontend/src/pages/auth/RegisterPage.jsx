@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useNotification, Card, Button, Input } from '@/components/common'
+import { requestGoogleCredential } from '@/utils/googleAuth'
 
 // ─── Schema ────────────────────────────────────────────────────────────────
 const registerSchema = z
@@ -72,7 +73,7 @@ const GoogleButton = ({ onClick, disabled }) => (
 // ─── Page ──────────────────────────────────────────────────────────────────
 const RegisterPage = () => {
   const navigate = useNavigate()
-  const { register: registerUser, loading, error, clearError } = useAuth()
+  const { register: registerUser, googleAuth, loading, error, clearError } = useAuth()
   const { showNotification } = useNotification()
 
   const defaultValues = useMemo(
@@ -121,8 +122,19 @@ const RegisterPage = () => {
   )
 
   const onGoogleRegister = useCallback(async () => {
-    notifyError('Google register chưa hỗ trợ', 'Hiện tại bạn hãy đăng ký bằng email và mật khẩu.')
-  }, [notifyError])
+    try {
+      clearError?.()
+      const credential = await requestGoogleCredential()
+      const user = await googleAuth(credential)
+      notifySuccess(
+        'Google đăng ký thành công',
+        `Chào mừng ${user?.displayName || user?.username || 'bạn'} đến với WebChess!`
+      )
+      navigate('/', { replace: true })
+    } catch (err) {
+      notifyError('Google đăng ký thất bại', err?.message || 'Vui lòng thử lại.')
+    }
+  }, [clearError, googleAuth, navigate, notifyError, notifySuccess])
 
   return (
     <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">

@@ -8,6 +8,7 @@ import gameService from '@/services/gameService'
 import { useGameSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
 import { ArrowLeft, Clock, Flag, Play, Trophy, Users } from 'lucide-react'
+import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -80,6 +81,7 @@ export default function RoomPlayPage() {
   const [gamePhase, setGamePhase] = useState('waiting')
   const [showStartBusy, setShowStartBusy] = useState(false)
   const [showResignConfirm, setShowResignConfirm] = useState(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [gameResult, setGameResult] = useState(null)
   const [moveHistory, setMoveHistory] = useState([])
   const [whiteTime, setWhiteTime] = useState(600)
@@ -407,6 +409,33 @@ export default function RoomPlayPage() {
     })
   }
 
+  const requestLeaveRoom = useCallback(() => {
+    if (gamePhase === 'playing' && !endedRef.current) {
+      setShowLeaveConfirm(true)
+      return
+    }
+    navigate('/rooms')
+  }, [gamePhase, navigate])
+
+  const confirmLeaveRoom = useCallback(() => {
+    setShowLeaveConfirm(false)
+
+    if (gamePhase === 'playing' && !endedRef.current && activeGameId && isSocketConnected) {
+      resign()
+      showNotification({
+        type: 'info',
+        title: 'Rời phòng',
+        message: 'Bạn rời trận giữa chừng và sẽ bị tính thua.',
+      })
+      setTimeout(() => {
+        navigate('/rooms')
+      }, 180)
+      return
+    }
+
+    navigate('/rooms')
+  }, [activeGameId, gamePhase, isSocketConnected, navigate, resign, showNotification])
+
   const roomMembers = room.members || []
   const host = roomMembers.find((member) => member.role === 'owner') || roomMembers[0]
   const opponentMember = roomMembers.find((member) => member.userId !== user?.id) || null
@@ -427,7 +456,7 @@ export default function RoomPlayPage() {
   return (
     <div className="max-w-7xl mx-auto px-3 py-4">
       <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" onClick={() => navigate('/rooms')} size="sm">
+        <Button variant="ghost" onClick={requestLeaveRoom} size="sm">
           <ArrowLeft className="w-4 h-4" />
           Rời phòng
         </Button>
@@ -550,7 +579,7 @@ export default function RoomPlayPage() {
                   Đầu hàng
                 </Button>
               )}
-              <Button variant="outline" onClick={() => navigate('/rooms')}>
+              <Button variant="outline" onClick={requestLeaveRoom}>
                 <ArrowLeft className="w-4 h-4" />
                 Về danh sách
               </Button>
@@ -606,11 +635,20 @@ export default function RoomPlayPage() {
               {moveHistory.length === 0 ? (
                 <p className="text-gray-500">Chưa có nước đi nào.</p>
               ) : (
-                <div className="space-y-1">
-                  {moveHistory.map((move, index) => (
-                    <div key={`${move.san}-${index}`} className="flex items-center gap-2">
-                      <span className="w-8 text-gray-400">{Math.floor(index / 2) + 1}.</span>
-                      <span className="font-mono text-gray-800">{move.san}</span>
+                <div className="space-y-1 text-xs">
+                  <div className="grid grid-cols-[36px_1fr_1fr] gap-2 px-1 text-gray-500 font-semibold border-b border-gray-100 pb-1">
+                    <span>#</span>
+                    <span>Trắng</span>
+                    <span>Đen</span>
+                  </div>
+                  {buildMovePairs(moveHistory).map((pair) => (
+                    <div
+                      key={`room-move-pair-${pair.fullMove}`}
+                      className="grid grid-cols-[36px_1fr_1fr] gap-2 items-center"
+                    >
+                      <span className="text-gray-400">{pair.fullMove}.</span>
+                      <span className="font-mono text-gray-800">{getMoveLabel(pair.white) || '-'}</span>
+                      <span className="font-mono text-gray-800">{getMoveLabel(pair.black) || '-'}</span>
                     </div>
                   ))}
                 </div>
@@ -632,6 +670,25 @@ export default function RoomPlayPage() {
               <Button variant="danger" onClick={handleResign} fullWidth>
                 <Flag className="w-4 h-4" />
                 Đầu hàng
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Rời phòng khi đang đấu?</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              Nếu rời lúc trận chưa kết thúc, hệ thống sẽ tính bạn thua.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setShowLeaveConfirm(false)} fullWidth>
+                Ở lại
+              </Button>
+              <Button variant="danger" onClick={confirmLeaveRoom} fullWidth>
+                Rời và nhận thua
               </Button>
             </div>
           </div>

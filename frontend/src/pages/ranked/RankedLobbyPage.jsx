@@ -228,18 +228,19 @@ const RankedLobbyPage = () => {
 
   // ──── Auth/User State ────
   const storeUser = useAuthStore((s) => s.user)
+  const [rankedStats, setRankedStats] = useState(null)
   const user = useMemo(
     () =>
       storeUser
         ? {
             id: storeUser.id,
             username: storeUser.username || 'Người chơi',
-            rating: storeUser.rating || 1200,
+            rating: Number(rankedStats?.currentRating ?? storeUser.rating ?? 1200),
             avatarUrl: storeUser.avatarUrl || null,
-            gamesPlayed: storeUser.gamesPlayed ?? 0,
-            wins: storeUser.wins ?? 0,
-            losses: storeUser.losses ?? 0,
-            draws: storeUser.draws ?? 0,
+            gamesPlayed: Number(rankedStats?.gamesPlayed ?? storeUser.gamesPlayed ?? 0),
+            wins: Number(rankedStats?.wins ?? storeUser.wins ?? 0),
+            losses: Number(rankedStats?.losses ?? storeUser.losses ?? 0),
+            draws: Number(rankedStats?.draws ?? storeUser.draws ?? 0),
           }
         : {
             id: '',
@@ -251,7 +252,7 @@ const RankedLobbyPage = () => {
             losses: 0,
             draws: 0,
           },
-    [storeUser]
+    [rankedStats, storeUser]
   )
 
   // ──── Queue & Match State ────
@@ -273,10 +274,15 @@ const RankedLobbyPage = () => {
   useEffect(() => {
     const fetchRecentGames = async () => {
       try {
-        const data = await gameService.getRankedHistory(1, 5)
-        setRecentGames(data.matches || [])
+        const [historyData, statsData] = await Promise.all([
+          gameService.getRankedHistory(1, 5),
+          gameService.getRankedStats(),
+        ])
+        setRecentGames(historyData.matches || [])
+        setRankedStats(statsData || null)
       } catch {
         setRecentGames([])
+        setRankedStats(null)
       } finally {
         setLoading(false)
       }

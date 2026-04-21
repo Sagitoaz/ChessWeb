@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useNotification } from '@/components/common/Notification'
 import { Card, Button, Input } from '@/components/common'
@@ -26,6 +26,15 @@ const TIME_CONTROLS = [
 
 const PARTICIPANT_OPTIONS = [4, 8, 16, 32, 64]
 
+const formatDateTimeLocal = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
 export default function CreateTournamentPage() {
   const navigate = useNavigate()
   const { showNotification } = useNotification()
@@ -51,6 +60,17 @@ export default function CreateTournamentPage() {
   })
 
   const [errors, setErrors] = useState({})
+  const startDateTime = useMemo(() => {
+    if (!formData.startDate || !formData.startTime) return null
+    const value = new Date(`${formData.startDate}T${formData.startTime}:00`)
+    return Number.isNaN(value.getTime()) ? null : value
+  }, [formData.startDate, formData.startTime])
+
+  const registrationDeadlineMax = useMemo(() => {
+    if (!startDateTime) return undefined
+    const maxDate = new Date(startDateTime.getTime() - 60 * 1000)
+    return formatDateTimeLocal(maxDate)
+  }, [startDateTime])
 
   const updateField = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -117,6 +137,7 @@ export default function CreateTournamentPage() {
     try {
       const startAt = new Date(`${formData.startDate}T${formData.startTime}:00`)
       const endAt = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
+      const registrationDeadline = new Date(formData.registrationDeadline)
 
       const payload = {
         name: formData.name.trim(),
@@ -127,6 +148,7 @@ export default function CreateTournamentPage() {
         timeControl: formData.timeControl,
         startAt: startAt.toISOString(),
         endAt: endAt.toISOString(),
+        registrationDeadline: registrationDeadline.toISOString(),
       }
 
       const response = await gameService.createTournament(payload)
@@ -371,27 +393,35 @@ export default function CreateTournamentPage() {
                     <label className="block text-sm font-semibold text-gray-900 mb-2">
                       Ngày bắt đầu <span className="text-red-500">*</span>
                     </label>
-                    <Input
+                    <input
                       type="date"
                       value={formData.startDate}
                       onChange={(e) => updateField('startDate', e.target.value)}
-                      fullWidth
-                      error={errors.startDate}
                       min={new Date().toISOString().split('T')[0]}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                        errors.startDate ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                      }`}
                     />
+                    {errors.startDate && (
+                      <p className="text-xs text-red-600 mt-1">{errors.startDate}</p>
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">
                       Giờ bắt đầu <span className="text-red-500">*</span>
                     </label>
-                    <Input
+                    <input
                       type="time"
                       value={formData.startTime}
                       onChange={(e) => updateField('startTime', e.target.value)}
-                      fullWidth
-                      error={errors.startTime}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                        errors.startTime ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                      }`}
                     />
+                    {errors.startTime && (
+                      <p className="text-xs text-red-600 mt-1">{errors.startTime}</p>
+                    )}
                   </div>
                 </div>
 
@@ -399,13 +429,20 @@ export default function CreateTournamentPage() {
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
                     Hạn đăng ký <span className="text-red-500">*</span>
                   </label>
-                  <Input
+                  <input
                     type="datetime-local"
                     value={formData.registrationDeadline}
                     onChange={(e) => updateField('registrationDeadline', e.target.value)}
-                    fullWidth
-                    error={errors.registrationDeadline}
+                    max={registrationDeadlineMax}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                      errors.registrationDeadline
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
                   />
+                  {errors.registrationDeadline && (
+                    <p className="text-xs text-red-600 mt-1">{errors.registrationDeadline}</p>
+                  )}
                   <p className="text-xs text-gray-500 mt-1">
                     Người chơi chỉ có thể đăng ký trước thời điểm này
                   </p>

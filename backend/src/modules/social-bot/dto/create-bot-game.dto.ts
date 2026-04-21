@@ -9,6 +9,10 @@ import {
 } from "class-validator";
 
 export enum BotDifficulty {
+  EASY = "easy",
+  NORMAL = "normal",
+  HARD = "hard",
+  SUPER_HARD = "super_hard",
   BEGINNER = "beginner",
   INTERMEDIATE = "intermediate",
   ADVANCED = "advanced",

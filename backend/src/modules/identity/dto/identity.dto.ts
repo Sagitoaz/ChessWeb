@@ -98,3 +98,10 @@ export class CheckEmailDto {
   @MaxLength(100)
   email!: string
 }
+
+export class GoogleAuthDto {
+  @IsString()
+  @MinLength(20)
+  @MaxLength(4096)
+  idToken!: string
+}

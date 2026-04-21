@@ -23,6 +23,7 @@ import { useAuthStore } from '@store'
 import { ChessGame } from '@utils/chessLogic'
 import { RANKS } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor } from '@utils/formatters'
+import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 import gameService from '@services/gameService'
 
 // ─────────────────────────────────────────────────────
@@ -367,16 +368,13 @@ const MoveListPanel = ({ moves }) => {
     )
   }
 
-  const pairs = []
-  for (let i = 0; i < moves.length; i += 2) {
-    pairs.push({
-      n: Math.floor(i / 2) + 1,
-      w: moves[i],
-      b: moves[i + 1] || null,
-      wi: i,
-      bi: i + 1,
-    })
-  }
+  const pairs = buildMovePairs(moves).map((pair) => ({
+    n: pair.fullMove,
+    w: pair.white,
+    b: pair.black,
+    wi: pair.whiteIndex,
+    bi: pair.blackIndex,
+  }))
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -391,7 +389,7 @@ const MoveListPanel = ({ moves }) => {
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              {p.w?.san || ''}
+              {getMoveLabel(p.w)}
             </span>
             {p.b && (
               <span
@@ -401,7 +399,7 @@ const MoveListPanel = ({ moves }) => {
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {p.b.san}
+                {getMoveLabel(p.b)}
               </span>
             )}
           </div>

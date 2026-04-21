@@ -10,6 +10,7 @@ import {
   CheckEmailDto,
   CheckUsernameDto,
   ForgotPasswordDto,
+  GoogleAuthDto,
   LoginDto,
   LogoutDto,
   RefreshTokenDto,
@@ -21,6 +22,7 @@ interface UserProfileDocument {
   _id: string
   username: string
   email?: string
+  googleId?: string
   passwordHash?: string
   displayName?: string | null
   isActive?: boolean | null
@@ -113,6 +115,13 @@ interface AvailabilityResponseData {
 
 interface MeResponseData {
   user: UserResponseData
+}
+
+interface GoogleTokenInfo {
+  sub: string
+  email: string | null
+  emailVerified: boolean
+  name: string | null
 }
 
 @Injectable()
@@ -221,6 +230,107 @@ export class IdentityService {
         )
       }
 
+      return this.errorResponse(requestId, 'INTERNAL_SERVER_ERROR', 'Loi he thong noi bo')
+    }
+  }
+
+  async googleAuth(
+    dto: GoogleAuthDto,
+    requestId: string | null
+  ): Promise<ApiResponse<LoginResponseData>> {
+    try {
+      if (!env.googleClientId) {
+        return this.errorResponse(
+          requestId,
+          'AUTH_FORBIDDEN',
+          'Google OAuth chua duoc cau hinh tren he thong'
+        )
+      }
+
+      const tokenInfo = await this.verifyGoogleIdToken(dto.idToken)
+      if (!tokenInfo) {
+        return this.errorResponse(requestId, 'AUTH_INVALID_CREDENTIALS', 'Google token khong hop le')
+      }
+
+      if (!tokenInfo.email || tokenInfo.emailVerified !== true) {
+        return this.errorResponse(
+          requestId,
+          'AUTH_FORBIDDEN',
+          'Tai khoan Google chua xac minh email'
+        )
+      }
+
+      const db = await this.getDb()
+      const users = this.userProfiles(db)
+      const email = this.normalizeEmail(tokenInfo.email)
+      const now = new Date()
+
+      let user =
+        (await users.findOne({ googleId: tokenInfo.sub })) || (await users.findOne({ email }))
+
+      if (!user) {
+        const username = await this.generateUniqueUsername(
+          users,
+          tokenInfo.name || email.split('@')[0] || 'google_user'
+        )
+
+        user = {
+          _id: this.generateUserId(),
+          username,
+          email,
+          googleId: tokenInfo.sub,
+          displayName: tokenInfo.name || username,
+          isActive: true,
+          isVerified: true,
+          role: Role.USER,
+          createdAt: now,
+          updatedAt: now,
+        }
+
+        await users.insertOne(user)
+        await this.seedUserDocuments(db, user._id, now)
+      } else {
+        if (user.isActive === false) {
+          return this.errorResponse(requestId, 'AUTH_FORBIDDEN', 'Tai khoan da bi khoa')
+        }
+
+        const patch: Record<string, unknown> = { updatedAt: now }
+
+        if (user.googleId !== tokenInfo.sub) {
+          patch.googleId = tokenInfo.sub
+        }
+        if (!user.email) {
+          patch.email = email
+        }
+        if (!user.displayName && tokenInfo.name) {
+          patch.displayName = tokenInfo.name
+        }
+        if (user.isVerified !== true) {
+          patch.isVerified = true
+        }
+
+        if (Object.keys(patch).length > 1) {
+          const updated = await users.findOneAndUpdate(
+            { _id: user._id },
+            { $set: patch },
+            { returnDocument: 'after' }
+          )
+          if (updated) {
+            user = updated
+          }
+        }
+      }
+
+      const tokens = await this.issueAuthTokens(db, user)
+      return successResponse(
+        {
+          user: this.toUserResponse(user),
+          token: tokens.token,
+          refreshToken: tokens.refreshToken,
+        },
+        requestId
+      )
+    } catch (_error) {
       return this.errorResponse(requestId, 'INTERNAL_SERVER_ERROR', 'Loi he thong noi bo')
     }
   }
@@ -488,6 +598,87 @@ export class IdentityService {
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase()
+  }
+
+  private normalizeUsernameSeed(seed: string): string {
+    const cleaned = seed
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+
+    if (cleaned.length >= 3) {
+      return cleaned.slice(0, 20)
+    }
+
+    return `user_${cleaned || randomUUID().slice(0, 8)}`
+      .replace(/[^a-z0-9_]+/g, '_')
+      .slice(0, 20)
+  }
+
+  private async generateUniqueUsername(
+    users: Collection<UserProfileDocument>,
+    seed: string
+  ): Promise<string> {
+    const base = this.normalizeUsernameSeed(seed)
+    let candidate = base
+
+    for (let i = 0; i < 50; i += 1) {
+      const exists = (await users.countDocuments({ username: candidate }, { limit: 1 })) > 0
+      if (!exists) {
+        return candidate
+      }
+
+      const suffix = String(Math.floor(1000 + Math.random() * 9000))
+      const head = base.slice(0, Math.max(3, 20 - suffix.length - 1))
+      candidate = `${head}_${suffix}`.slice(0, 20)
+    }
+
+    return `user_${randomUUID().replace(/-/g, '').slice(0, 8)}`
+  }
+
+  private async verifyGoogleIdToken(idToken: string): Promise<GoogleTokenInfo | null> {
+    const token = idToken.trim()
+    if (!token) return null
+
+    const endpoint = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`
+    const response = await fetch(endpoint, { method: 'GET' })
+    if (!response.ok) {
+      return null
+    }
+
+    const payload = (await response.json()) as Record<string, unknown>
+
+    const aud = String(payload.aud || '')
+    const iss = String(payload.iss || '')
+    const exp = Number(payload.exp || 0)
+    const email = typeof payload.email === 'string' ? payload.email : null
+    const emailVerified = String(payload.email_verified || '').toLowerCase() === 'true'
+    const sub = String(payload.sub || '')
+
+    if (!sub || !aud || !iss || !exp) {
+      return null
+    }
+
+    if (aud !== env.googleClientId) {
+      return null
+    }
+
+    if (iss !== 'accounts.google.com' && iss !== 'https://accounts.google.com') {
+      return null
+    }
+
+    if (exp * 1000 <= Date.now()) {
+      return null
+    }
+
+    return {
+      sub,
+      email,
+      emailVerified,
+      name: typeof payload.name === 'string' && payload.name.trim().length > 0 ? payload.name : null,
+    }
   }
 
   private resolveLoginIdentifier(dto: LoginDto): { type: 'email' | 'username'; value: string } | null {
