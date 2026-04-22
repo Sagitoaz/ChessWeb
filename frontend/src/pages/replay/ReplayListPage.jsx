@@ -17,19 +17,21 @@ function ResultBadge({ result }) {
   const cfg = {
     win: {
       label: '✅ Thắng',
-      bg: STATUS_COLORS.playing.bg,
-      text: STATUS_COLORS.playing.text,
+      bg: 'bg-green-50',
+      text: 'text-green-700',
+      border: 'border-green-200',
     },
-    lose: { label: '❌ Thua', bg: STATUS_COLORS.draw.bg, text: STATUS_COLORS.draw.text },
-    draw: { label: '🤝 Hòa', bg: STATUS_COLORS.waiting.bg, text: STATUS_COLORS.waiting.text },
+    lose: { label: '❌ Thua', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+    draw: { label: '🤝 Hòa', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
   }
-  const { label, bg, text } = cfg[result] ?? {
+  const { label, bg, text, border } = cfg[result] ?? {
     label: 'Chưa có kết quả',
     bg: STATUS_COLORS.draw.bg,
     text: STATUS_COLORS.draw.text,
+    border: 'border-gray-200',
   }
   return (
-    <span className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${bg} ${text}`}>
+    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${bg} ${text} ${border}`}>
       {label}
     </span>
   )
@@ -47,13 +49,7 @@ function ModeBadge({ mode }) {
             ? 'Giao hữu'
             : 'Khác'
 
-  return (
-    <span
-      className={`px-3 py-1 ${THEME.rounded.DEFAULT} text-xs font-medium ${STATUS_COLORS.playing.bg} ${STATUS_COLORS.playing.text}`}
-    >
-      {modeLabel}
-    </span>
-  )
+  return <span className="px-2.5 py-1 rounded-full text-xs font-semibold border border-gray-200 bg-gray-50 text-gray-700">{modeLabel}</span>
 }
 
 export default function ReplayListPage() {
@@ -152,19 +148,26 @@ export default function ReplayListPage() {
   const handleSelect = (gameId) => navigate(`/replays/${gameId}`)
 
   return (
-    <div className={`min-h-screen ${THEME.background.page} py-8 px-4`}>
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-8">
-          <div className="text-6xl mb-4 text-center">📹</div>
-          <h1 className={`text-3xl font-bold ${THEME.text.primary} mb-2 text-center`}>
-            Lịch sử đấu & Replay
-          </h1>
-          <p className={`${THEME.text.secondary} text-center`}>Xem lại các ván đấu đã chơi</p>
+    <div className={`min-h-full ${THEME.background.page} py-4 px-2 sm:px-4`}>
+      <div className="max-w-6xl mx-auto">
+        <div className="ui-surface ui-card-padding mb-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em] font-bold text-gray-400 mb-1">Replay</p>
+              <h1 className={`text-2xl sm:text-3xl font-bold ${THEME.text.primary} mb-1`}>
+                Lịch sử đấu & Replay
+              </h1>
+              <p className={`${THEME.text.secondary}`}>
+                Xem lại ván đã chơi theo chế độ, kết quả và thời gian
+              </p>
+            </div>
+            <span className="ui-chip">{games.length} ván</span>
+          </div>
         </div>
 
         {/* Filters */}
         <div
-          className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-4 mb-6`}
+          className={`${THEME.background.card} ${THEME.rounded.lg} border ${THEME.border.DEFAULT} p-4 mb-4`}
         >
           <div className="flex flex-wrap gap-3">
             <select
@@ -213,39 +216,25 @@ export default function ReplayListPage() {
         )}
 
         {!isLoading && games.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {games.map((game) => (
               <button
                 key={game.id}
                 onClick={() => handleSelect(game.id)}
-                className={`w-full ${THEME.background.card} ${THEME.background.hover} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 text-left transition-all group ${THEME.shadow.sm}`}
+                className={`w-full ${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-4 text-left transition-all group hover:bg-gray-50 hover:border-gray-300 ${THEME.shadow.sm}`}
               >
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className={`${THEME.text.primary} font-semibold`}>
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-3 items-center">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className={`${THEME.text.primary} font-semibold text-sm`}>
                       Đối thủ: {game.opponent || game.blackPlayer.username}
                     </span>
                     <ModeBadge mode={game.mode} />
                     <ResultBadge result={game.result} />
                   </div>
-                  <div className={`flex items-center gap-4 text-sm ${THEME.text.secondary}`}>
-                    <span>
-                      Chế độ:{' '}
-                      {game.mode === 'bot'
-                        ? 'Đấu Bot'
-                        : game.mode === 'ranked'
-                          ? 'Đấu hạng'
-                          : game.mode === 'tournament'
-                            ? 'Giải đấu'
-                            : 'Giao hữu'}
-                    </span>
-                    <span>
-                      Kết quả:{' '}
-                      {game.result === 'win' ? 'Thắng' : game.result === 'lose' ? 'Thua' : 'Hòa'}
-                    </span>
-                    <span>{game.metadata?.totalMoves ?? '?'} nước</span>
+                  <div className={`flex items-center justify-between lg:justify-end gap-3 flex-wrap text-xs sm:text-sm ${THEME.text.secondary}`}>
+                    <span className="font-medium">{game.metadata?.totalMoves ?? '?'} nước</span>
                     {game.metadata?.opening && (
-                      <span className="hidden md:inline truncate max-w-[160px]">
+                      <span className="hidden md:inline truncate max-w-[180px]">
                         {game.metadata.opening}
                       </span>
                     )}
@@ -256,11 +245,9 @@ export default function ReplayListPage() {
                         minute: '2-digit',
                       })}
                     </span>
-                    <span
-                      className={`${THEME.primary.text} group-hover:underline flex items-center gap-1`}
-                    >
+                    <span className={`${THEME.primary.text} group-hover:underline flex items-center gap-1 font-semibold`}>
                       <PlayCircle className="w-4 h-4" />
-                      Xem replay
+                      Replay
                     </span>
                   </div>
                 </div>

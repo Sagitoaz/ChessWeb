@@ -30,21 +30,24 @@ import { THEME } from '@/styles/theme'
 const PAGE_SIZE = 10
 
 const RESULT_FILTERS = [
-  { value: 'all', label: 'All Results' },
-  { value: 'win', label: 'Wins' },
-  { value: 'loss', label: 'Losses' },
-  { value: 'draw', label: 'Draws' },
+  { value: 'all', label: 'Tất cả' },
+  { value: 'win', label: 'Thắng' },
+  { value: 'loss', label: 'Thua' },
+  { value: 'draw', label: 'Hòa' },
 ]
 
 const END_REASON_ICONS = {
-  checkmate: { icon: Crown, label: 'Checkmate', color: 'text-yellow-400' },
-  resignation: { icon: Flag, label: 'Resignation', color: 'text-red-400' },
-  forfeit: { icon: Flag, label: 'Forfeit', color: 'text-red-500' },
-  timeout: { icon: Timer, label: 'Timeout', color: 'text-orange-400' },
-  draw: { icon: Handshake, label: 'Draw', color: 'text-blue-400' },
-  stalemate: { icon: Handshake, label: 'Stalemate', color: 'text-gray-400' },
-  completed: { icon: Swords, label: 'Completed', color: 'text-gray-400' },
-  aborted: { icon: AlertTriangle, label: 'Aborted', color: 'text-amber-400' },
+  checkmate: { icon: Crown, label: 'Chiếu hết', color: 'text-yellow-500' },
+  resignation: { icon: Flag, label: 'Đầu hàng', color: 'text-red-500' },
+  forfeit: { icon: Flag, label: 'Bỏ trận', color: 'text-red-500' },
+  timeout: { icon: Timer, label: 'Hết giờ', color: 'text-orange-500' },
+  draw: { icon: Handshake, label: 'Hòa', color: 'text-blue-500' },
+  draw_agreement: { icon: Handshake, label: 'Đồng ý hòa', color: 'text-blue-500' },
+  stalemate: { icon: Handshake, label: 'Pat', color: 'text-gray-500' },
+  completed: { icon: Swords, label: 'Kết thúc', color: 'text-gray-500' },
+  aborted: { icon: AlertTriangle, label: 'Hủy trận', color: 'text-amber-500' },
+  disconnect: { icon: AlertTriangle, label: 'Mất kết nối', color: 'text-amber-500' },
+  unknown: { icon: Swords, label: 'Không rõ', color: 'text-gray-500' },
 }
 
 const RESULT_BADGE = {
@@ -55,6 +58,7 @@ const RESULT_BADGE = {
     border: 'border-green-600/30',
   },
   loss: { label: 'LOSS', bg: 'bg-red-600/20', text: 'text-red-400', border: 'border-red-600/30' },
+  lose: { label: 'LOSS', bg: 'bg-red-600/20', text: 'text-red-400', border: 'border-red-600/30' },
   draw: {
     label: 'DRAW',
     bg: 'bg-blue-600/20',
@@ -67,6 +71,21 @@ const RESULT_BADGE = {
 // HELPERS
 // ─────────────────────────────────────────────────────
 const getRankInfo = (rating) => RANKS.find((r) => rating >= r.min && rating < r.max) || RANKS[0]
+
+const toEndReasonInfo = (reason) => {
+  const normalized = String(reason || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+
+  if (!normalized) return END_REASON_ICONS.completed
+  if (END_REASON_ICONS[normalized]) return END_REASON_ICONS[normalized]
+
+  return {
+    ...END_REASON_ICONS.unknown,
+    label: normalized.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+  }
+}
 
 /** Format seconds → "M:SS" */
 const fmtDuration = (secs) => {
@@ -82,17 +101,17 @@ const fmtDuration = (secs) => {
 // ═════════════════════════════════════════════════════
 const HistoryRow = ({ match }) => {
   const badge = RESULT_BADGE[match.result] || RESULT_BADGE.draw
-  const endInfo = END_REASON_ICONS[match.endReason] || END_REASON_ICONS.draw
+  const endInfo = toEndReasonInfo(match.endReason)
   const EndIcon = endInfo.icon
   const oppRank = getRankInfo(match.opponent.rating)
 
   return (
     <div
-      className={`group flex items-center gap-4 px-4 py-3 rounded-lg ${THEME.background.card} border ${THEME.border.DEFAULT} hover:border-gray-300 transition-all duration-200 ${THEME.shadow.sm}`}
+      className={`group grid grid-cols-1 sm:grid-cols-[72px_16px_minmax(0,1fr)_120px_80px_70px_96px_28px] items-center gap-3 px-4 py-3 rounded-xl ${THEME.background.card} border ${THEME.border.DEFAULT} hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 ${THEME.shadow.sm}`}
     >
       {/* Result badge */}
       <div
-        className={`flex-shrink-0 w-16 py-1 rounded text-center text-xs font-bold uppercase tracking-wider border ${badge.bg} ${badge.text} ${badge.border}`}
+        className={`w-16 py-1 rounded-md text-center text-xs font-bold uppercase tracking-wider border ${badge.bg} ${badge.text} ${badge.border}`}
       >
         {badge.label}
       </div>
@@ -108,10 +127,10 @@ const HistoryRow = ({ match }) => {
       />
 
       {/* Opponent info */}
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+      <div className="flex items-center gap-3 min-w-0">
         <Avatar src={match.opponent.avatarUrl} alt={match.opponent.username} size="sm" />
         <div className="min-w-0">
-          <p className={`font-semibold ${THEME.text.primary} text-sm truncate`}>
+          <p className={`font-semibold ${THEME.text.primary} text-sm truncate`} title={match.opponent.username}>
             {match.opponent.username}
           </p>
           <p className="text-xs" style={{ color: oppRank.color }}>
@@ -127,27 +146,27 @@ const HistoryRow = ({ match }) => {
       </div>
 
       {/* Moves / Duration */}
-      <div className="hidden md:block text-center min-w-[70px]">
+      <div className="hidden md:block text-center">
         <p className={`text-xs ${THEME.text.primary}`}>{match.moves} moves</p>
         <p className={`text-xs ${THEME.text.secondary}`}>{fmtDuration(match.duration)}</p>
       </div>
 
       {/* Rating change */}
-      <div className="min-w-[60px] text-right">
+      <div className="text-right">
         <p className={`font-mono font-bold text-sm ${eloDeltaColor(match.ratingChange)}`}>
           {formatEloDelta(match.ratingChange)}
         </p>
       </div>
 
       {/* Date */}
-      <div className="hidden lg:block min-w-[90px] text-right">
+      <div className="hidden lg:block text-right">
         <p className={`text-xs ${THEME.text.secondary}`}>{formatRelativeTime(match.playedAt)}</p>
       </div>
 
       {/* View link */}
       <Link
         to={`/replays/${match.id}`}
-        className={`flex-shrink-0 p-1.5 rounded hover:bg-gray-100 ${THEME.text.secondary} hover:text-[#81b64c] transition-colors opacity-0 group-hover:opacity-100`}
+        className={`p-1.5 rounded hover:bg-gray-100 ${THEME.text.secondary} hover:text-[#81b64c] transition-colors opacity-0 group-hover:opacity-100`}
         title="View replay"
       >
         <Eye className="w-4 h-4" />
@@ -169,27 +188,27 @@ const StatsStrip = ({ matches }) => {
   }, [matches])
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
       <div
-        className={`${THEME.background.card} rounded-lg p-3 text-center border border-green-200 ${THEME.shadow.sm}`}
+        className={`${THEME.background.card} rounded-xl p-3 text-center border border-green-200 ${THEME.shadow.sm}`}
       >
         <p className={`text-xs ${THEME.text.secondary} mb-1`}>Wins</p>
         <p className="text-xl font-bold text-green-600">{stats.wins}</p>
       </div>
       <div
-        className={`${THEME.background.card} rounded-lg p-3 text-center border border-red-200 ${THEME.shadow.sm}`}
+        className={`${THEME.background.card} rounded-xl p-3 text-center border border-red-200 ${THEME.shadow.sm}`}
       >
         <p className={`text-xs ${THEME.text.secondary} mb-1`}>Losses</p>
         <p className="text-xl font-bold text-red-600">{stats.losses}</p>
       </div>
       <div
-        className={`${THEME.background.card} rounded-lg p-3 text-center border border-blue-200 ${THEME.shadow.sm}`}
+        className={`${THEME.background.card} rounded-xl p-3 text-center border border-blue-200 ${THEME.shadow.sm}`}
       >
         <p className={`text-xs ${THEME.text.secondary} mb-1`}>Draws</p>
         <p className="text-xl font-bold text-blue-600">{stats.draws}</p>
       </div>
       <div
-        className={`${THEME.background.card} rounded-lg p-3 text-center border ${THEME.border.DEFAULT} ${THEME.shadow.sm}`}
+        className={`${THEME.background.card} rounded-xl p-3 text-center border ${THEME.border.DEFAULT} ${THEME.shadow.sm}`}
       >
         <p className={`text-xs ${THEME.text.secondary} mb-1`}>Net Rating</p>
         <p className={`text-xl font-bold ${eloDeltaColor(stats.totalRatingChange)}`}>
@@ -365,9 +384,9 @@ const RankedHistoryPage = () => {
 
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         {/* ─── Header ─── */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="ui-surface ui-card-padding flex items-center gap-4 mb-5">
           <button
             onClick={() => navigate(isDemo ? '/demo/ranked' : '/ranked')}
             className={`p-2 rounded-lg hover:bg-gray-100 ${THEME.text.secondary} hover:${THEME.text.primary} transition-colors`}
@@ -378,14 +397,14 @@ const RankedHistoryPage = () => {
           <div className="flex-1">
             <h1 className={`text-2xl font-bold ${THEME.text.primary} flex items-center gap-3`}>
               <History className="w-6 h-6 text-[#81b64c]" />
-              Match History
+              Lịch sử đấu hạng
             </h1>
             <p className={`text-sm ${THEME.text.secondary} mt-0.5`}>
-              View your ranked game results and replay past matches
+              Theo dõi kết quả, lý do kết thúc và thay đổi ELO theo từng trận
             </p>
           </div>
           <div
-            className={`hidden sm:flex items-center gap-2 ${THEME.background.card} rounded-lg px-3 py-2 border ${THEME.border.DEFAULT}`}
+            className={`hidden sm:flex items-center gap-2 ${THEME.background.card} rounded-xl px-3 py-2 border ${THEME.border.DEFAULT}`}
           >
             <Avatar src={user.avatarUrl} alt={user.username} size="sm" />
             <div>
@@ -401,7 +420,7 @@ const RankedHistoryPage = () => {
         {!loading && matches.length > 0 && <StatsStrip matches={matches} />}
 
         {/* ─── Filters Bar ─── */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+        <div className="ui-surface ui-card-padding flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
           {/* Result filter tabs */}
           <div
             className={`flex ${THEME.background.card} rounded-lg p-1 border ${THEME.border.DEFAULT}`}
@@ -430,7 +449,7 @@ const RankedHistoryPage = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search opponent..."
+              placeholder="Tìm đối thủ..."
               className={`w-full ${THEME.background.card} border ${THEME.border.DEFAULT} rounded-lg pl-9 pr-4 py-2 text-sm ${THEME.text.primary} placeholder:${THEME.text.muted} focus:outline-none focus:border-[#81b64c]/50 transition-colors`}
             />
           </div>
@@ -441,22 +460,22 @@ const RankedHistoryPage = () => {
             className={`flex items-center gap-2 px-4 py-2 ${THEME.background.card} border ${THEME.border.DEFAULT} rounded-lg text-sm ${THEME.text.secondary} hover:text-[#81b64c] hover:border-[#81b64c]/30 transition-colors`}
           >
             <BarChart3 className="w-4 h-4" />
-            Stats
+            Thống kê
           </Link>
         </div>
 
         {/* ─── Table Header ─── */}
         <div
-          className={`hidden sm:flex items-center gap-4 px-4 py-2 text-xs ${THEME.text.secondary} uppercase tracking-wider font-semibold mb-1`}
+          className={`hidden sm:grid sm:grid-cols-[72px_16px_minmax(0,1fr)_120px_80px_70px_96px_28px] items-center gap-3 px-4 py-2 text-xs ${THEME.text.secondary} uppercase tracking-wider font-semibold mb-1`}
         >
-          <div className="w-16 text-center">Result</div>
-          <div className="w-4" />
-          <div className="flex-1">Opponent</div>
-          <div className="hidden sm:block w-[110px]">End Reason</div>
-          <div className="hidden md:block w-[70px] text-center">Detail</div>
-          <div className="w-[60px] text-right">Rating</div>
-          <div className="hidden lg:block w-[90px] text-right">Date</div>
-          <div className="w-[30px]" />
+          <div className="text-center">KQ</div>
+          <div />
+          <div>Đối thủ</div>
+          <div>Lý do kết thúc</div>
+          <div className="text-center">Nước đi</div>
+          <div className="text-right">ELO</div>
+          <div className="text-right">Thời gian</div>
+          <div />
         </div>
 
         {/* ─── Content ─── */}
@@ -487,7 +506,7 @@ const RankedHistoryPage = () => {
             )}
           </div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {filteredMatches.map((match) => (
               <HistoryRow key={match.id} match={match} />
             ))}
@@ -502,7 +521,7 @@ const RankedHistoryPage = () => {
         {/* ─── Bottom info ─── */}
         {!loading && matches.length > 0 && (
           <p className={`text-center text-xs ${THEME.text.secondary} mt-4`}>
-            Showing page {currentPage} of {totalPages} · {PAGE_SIZE} matches per page
+            Trang {currentPage}/{totalPages} · {PAGE_SIZE} trận mỗi trang
           </p>
         )}
       </div>

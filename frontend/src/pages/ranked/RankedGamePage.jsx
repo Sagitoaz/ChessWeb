@@ -359,15 +359,15 @@ const DrawOfferBanner = ({ from, onAccept, onDecline }) => (
       <div className="flex gap-2">
         <button
           onClick={onAccept}
-          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors"
+          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md transition-colors"
         >
-          Accept
+          Chấp nhận
         </button>
         <button
           onClick={onDecline}
-          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors"
+          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors"
         >
-          Decline
+          Từ chối
         </button>
       </div>
     </div>
@@ -386,8 +386,8 @@ const MoveListPanel = ({ moves }) => {
 
   if (moves.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
-        Game started — make your move!
+      <div className="h-full flex items-center justify-center text-gray-500 text-sm rounded-lg border border-dashed border-gray-200 bg-gray-50">
+        Chưa có nước đi nào
       </div>
     )
   }
@@ -401,26 +401,29 @@ const MoveListPanel = ({ moves }) => {
   }))
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-2 space-y-0.5">
+    <div className="h-full overflow-y-auto pr-1">
+      <div className="space-y-1">
         {pairs.map((p) => (
-          <div key={p.n} className="flex items-center gap-1 text-sm">
-            <span className="w-7 text-gray-500 text-xs font-mono text-right">{p.n}.</span>
+          <div
+            key={p.n}
+            className="grid grid-cols-[26px_1fr_1fr] gap-1 text-sm items-center rounded-md hover:bg-gray-50 px-1.5 py-1 transition-colors"
+          >
+            <span className="text-gray-500 text-xs font-mono text-right">{p.n}.</span>
             <span
-              className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
+              className={`font-mono px-2 py-1 rounded ${
                 p.wi === moves.length - 1
                   ? 'bg-yellow-100 text-yellow-800 font-semibold'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  : 'text-gray-700'
               }`}
             >
               {getMoveLabel(p.w)}
             </span>
             {p.b && (
               <span
-                className={`flex-1 font-mono px-1.5 py-0.5 rounded ${
+                className={`font-mono px-2 py-1 rounded ${
                   p.bi === moves.length - 1
                     ? 'bg-yellow-100 text-yellow-800 font-semibold'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    : 'text-gray-700'
                 }`}
               >
                 {getMoveLabel(p.b)}
@@ -454,9 +457,12 @@ const InlineChat = ({ messages, onSend, disabled }) => {
   }
 
   return (
-    <div className="flex flex-col border-t border-gray-200">
-      {/* Messages */}
-      <div className="h-28 overflow-y-auto p-2 space-y-1">
+    <div className="flex flex-col h-full rounded-lg border border-gray-200">
+      <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Chat trận đấu</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
         {messages.length === 0 ? (
           <p className="text-xs text-gray-400 text-center mt-6">Chưa có tin nhắn</p>
         ) : (
@@ -472,15 +478,14 @@ const InlineChat = ({ messages, onSend, disabled }) => {
               }`}
             >
               {!m.isSystem && <span className="font-semibold mr-1">{m.sender}:</span>}
-              {m.text}
+              <span>{m.text}</span>
             </div>
           ))
         )}
         <div ref={endRef} />
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="flex gap-1 p-2 border-t border-gray-100">
+      <form onSubmit={handleSubmit} className="flex gap-1 p-2 border-t border-gray-200 bg-white">
         <input
           type="text"
           value={text}
@@ -488,12 +493,12 @@ const InlineChat = ({ messages, onSend, disabled }) => {
           disabled={disabled}
           placeholder={disabled ? 'Trận đấu kết thúc' : 'Nhắn tin...'}
           maxLength={150}
-          className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-1 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-green-400"
+          className="flex-1 bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-green-400"
         />
         <button
           type="submit"
           disabled={disabled || !text.trim()}
-          className="px-2 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded text-xs transition-colors"
+          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-md text-xs transition-colors"
         >
           <Send className="w-3 h-3" />
         </button>
@@ -1326,41 +1331,46 @@ const RankedGamePage = () => {
         </div>
       )}
 
-      <div className="mx-auto px-2 sm:px-4 py-2">
-        {/* ─── Header bar ─── */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleBackClick}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
-              title="Về Lobby"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-green-600" />
-                Ranked Match
-              </h1>
-              <p className="text-xs text-gray-500 font-mono">
-                {matchId || 'match'} · 10+0 · Có xếp hạng · Realtime Socket
-              </p>
+      <div className="max-w-[1500px] mx-auto px-2 sm:px-4 py-2">
+        <div className="ui-surface ui-card-padding mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBackClick}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+                title="Về Lobby"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-green-600" />
+                  Ranked Match
+                </h1>
+                <p className="text-xs text-gray-500 font-mono">
+                  {matchId || 'match'} · 10+0 · Có xếp hạng
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="ui-chip">
+                {gameSocket?.isConnected ? 'Socket: online' : 'Socket: offline'}
+              </span>
+              <span className="ui-chip">{playerColor === 'white' ? 'Bạn: Trắng' : 'Bạn: Đen'}</span>
+              <button
+                onClick={() => setSoundEnabled((v) => !v)}
+                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+                title={soundEnabled ? 'Tắt âm' : 'Mở âm'}
+              >
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => setSoundEnabled((v) => !v)}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
-            title={soundEnabled ? 'Tắt âm' : 'Mở âm'}
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          </button>
         </div>
 
-        {/* ─── Main game area ─── */}
-        <div className="flex flex-col lg:flex-row gap-4 items-start">
-          {/* ═════ LEFT: Board column — takes ~60% width on desktop ═════ */}
-          <div className="w-full lg:w-[60%] flex-shrink-0">
-            {/* Opponent bar (top) */}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_370px] gap-4 items-start">
+          <section className="ui-surface p-2 sm:p-3">
             <PlayerBar
               player={topPlayer}
               timeMs={topTime}
@@ -1371,11 +1381,7 @@ const RankedGamePage = () => {
               isTop
             />
 
-            {/* Chess board — dùng component ChessBoard có sẵn */}
-            <div
-              className="my-1 w-full"
-              style={{ maxWidth: 'calc(100vh - 180px)', margin: '4px auto' }}
-            >
+            <div className="my-2 w-full" style={{ maxWidth: 'min(calc(100vh - 210px), 100%)', margin: '8px auto' }}>
               <ChessBoard
                 gameState={gameRef.current}
                 onMove={handleChessBoardMove}
@@ -1389,7 +1395,6 @@ const RankedGamePage = () => {
               />
             </div>
 
-            {/* Player bar (bottom) */}
             <PlayerBar
               player={bottomPlayer}
               timeMs={bottomTime}
@@ -1399,16 +1404,11 @@ const RankedGamePage = () => {
               materialAdv={matAdv}
               isTop={false}
             />
-          </div>
+          </section>
 
-          {/* ═════ RIGHT: Side panel ═════ */}
-          <div
-            className="w-full lg:flex-1 lg:min-w-[280px] flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
-            style={{ maxHeight: 'calc(100vh - 120px)' }}
-          >
-            {/* Opponent Disconnected Banner */}
+          <aside className="ui-surface overflow-hidden xl:sticky xl:top-16 flex flex-col">
             {opponentDisconnected && gamePhase === GAME_PHASE.PLAYING && (
-              <div className="px-3 py-2 bg-yellow-50 border-b border-yellow-200">
+              <div className="px-4 py-2 bg-yellow-50 border-b border-yellow-200">
                 <div className="flex items-center justify-center gap-2 text-sm text-yellow-700 font-medium">
                   <AlertTriangle className="w-4 h-4" />
                   <span>Đối thủ ngắt kết nối. Chờ kết nối lại...</span>
@@ -1416,9 +1416,8 @@ const RankedGamePage = () => {
               </div>
             )}
 
-            {/* Status strip */}
             <div
-              className={`px-4 py-2 text-sm font-semibold text-center border-b border-gray-200 ${
+              className={`px-4 py-3 text-sm font-semibold border-b border-gray-200 ${
                 gamePhase === GAME_PHASE.ENDED
                   ? endResult?.result === 'win'
                     ? 'bg-green-50 text-green-700'
@@ -1433,7 +1432,6 @@ const RankedGamePage = () => {
               {statusText}
             </div>
 
-            {/* Draw offer banner */}
             {drawOffer === 'received' && (
               <DrawOfferBanner
                 from={opponent.username}
@@ -1443,65 +1441,62 @@ const RankedGamePage = () => {
             )}
 
             {drawOffer === 'sent' && (
-              <div className="mx-3 my-2 bg-blue-50 border border-blue-300 rounded-lg p-3 text-sm text-blue-800 font-medium">
+              <div className="mx-3 mt-3 bg-blue-50 border border-blue-300 rounded-lg p-3 text-sm text-blue-800 font-medium">
                 Đã gửi đề nghị hòa. Đang chờ đối thủ phản hồi...
               </div>
             )}
 
-            {/* Moves header */}
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50">
-              <List className="w-4 h-4 text-gray-500" />
-              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                Nước đi
-              </span>
-              <span className="text-xs text-gray-400 ml-auto">{moveHistory.length} nước</span>
+            <div className="px-3 pt-3 pb-2 border-b border-gray-200">
+              <div className="flex items-center gap-2 mb-2">
+                <List className="w-4 h-4 text-gray-500" />
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                  Move history
+                </span>
+                <span className="text-xs text-gray-400 ml-auto">{moveHistory.length} nước</span>
+              </div>
+              <div className="h-[240px]">
+                <MoveListPanel moves={moveHistory} />
+              </div>
             </div>
 
-            {/* Move list */}
-            <MoveListPanel moves={moveHistory} />
+            <div className="px-3 py-3 h-[260px]">
+              <InlineChat
+                messages={chatMessages}
+                onSend={handleSendChat}
+                disabled={gamePhase === GAME_PHASE.ENDED}
+              />
+            </div>
 
-            {/* Game controls */}
-            <div className="px-3 py-2 border-t border-gray-200 flex gap-2">
+            <div className="px-3 py-3 border-t border-gray-200 bg-gray-50/70 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2">
               <button
                 onClick={handleResign}
                 disabled={!playing}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   !playing
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : showResignConfirm
                       ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
-                      : 'bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700'
+                      : 'bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-gray-700'
                 }`}
               >
-                {showResignConfirm ? (
-                  <AlertTriangle className="w-4 h-4" />
-                ) : (
-                  <Flag className="w-4 h-4" />
-                )}
-                {showResignConfirm ? 'Xác nhận?' : 'Đầu hàng'}
+                {showResignConfirm ? <AlertTriangle className="w-4 h-4" /> : <Flag className="w-4 h-4" />}
+                {showResignConfirm ? 'Xác nhận đầu hàng?' : 'Đầu hàng'}
               </button>
 
               <button
                 onClick={handleOfferDraw}
                 disabled={!playing || drawOffer !== null || !gameSocket?.isConnected}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   !playing || drawOffer !== null || !gameSocket?.isConnected
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-700'
+                    : 'bg-white border border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-gray-700'
                 }`}
               >
                 <Handshake className="w-4 h-4" />
                 Đề nghị hòa
               </button>
             </div>
-
-            {/* Inline chat */}
-            <InlineChat
-              messages={chatMessages}
-              onSend={handleSendChat}
-              disabled={gamePhase === GAME_PHASE.ENDED}
-            />
-          </div>
+          </aside>
         </div>
       </div>
 

@@ -11,6 +11,11 @@
     --chess-green-hover: #739e44;
     --chess-brown: #b58863;
     --chess-light: #f0d9b5;
+    --ui-radius-card: 14px;
+    --ui-radius-control: 10px;
+    --ui-space-section: 24px;
+    --ui-space-card: 20px;
+    --ui-ring: 0 0 0 2px rgba(129, 182, 76, 0.25);
   }
 
   * {
@@ -26,9 +31,67 @@
   #root {
     @apply min-h-screen;
   }
+
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight;
+  }
 }
 
 @layer components {
+  .ui-page {
+    @apply min-h-full;
+  }
+
+  .ui-container {
+    @apply mx-auto w-full max-w-7xl;
+  }
+
+  .ui-surface {
+    @apply bg-white border border-gray-200 shadow-sm;
+    border-radius: var(--ui-radius-card);
+  }
+
+  .ui-surface-soft {
+    @apply bg-white/80 border border-gray-200 shadow-sm;
+    border-radius: var(--ui-radius-card);
+    backdrop-filter: blur(2px);
+  }
+
+  .ui-card-padding {
+    padding: var(--ui-space-card);
+  }
+
+  .ui-section-gap {
+    gap: var(--ui-space-section);
+  }
+
+  .ui-title {
+    @apply text-2xl font-bold text-gray-900;
+  }
+
+  .ui-subtitle {
+    @apply text-sm text-gray-600;
+  }
+
+  .ui-chip {
+    @apply inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700;
+  }
+
+  .ui-tab {
+    @apply rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900;
+  }
+
+  .ui-tab-active {
+    @apply bg-green-50 text-green-700 border border-green-200;
+  }
+
+  .ui-focus {
+    @apply focus:outline-none;
+    box-shadow: var(--ui-ring);
+  }
+
   /* Chess.com inspired button */
   .btn-chess {
     @apply px-6 py-3 bg-[#81b64c] text-white font-semibold rounded-lg 

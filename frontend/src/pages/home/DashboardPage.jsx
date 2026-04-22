@@ -140,41 +140,6 @@ const normalizeHistoryPayload = (payload, username) => {
     .sort((a, b) => new Date(b.playedAt || 0) - new Date(a.playedAt || 0))
 }
 
-const resolvePlayerSide = (item, username) => {
-  const explicit = String(item?.playerSide || item?.playerColor || '').toLowerCase()
-  if (explicit === 'white' || explicit === 'black') return explicit
-
-  if (!username) return null
-
-  const whiteName = String(item?.whitePlayer?.username || '')
-    .trim()
-    .toLowerCase()
-  const blackName = String(item?.blackPlayer?.username || '')
-    .trim()
-    .toLowerCase()
-  const self = String(username).trim().toLowerCase()
-
-  if (whiteName && self === whiteName) return 'white'
-  if (blackName && self === blackName) return 'black'
-  return null
-}
-
-const resolveOpponent = (item, username) => {
-  const explicit =
-    item?.opponent?.username || item?.opponentUsername || item?.opponentId || item?.opponent || null
-  if (explicit) return explicit
-
-  const white = item?.whitePlayer?.username || item?.whitePlayerId || 'White'
-  const black = item?.blackPlayer?.username || item?.blackPlayerId || 'Black'
-
-  if (!username) return `${white} vs ${black}`
-
-  const self = String(username).toLowerCase()
-  if (String(white).toLowerCase() === self) return black
-  if (String(black).toLowerCase() === self) return white
-  return `${white} vs ${black}`
-}
-
 const calcWinStreak = (matches) => {
   let streak = 0
   for (const match of matches) {
@@ -217,17 +182,17 @@ const getHeatColor = (count, max) => {
 
 const StatCard = ({ icon: Icon, title, value, caption }) => (
   <div
-    className={`${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg`}
+    className="ui-surface ui-card-padding transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
   >
-    <div className="flex items-center justify-between mb-3">
-      <p className={`text-xs uppercase tracking-[0.14em] font-semibold ${THEME.text.muted}`}>
+    <div className="flex items-start justify-between mb-3">
+      <p className={`text-[11px] uppercase tracking-[0.14em] font-semibold ${THEME.text.muted}`}>
         {title}
       </p>
-      <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+      <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 flex items-center justify-center">
         <Icon className="w-5 h-5" />
       </div>
     </div>
-    <p className={`text-3xl font-black ${THEME.text.primary}`}>{value}</p>
+    <p className={`text-3xl font-extrabold leading-none ${THEME.text.primary}`}>{value}</p>
     <p className={`text-sm ${THEME.text.secondary} mt-1`}>{caption}</p>
   </div>
 )
@@ -235,7 +200,7 @@ const StatCard = ({ icon: Icon, title, value, caption }) => (
 const MatchModeBadge = ({ mode }) => {
   const meta = MODE_META[mode] || MODE_META.friendly
   return (
-    <span className={`px-2 py-1 text-xs rounded-full border font-semibold ${meta.badge}`}>
+    <span className={`px-2.5 py-1 text-[11px] rounded-full border font-semibold ${meta.badge}`}>
       {meta.label}
     </span>
   )
@@ -245,6 +210,8 @@ export default function DashboardPage() {
   const { user, hasHydrated } = useAuthStore()
   const token = useAuthStore((state) => state.token)
   const setAuthLogin = useAuthStore((state) => state.login)
+  const currentUsername = user?.username
+  const currentUserId = user?.id
 
   const [loading, setLoading] = useState(true)
   const [rankedStats, setRankedStats] = useState(null)
@@ -257,7 +224,7 @@ export default function DashboardPage() {
 
     const load = async () => {
       setLoading(true)
-      const profileTask = user?.id ? Promise.resolve({ user }) : authService.getCurrentUser()
+      const profileTask = currentUserId ? Promise.resolve({ user }) : authService.getCurrentUser()
 
       const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
         profileTask,
@@ -268,7 +235,7 @@ export default function DashboardPage() {
       if (!mounted) return
 
       const gamesHistory = gamesResult.status === 'fulfilled' ? gamesResult.value : { items: [] }
-      setMatches(normalizeHistoryPayload(gamesHistory, user?.username))
+      setMatches(normalizeHistoryPayload(gamesHistory, currentUsername))
 
       if (profileResult.status === 'fulfilled') {
         const profileData = profileResult.value?.data ?? profileResult.value
@@ -297,7 +264,7 @@ export default function DashboardPage() {
     return () => {
       mounted = false
     }
-  }, [hasHydrated, setAuthLogin, token, user?.username])
+  }, [currentUserId, currentUsername, hasHydrated, setAuthLogin, token, user])
 
   const analytics = useMemo(() => {
     const totalGames = matches.length
@@ -339,20 +306,63 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className={`font-sans ${THEME.background.page} min-h-full py-6`}>
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="mb-8 flex items-center gap-4">
-          <Avatar src={user?.avatarUrl} alt={user?.username} size="lg" />
-          <div>
-            <h1 className="text-3xl font-black text-gray-900">Dashboard Tổng Hợp</h1>
-            <p className="text-gray-600">
-              Chào {user?.displayName || user?.username || 'Kỳ thủ'}, đây là toàn cảnh tất cả trận
-              của bạn.
-            </p>
-          </div>
-        </div>
+    <div className={`font-sans ${THEME.background.page} min-h-full`}>
+      <div className="max-w-7xl mx-auto px-2 sm:px-3 lg:px-4">
+        <section className="ui-surface ui-card-padding mb-5">
+          <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-5">
+            <div className="flex items-start gap-4">
+              <Avatar src={user?.avatarUrl} alt={user?.username} size="lg" />
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.14em] font-bold text-gray-400 mb-1">
+                  Dashboard
+                </p>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-tight">
+                  Xin chào {user?.displayName || user?.username || 'Kỳ thủ'}
+                </h1>
+                <p className="text-sm text-gray-600 mt-1">
+                  Theo dõi phong độ, lịch sử đấu và vào trận nhanh chỉ với một lần chạm.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="ui-chip">
+                    <Zap className="w-3.5 h-3.5 mr-1 text-amber-600" />
+                    Elo hiện tại {currentRating}
+                  </span>
+                  <span className="ui-chip">
+                    <Target className="w-3.5 h-3.5 mr-1 text-blue-600" />
+                    Win rate {analytics.winRate}%
+                  </span>
+                  <span className="ui-chip">
+                    <Flame className="w-3.5 h-3.5 mr-1 text-orange-600" />
+                    Chuỗi thắng {analytics.winStreak}
+                  </span>
+                </div>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-7">
+            <div className="ui-surface-soft p-4">
+              <p className="text-xs uppercase tracking-[0.14em] font-bold text-gray-400 mb-3">
+                Vào trận nhanh
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
+                {QUICK_ACTIONS.map((action) => (
+                  <Link
+                    key={action.to}
+                    to={action.to}
+                    className={`${action.color} text-white rounded-lg px-4 py-2.5 flex items-center justify-between transition-colors`}
+                  >
+                    <span className="flex items-center gap-2 font-semibold text-sm">
+                      <action.icon className="w-4 h-4" />
+                      {action.label}
+                    </span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-5">
           <StatCard
             icon={Swords}
             title="Tổng ván đấu"
@@ -363,11 +373,7 @@ export default function DashboardPage() {
             icon={BadgeCheck}
             title="Elo hiện tại"
             value={currentRating}
-            caption={
-              rankedStats?.peakRating
-                ? `Elo cao nhất ${rankedStats.peakRating}`
-                : 'Xếp hạng hiện tại'
-            }
+            caption={rankedStats?.peakRating ? `Elo cao nhất ${rankedStats.peakRating}` : 'Xếp hạng hiện tại'}
           />
           <StatCard
             icon={Target}
@@ -381,117 +387,106 @@ export default function DashboardPage() {
             value={analytics.winStreak}
             caption={analytics.winStreak > 0 ? 'Đang thăng hoa' : 'Hãy bắt đầu chuỗi mới'}
           />
-        </div>
+        </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <section className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Biểu đồ hoạt động (30 ngày)</h2>
-              <span className="text-sm text-gray-500">Mật độ chơi cờ theo ngày</span>
+        <section className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-5 mb-5">
+          <div className="ui-surface ui-card-padding">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Trận gần đây</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Dễ scan theo chế độ, kết quả và thời gian</p>
+              </div>
+              <Link to="/replays" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                Xem toàn bộ
+              </Link>
             </div>
 
-            <div className="grid grid-cols-10 sm:grid-cols-15 gap-2">
-              {heatmap.cells.map((cell) => (
-                <div
-                  key={cell.date}
-                  className="aspect-square rounded-md border border-white/40"
-                  style={{ backgroundColor: getHeatColor(cell.count, heatmap.max) }}
-                  title={`${cell.date}: ${cell.count} trận`}
-                />
-              ))}
-            </div>
+            {recentMatches.length === 0 ? (
+              <p className="text-sm text-gray-500 py-8 text-center">Chưa có trận nào để hiển thị.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {recentMatches.map((match) => {
+                  const resultClass =
+                    match.result === 'win'
+                      ? 'text-green-700 bg-green-50 border-green-100'
+                      : match.result === 'lose'
+                        ? 'text-red-700 bg-red-50 border-red-100'
+                        : 'text-gray-700 bg-gray-100 border-gray-200'
 
-            <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
-              <span>Ít</span>
-              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(0, 4) }} />
-              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(1, 4) }} />
-              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(2, 4) }} />
-              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(3, 4) }} />
-              <span className="w-4 h-4 rounded" style={{ backgroundColor: getHeatColor(4, 4) }} />
-              <span>Nhiều</span>
-            </div>
-          </section>
+                  return (
+                    <div
+                      key={`${match.id}-${match.playedAt}`}
+                      className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr_auto] items-center gap-3 px-3.5 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                    >
+                      <MatchModeBadge mode={match.mode} />
+                      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${resultClass}`}>
+                        {match.result.toUpperCase()}
+                      </span>
+                      <p className="text-sm font-medium text-gray-700 truncate">{match.opponent}</p>
+                      <p className="text-xs text-gray-500">{relativeTime(match.playedAt)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
-          <aside className="space-y-6">
-            <section className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Lối tắt thi đấu</h3>
-              <div className="space-y-3">
-                {QUICK_ACTIONS.map((action) => (
-                  <Link
-                    key={action.to}
-                    to={action.to}
-                    className={`${action.color} text-white rounded-lg px-4 py-3 flex items-center justify-between transition-colors`}
-                  >
-                    <span className="flex items-center gap-2 font-semibold">
-                      <action.icon className="w-4 h-4" />
-                      {action.label}
-                    </span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
+          <div className="space-y-5">
+            <section className="ui-surface ui-card-padding">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-gray-900">Mật độ chơi 30 ngày</h3>
+                <span className="text-xs text-gray-500">Daily activity</span>
+              </div>
+
+              <div
+                className="grid gap-1.5"
+                style={{
+                  gridTemplateColumns: 'repeat(15, minmax(0, 1fr))',
+                }}
+              >
+                {heatmap.cells.map((cell) => (
+                  <div
+                    key={cell.date}
+                    className="aspect-square rounded-[6px] border border-white/40"
+                    style={{ backgroundColor: getHeatColor(cell.count, heatmap.max) }}
+                    title={`${cell.date}: ${cell.count} trận`}
+                  />
                 ))}
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500">
+                <span>Ít</span>
+                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(0, 4) }} />
+                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(1, 4) }} />
+                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(2, 4) }} />
+                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(3, 4) }} />
+                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(4, 4) }} />
+                <span>Nhiều</span>
               </div>
             </section>
 
-            <section className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Tóm tắt nhanh</h3>
-              <div className="space-y-3 text-sm">
+            <section className="ui-surface ui-card-padding">
+              <h3 className="text-base font-bold text-gray-900 mb-3">Tóm tắt nhanh</h3>
+              <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Tổng thắng</span>
+                  <span className="text-gray-600">Thắng</span>
                   <span className="font-bold text-green-600">{analytics.wins}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Tổng thua</span>
+                  <span className="text-gray-600">Thua</span>
                   <span className="font-bold text-red-600">{analytics.losses}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Tổng hòa</span>
+                  <span className="text-gray-600">Hòa</span>
                   <span className="font-bold text-gray-700">{analytics.draws}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Chuỗi hiện tại</span>
+                  <span className="text-gray-600">Chuỗi thắng</span>
                   <span className="font-bold text-indigo-700">{analytics.winStreak} W</span>
                 </div>
               </div>
             </section>
-          </aside>
-        </div>
-
-        <section className="mt-6 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Trận gần đây</h2>
-            <Link to="/replays" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
-              Xem toàn bộ lịch sử
-            </Link>
           </div>
-
-          {recentMatches.length === 0 ? (
-            <p className="text-sm text-gray-500">Chưa có trận nào để hiển thị.</p>
-          ) : (
-            <div className="space-y-2">
-              {recentMatches.map((match) => {
-                const resultClass =
-                  match.result === 'win'
-                    ? 'text-green-600 bg-green-50'
-                    : match.result === 'lose'
-                      ? 'text-red-600 bg-red-50'
-                      : 'text-gray-600 bg-gray-100'
-
-                return (
-                  <div
-                    key={`${match.id}-${match.playedAt}`}
-                    className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr_auto] items-center gap-3 px-3 py-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors"
-                  >
-                    <MatchModeBadge mode={match.mode} />
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${resultClass}`}>
-                      {match.result.toUpperCase()}
-                    </span>
-                    <p className="text-sm text-gray-700 truncate">{match.opponent}</p>
-                    <p className="text-xs text-gray-500">{relativeTime(match.playedAt)}</p>
-                  </div>
-                )
-              })}
-            </div>
-          )}
         </section>
       </div>
     </div>

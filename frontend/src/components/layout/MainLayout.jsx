@@ -42,12 +42,12 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
         {!hideSidebar && (
           <>
             {/* Desktop Sidebar — chiều cao 100% vùng body, tự cuộn nội dung nếu cần */}
-            <div className="hidden md:flex flex-col relative h-full flex-shrink-0">
+            <div className="hidden md:flex flex-col relative h-full flex-shrink-0 border-r border-white/40">
               <Sidebar collapsed={sidebarCollapsed} />
               {/* Toggle collapse button */}
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="absolute -right-3 top-6 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-lg transition-colors z-10"
+                className="absolute -right-3 top-6 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md transition-colors z-10"
                 title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
                 {sidebarCollapsed ? '›' : '‹'}
@@ -69,8 +69,8 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
         )}
 
         {/* Main content area — cuộn độc lập, sidebar không bị ảnh hưởng */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="min-h-full p-4 md:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto bg-gradient-to-b from-[#e7f1ff] via-[#e1edff] to-[#dce9ff]">
+          <div className="min-h-full px-3 py-4 sm:px-5 sm:py-6 lg:px-7 lg:py-7">
             {children}
             {!hideFooter && <Footer />}
           </div>
