@@ -96,17 +96,22 @@ export default function JoinRoomPage() {
   const [isJoining, setIsJoining] = useState(false)
   const [roomInfo, setRoomInfo] = useState(null)
 
+  const normalizedRoomStatus = String(roomInfo?.status || '').toLowerCase()
   const alreadyJoined = Boolean(
     roomInfo?.members?.some((member) => normalizeId(member?.userId) === currentUserId)
   )
-  const roomStarted = roomInfo?.status === 'playing' || Boolean(roomInfo?.activeGameId)
+  const roomClosed = normalizedRoomStatus === 'finished' || normalizedRoomStatus === 'cancelled'
+  const roomStarted = normalizedRoomStatus === 'playing' || Boolean(roomInfo?.activeGameId)
   const roomFull = Number(roomInfo?.playerCount || 0) >= Number(roomInfo?.maxPlayers || 2)
-  const canJoinRoom = Boolean(roomInfo) && (!roomStarted || alreadyJoined) && (!roomFull || alreadyJoined)
+  const canJoinRoom =
+    Boolean(roomInfo) && !roomClosed && (!roomStarted || alreadyJoined) && (!roomFull || alreadyJoined)
 
   const roomStatusText = !roomInfo
     ? ''
     : alreadyJoined
       ? 'Bạn đã tham gia phòng này.'
+      : roomClosed
+        ? 'Phòng này đã kết thúc hoặc đã bị hủy.'
       : roomStarted
         ? 'Trận đang diễn ra, chỉ người đã tham gia mới vào lại được.'
         : roomFull

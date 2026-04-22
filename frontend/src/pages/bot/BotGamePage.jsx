@@ -104,6 +104,7 @@ export default function BotGamePage() {
   )
   const [isHintLoading, setIsHintLoading] = useState(false)
   const [hintError, setHintError] = useState('')
+  const abandonWithoutSaveRef = useRef(false)
 
   const buildReplayMoves = useCallback(() => {
     try {
@@ -207,7 +208,7 @@ export default function BotGamePage() {
   // UC6: Save Game to History
   // =============================================
   useEffect(() => {
-    if (gameState === 'Finished' && gameResult && !isSaved) {
+    if (gameState === 'Finished' && gameResult && !isSaved && !abandonWithoutSaveRef.current) {
       const derivedMoves = buildReplayMoves()
       const finalMoves = derivedMoves.length >= moveHistory.length ? derivedMoves : moveHistory
       const fallbackHuman = { username: 'You', isBot: false }
@@ -466,6 +467,7 @@ export default function BotGamePage() {
   const handleForfeitAndLeave = () => {
     // User requested: exiting an unfinished bot game should not be saved to history.
     const destination = pendingLeavePath || '/bot'
+    abandonWithoutSaveRef.current = true
     setShowLeaveConfirm(false)
     setPendingLeavePath(null)
     navigate(destination)

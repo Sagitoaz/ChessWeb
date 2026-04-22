@@ -16,7 +16,8 @@ export function useWebSocket(autoConnect = true) {
   // Connect to WebSocket
   const connect = useCallback((token) => {
     try {
-      socketService.connect(token)
+      const socket = socketService.connect(token)
+      setIsConnected(Boolean(socket?.connected))
       setConnectionError(null)
     } catch (error) {
       setConnectionError(error.message)
@@ -87,6 +88,7 @@ export function useWebSocket(autoConnect = true) {
     socketService.on('connect', handleConnect)
     socketService.on('disconnect', handleDisconnect)
     socketService.on('connect_error', handleError)
+    setIsConnected(Boolean(socketService.socket?.connected))
 
     const trackedListeners = listenersRef.current
 
@@ -104,11 +106,10 @@ export function useWebSocket(autoConnect = true) {
       })
       trackedListeners.clear()
 
-      if (autoConnect) {
-        disconnect()
-      }
+      // Keep singleton socket alive across route transitions.
+      // Disconnect should happen explicitly on logout/app teardown.
     }
-  }, [autoConnect, connect, disconnect])
+  }, [autoConnect, connect])
 
   return {
     isConnected,
@@ -130,9 +131,9 @@ export function useGameSocket(matchId) {
   const { isConnected, on, off, emit } = useWebSocket()
 
   useEffect(() => {
-    if (!matchId || !isConnected) return
+    if (!matchId) return
     emit('game:join', { matchId })
-  }, [matchId, isConnected, emit])
+  }, [matchId, emit])
 
   // Send move
   const sendMove = useCallback(
@@ -147,6 +148,19 @@ export function useGameSocket(matchId) {
     if (!matchId) return
     emit('game:join', { matchId })
   }, [matchId, emit])
+
+  // Send chat message
+  const sendChat = useCallback(
+    (payload) => {
+      if (!matchId || !payload?.text) return
+      emit('game:chat', {
+        matchId,
+        text: String(payload.text),
+        messageId: payload.messageId || null,
+      })
+    },
+    [matchId, emit]
+  )
 
   // Resign game
   const resign = useCallback(() => {
@@ -177,6 +191,7 @@ export function useGameSocket(matchId) {
   const onTimeUpdate = useCallback((callback) => on('game:timeUpdate', callback), [on])
   const onGameEnd = useCallback((callback) => on('game:end', callback), [on])
   const onDrawOffer = useCallback((callback) => on('game:drawOffer', callback), [on])
+  const onChatMessage = useCallback((callback) => on('game:chat', callback), [on])
   const onOpponentDisconnected = useCallback(
     (callback) => on('game:opponentDisconnected', callback),
     [on]
@@ -194,10 +209,12 @@ export function useGameSocket(matchId) {
     offerDraw,
     acceptDraw,
     declineDraw,
+    sendChat,
     onMoveUpdate,
     onTimeUpdate,
     onGameEnd,
     onDrawOffer,
+    onChatMessage,
     onOpponentDisconnected,
     onOpponentReconnected,
     off,
@@ -208,7 +225,7 @@ export function useGameSocket(matchId) {
  * Hook for ranked queue WebSocket events
  */
 export function useRankedSocket() {
-  const { isConnected, on, emit } = useWebSocket()
+  const { isConnected, on, emit, connect } = useWebSocket()
 
   // Join ranked queue
   const joinQueue = useCallback(
@@ -229,6 +246,7 @@ export function useRankedSocket() {
 
   return {
     isConnected,
+    connect,
     joinQueue,
     leaveQueue,
     onMatchFound,

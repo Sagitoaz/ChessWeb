@@ -5,7 +5,7 @@ import { Chess } from 'chess.js'
 import { ChessBoard } from '@components/game'
 import { Avatar, Button, Card } from '@/components/common'
 import gameService from '@/services/gameService'
-import { useGameSocket } from '@hooks/useWebSocket'
+import { useGameSocket, useWebSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
 import { ArrowLeft, Clock, Flag, Play, Trophy, Users } from 'lucide-react'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
@@ -92,8 +92,10 @@ export default function RoomPlayPage() {
   const clockRef = useRef(null)
   const lastTickRef = useRef(null)
   const endedRef = useRef(false)
+  const resultPersistedRef = useRef(false)
   const joinedGameRef = useRef(null)
   const loadedGameRef = useRef(null)
+  const roomUnavailableRef = useRef(false)
 
   const activeGameId = room.activeGameId || location.state?.activeGameId || null
   const currentUserId = normalizeId(user?.id || user?.userId || user?._id || user?.sub)
@@ -133,12 +135,14 @@ export default function RoomPlayPage() {
     onGameEnd,
     off,
   } = useGameSocket(activeGameId)
+  const { on: onSocketEvent, off: offSocketEvent } = useWebSocket()
 
   const refreshRoom = useCallback(async () => {
     if (!roomId) return
     try {
       const response = await gameService.getRoom(roomId)
       const data = response?.data ?? response
+      roomUnavailableRef.current = false
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.debug('[room:play] refresh room', {
@@ -149,6 +153,17 @@ export default function RoomPlayPage() {
       }
       setRoom(normalizeRoom(data, roomId))
     } catch (fetchError) {
+      const status = Number(fetchError?.response?.status ?? fetchError?.status ?? 0)
+      if (status === 404 && !roomUnavailableRef.current) {
+        roomUnavailableRef.current = true
+        showNotification({
+          type: 'warning',
+          title: 'Phòng không còn tồn tại',
+          message: 'Phòng đã bị hủy hoặc đã kết thúc. Bạn được đưa về danh sách phòng.',
+        })
+        navigate('/rooms', { replace: true })
+        return
+      }
       showNotification({
         type: 'error',
         title: 'Lỗi tải phòng',
@@ -157,7 +172,7 @@ export default function RoomPlayPage() {
     } finally {
       setLoading(false)
     }
-  }, [roomId, showNotification])
+  }, [navigate, roomId, showNotification])
 
   useEffect(() => {
     void refreshRoom()
@@ -169,11 +184,79 @@ export default function RoomPlayPage() {
   }, [refreshRoom])
 
   useEffect(() => {
-    if (!activeGameId || !isSocketConnected) return
+    if (!roomId) return undefined
+
+    const handleRoomCancelled = (payload) => {
+      const payloadCode = String(payload?.roomCode || payload?.code || '').toUpperCase()
+      const currentCode = String(room?.code || roomId || '').toUpperCase()
+      if (!payloadCode || payloadCode !== currentCode) return
+
+      showNotification({
+        type: 'warning',
+        title: 'Phòng đã bị hủy',
+        message: 'Chủ phòng đã rời đi. Bạn được đưa về danh sách phòng.',
+      })
+      navigate('/rooms', { replace: true })
+    }
+
+    onSocketEvent('room:cancelled', handleRoomCancelled)
+    return () => {
+      offSocketEvent('room:cancelled', handleRoomCancelled)
+    }
+  }, [navigate, offSocketEvent, onSocketEvent, room?.code, roomId, showNotification])
+
+  useEffect(() => {
+    if (!activeGameId) return
     if (joinedGameRef.current === activeGameId) return
     joinGame()
     joinedGameRef.current = activeGameId
-  }, [activeGameId, isSocketConnected, joinGame])
+  }, [activeGameId, joinGame])
+
+  const persistRoomResult = useCallback(
+    async (result, reason) => {
+      if (!activeGameId || resultPersistedRef.current) return
+      resultPersistedRef.current = true
+
+      const members = Array.isArray(room.members) ? room.members : []
+      const opponent = members.find(
+        (member) => member?.userId && normalizeId(member.userId) !== currentUserId
+      )
+      const meName = user?.username || user?.displayName || 'Bạn'
+      const oppName = opponent?.username || 'Đối thủ'
+      const whiteName = playerColor === 'white' ? meName : oppName
+      const blackName = playerColor === 'black' ? meName : oppName
+      const absoluteResult =
+        result === 'draw'
+          ? 'Draw'
+          : result === 'win'
+            ? playerColor === 'white'
+              ? 'WhiteWin'
+              : 'BlackWin'
+            : playerColor === 'white'
+              ? 'BlackWin'
+              : 'WhiteWin'
+
+      try {
+        await gameService.saveGame(activeGameId, {
+          result: absoluteResult,
+          state: 'Saved',
+          mode: 'room',
+          initialFEN: INITIAL_FEN,
+          moves: chessRef.current.history({ verbose: true }),
+          whitePlayer: { username: whiteName, isBot: false },
+          blackPlayer: { username: blackName, isBot: false },
+          metadata: {
+            endReason: reason || 'completed',
+            roomCode: room.code || roomId,
+          },
+        })
+      } catch {
+        // Retry on next end sync tick if save fails temporarily.
+        resultPersistedRef.current = false
+      }
+    },
+    [activeGameId, currentUserId, playerColor, room.code, room.members, roomId, user]
+  )
 
   const endGame = useCallback(
     (result, reason) => {
@@ -192,8 +275,9 @@ export default function RoomPlayPage() {
               ? 'Trận đấu đã kết thúc do đầu hàng.'
               : 'Trận đấu đã kết thúc.',
       })
+      void persistRoomResult(result, reason)
     },
-    [showNotification]
+    [persistRoomResult, showNotification]
   )
 
   useEffect(() => {
@@ -257,6 +341,7 @@ export default function RoomPlayPage() {
       chessRef.current = new Chess(INITIAL_FEN)
       setMoveHistory([])
       endedRef.current = false
+      resultPersistedRef.current = false
       setGameResult(null)
       loadedGameRef.current = room.activeGameId
     }
@@ -451,12 +536,13 @@ export default function RoomPlayPage() {
 
   const requestLeaveRoom = useCallback(
     (destination = '/rooms') => {
+      const safeDestination = typeof destination === 'string' ? destination : '/rooms'
       if (gamePhase === 'playing' && !endedRef.current) {
-        setPendingLeavePath(destination)
+        setPendingLeavePath(safeDestination)
         setShowLeaveConfirm(true)
         return
       }
-      void leaveRoomViaApi().finally(() => navigate(destination))
+      void leaveRoomViaApi().finally(() => navigate(safeDestination))
     },
     [gamePhase, leaveRoomViaApi, navigate]
   )
@@ -571,7 +657,7 @@ export default function RoomPlayPage() {
   return (
     <div className="max-w-7xl mx-auto px-3 py-4">
       <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" onClick={requestLeaveRoom} size="sm">
+        <Button variant="ghost" onClick={() => requestLeaveRoom()} size="sm">
           <ArrowLeft className="w-4 h-4" />
           Rời phòng
         </Button>
@@ -694,7 +780,7 @@ export default function RoomPlayPage() {
                   Đầu hàng
                 </Button>
               )}
-              <Button variant="outline" onClick={requestLeaveRoom}>
+              <Button variant="outline" onClick={() => requestLeaveRoom()}>
                 <ArrowLeft className="w-4 h-4" />
                 Về danh sách
               </Button>

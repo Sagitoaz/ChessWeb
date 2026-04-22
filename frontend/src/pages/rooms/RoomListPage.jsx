@@ -121,7 +121,14 @@ export default function RoomListPage() {
         ])
 
         const publicItems = Array.isArray(publicResult?.items) ? publicResult.items : []
-        setPublicRooms(publicItems.map(mapRoomCard))
+        setPublicRooms(
+          publicItems
+            .map(mapRoomCard)
+            .filter((room) => {
+              const status = String(room?.status || '').toLowerCase()
+              return status !== 'finished' && status !== 'cancelled'
+            })
+        )
 
         if (recentCodes.length > 0) {
           const roomSnapshots = await Promise.all(
@@ -135,7 +142,12 @@ export default function RoomListPage() {
           const hydratedRecent = roomSnapshots
             .filter(Boolean)
             .map(mapRoomCard)
-            .filter((room) => room.code)
+            .filter(
+              (room) =>
+                room.code &&
+                String(room.status || '').toLowerCase() !== 'finished' &&
+                String(room.status || '').toLowerCase() !== 'cancelled'
+            )
           setRecentRooms(hydratedRecent)
         } else {
           setRecentRooms([])

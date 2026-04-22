@@ -797,6 +797,7 @@ export class CompetitionService {
       projection: {
         _id: 1,
         mode: 1,
+        roomCode: 1,
         whitePlayerId: 1,
         blackPlayerId: 1,
         result: 1,
@@ -869,6 +870,25 @@ export class CompetitionService {
         },
       },
     );
+
+    const roomCode =
+      typeof game.roomCode === "string" ? game.roomCode.trim() : "";
+    if (roomCode) {
+      await this.mongoService
+        .getDb()
+        .collection("rooms")
+        .updateOne(
+          { $or: [{ roomCode }, { code: roomCode }] },
+          {
+            $set: {
+              status: "finished",
+              activeGameId: null,
+              updatedAt: now,
+              finishedAt: now,
+            },
+          },
+        );
+    }
 
     return {
       result: persistedResult === "white_win" ? "WhiteWin" : "BlackWin",

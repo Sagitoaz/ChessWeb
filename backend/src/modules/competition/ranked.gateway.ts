@@ -45,6 +45,12 @@ type GameMovePayload = {
   };
 };
 
+type GameChatPayload = {
+  matchId?: string;
+  text?: string;
+  messageId?: string;
+};
+
 type GameResignPayload = {
   matchId?: string;
 };
@@ -197,6 +203,20 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     status?: string;
   }): void {
     this.server.emit("room:gameStarted", {
+      ...payload,
+      code: payload.code || payload.roomCode,
+      roomCode: payload.roomCode || payload.code,
+      at: new Date().toISOString(),
+    });
+  }
+
+  emitRoomCancelled(payload: {
+    roomCode: string;
+    code?: string;
+    cancelledByUserId?: string;
+    reason?: string;
+  }): void {
+    this.server.emit("room:cancelled", {
       ...payload,
       code: payload.code || payload.roomCode,
       roomCode: payload.roomCode || payload.code,
@@ -442,6 +462,44 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         byUserId: user.userId,
         at: new Date().toISOString(),
       });
+  }
+
+  @SubscribeMessage("game:chat")
+  async onGameChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: GameChatPayload | undefined,
+  ): Promise<void> {
+    const user = this.getSocketUser(client);
+    const matchId = body?.matchId;
+    const text = String(body?.text || "").trim();
+
+    if (!matchId || typeof matchId !== "string") {
+      throw new UnauthorizedException("Missing matchId");
+    }
+    if (!text) return;
+
+    const allowed = await this.competitionService.isUserInMatch(
+      matchId,
+      user.userId,
+    );
+    if (!allowed) {
+      throw new UnauthorizedException(
+        "User is not a participant of this match",
+      );
+    }
+
+    const payload = {
+      matchId,
+      text: text.slice(0, 500),
+      fromUserId: user.userId,
+      messageId:
+        typeof body?.messageId === "string" && body.messageId.length > 0
+          ? body.messageId
+          : null,
+      at: new Date().toISOString(),
+    };
+
+    this.server.to(`match:${matchId}`).emit("game:chat", payload);
   }
 
   @SubscribeMessage("game:resign")

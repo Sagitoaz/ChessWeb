@@ -78,6 +78,16 @@ export class SocialBotRepository {
     return this.db.collection("room_members").deleteOne({ roomId, userId });
   }
 
+  async removeRoomMembers(roomId: ObjectId | string) {
+    return this.db.collection("room_members").deleteMany({ roomId });
+  }
+
+  async deleteRoomByCode(roomCode: string) {
+    return this.db.collection("rooms").deleteOne({
+      $or: [{ roomCode }, { code: roomCode }],
+    });
+  }
+
   async findTournamentById(id: string) {
     if (!ObjectId.isValid(id)) {
       return null;

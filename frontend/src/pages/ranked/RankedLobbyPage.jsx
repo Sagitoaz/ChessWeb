@@ -268,7 +268,8 @@ const RankedLobbyPage = () => {
   const matchFoundRef = useRef(false) // guard against double-navigation
 
   // ──── WebSocket Hook ────
-  const { isConnected, joinQueue, leaveQueue, onMatchFound, onQueueUpdate } = useRankedSocket()
+  const { isConnected, connect, joinQueue, leaveQueue, onMatchFound, onQueueUpdate } =
+    useRankedSocket()
 
   // ──── Load Recent Games ────
   useEffect(() => {
@@ -349,13 +350,16 @@ const RankedLobbyPage = () => {
     matchFoundRef.current = false // reset guard for new search
     setQueueStatus(QUEUE_STATUS.SEARCHING)
     setMatchData(null)
+    if (!isConnected) {
+      connect(localStorage.getItem('token'))
+    }
 
     // Emit WebSocket event
     joinQueue({
       timeControl: queueTimeControl,
       preferredColor: queuePreferredColor,
     })
-  }, [joinQueue, queuePreferredColor, queueTimeControl])
+  }, [connect, isConnected, joinQueue, queuePreferredColor, queueTimeControl])
 
   const handleCancelSearch = useCallback(() => {
     setQueueStatus(QUEUE_STATUS.IDLE)
@@ -483,7 +487,7 @@ const RankedLobbyPage = () => {
                   <select
                     value={queueTimeControl}
                     onChange={(e) => setQueueTimeControl(e.target.value)}
-                    disabled={isSearching || !isConnected}
+                    disabled={isSearching}
                     className={`w-full ${THEME.background.card} ${THEME.text.primary} border ${THEME.border.DEFAULT} ${THEME.rounded.DEFAULT} px-4 py-3 text-sm disabled:opacity-60`}
                   >
                     {QUEUE_TIME_CONTROLS.map((option) => (
@@ -503,7 +507,7 @@ const RankedLobbyPage = () => {
                   <select
                     value={queuePreferredColor}
                     onChange={(e) => setQueuePreferredColor(e.target.value)}
-                    disabled={isSearching || !isConnected}
+                    disabled={isSearching}
                     className={`w-full ${THEME.background.card} ${THEME.text.primary} border ${THEME.border.DEFAULT} ${THEME.rounded.DEFAULT} px-4 py-3 text-sm disabled:opacity-60`}
                   >
                     {QUEUE_PREFERRED_COLORS.map((option) => (
@@ -517,7 +521,7 @@ const RankedLobbyPage = () => {
 
               <button
                 onClick={handleFindMatch}
-                disabled={isSearching || !isConnected}
+                disabled={isSearching}
                 className="
                   relative w-full max-w-xs mx-auto
                   px-10 py-4 text-lg font-bold text-white

@@ -281,7 +281,12 @@ export default function TournamentDetailPage() {
     if (!window.confirm('Bạn có chắc muốn hủy giải đấu này?')) return
     try {
       await gameService.cancelTournament(tournamentId)
-      await loadTournament()
+      showNotification({
+        type: 'success',
+        title: 'Đã hủy giải',
+        message: 'Giải đấu đã được hủy. Đang quay lại danh sách giải đấu.',
+      })
+      navigate('/tournaments', { replace: true })
     } catch (_error) {
       showNotification({
         type: 'error',

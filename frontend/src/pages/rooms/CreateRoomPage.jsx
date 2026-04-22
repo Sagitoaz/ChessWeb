@@ -231,9 +231,13 @@ export default function CreateRoomPage() {
       })
   }
 
-  const handleCancel = () => {
-    if (roomCreated) {
-      // TODO: socket.emit('room:delete', roomCode)
+  const handleCancel = async () => {
+    if (roomCreated && roomCode) {
+      try {
+        await gameService.leaveRoom(roomCode)
+      } catch {
+        // Ignore cancellation failures and still navigate out.
+      }
     }
     navigate('/rooms')
   }

@@ -11,6 +11,7 @@ class SocketService {
     this.socket = null
     this.listeners = new Map()
     this.authToken = null
+    this.pendingEmits = []
   }
 
   connect(token) {
@@ -23,9 +24,7 @@ class SocketService {
 
     const tokenChanged = Boolean(this.authToken && this.authToken !== nextToken)
 
-    if (this.socket?.connected && !tokenChanged) {
-      // eslint-disable-next-line no-console
-      console.log('Socket already connected with current token')
+    if (this.socket && !tokenChanged) {
       return this.socket
     }
 
@@ -56,6 +55,7 @@ class SocketService {
         // eslint-disable-next-line no-console
         console.log('✅ Socket connected:', this.socket.id)
       }
+      this.flushPendingEmits()
     })
 
     this.socket.on('disconnect', (reason) => {
@@ -78,6 +78,7 @@ class SocketService {
       this.socket = null
       this.listeners.clear()
       this.authToken = null
+      this.pendingEmits = []
       // eslint-disable-next-line no-console
       console.log('Socket disconnected manually')
     }
@@ -114,8 +115,13 @@ class SocketService {
   }
 
   emit(event, data) {
-    if (!this.socket || !this.socket.connected) {
-      console.warn('⚠️ Socket not connected. Cannot emit event:', event)
+    if (!this.socket) {
+      console.warn('⚠️ Socket not ready. Cannot emit event:', event)
+      return
+    }
+
+    if (!this.socket.connected) {
+      this.pendingEmits.push({ event, data })
       return
     }
 
@@ -124,6 +130,19 @@ class SocketService {
       // eslint-disable-next-line no-console
       console.log(`📤 Emitted ${event}:`, data)
     }
+  }
+
+  flushPendingEmits() {
+    if (!this.socket?.connected || this.pendingEmits.length === 0) return
+    const queue = [...this.pendingEmits]
+    this.pendingEmits = []
+    queue.forEach(({ event, data }) => {
+      this.socket.emit(event, data)
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.log(`📤 Flushed ${event}:`, data)
+      }
+    })
   }
 
   // Convenience methods for common events

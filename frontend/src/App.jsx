@@ -16,17 +16,6 @@ const queryClient = new QueryClient({
   },
 })
 
-const preloadCoreRouteChunks = () => {
-  // Preload high-traffic routes to avoid first-navigation full-page fallback flash.
-  void import('@pages/ranked/RankedLobbyPage')
-  void import('@pages/ranked/RankedGamePage')
-  void import('@pages/rooms/RoomListPage')
-  void import('@pages/rooms/CreateRoomPage')
-  void import('@pages/rooms/JoinRoomPage')
-  void import('@pages/tournaments/TournamentListPage')
-  void import('@pages/bot/BotSelectPage')
-}
-
 function App() {
   useEffect(() => {
     useAuthStore.getState().loadUser()
@@ -42,10 +31,6 @@ function App() {
     return () => {
       window.removeEventListener('storage', handleStorageChange)
     }
-  }, [])
-
-  useEffect(() => {
-    preloadCoreRouteChunks()
   }, [])
 
   return (

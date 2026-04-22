@@ -95,12 +95,23 @@ const toLocalResultFromServer = (playerColor, serverResult) => {
 
 const normalizeId = (value) => {
   if (!value) return ''
-  if (typeof value === 'string') return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    const objectIdMatch = trimmed.match(/^ObjectId\("([a-fA-F0-9]{24})"\)$/)
+    return objectIdMatch?.[1] || trimmed
+  }
   if (typeof value === 'object') {
+    if (typeof value.$oid === 'string') return value.$oid
     if (typeof value.id === 'string') return value.id
     if (typeof value._id === 'string') return value._id
     if (typeof value.userId === 'string') return value.userId
     if (typeof value.sub === 'string') return value.sub
+    if (typeof value.toString === 'function') {
+      const asString = String(value.toString())
+      const objectIdMatch = asString.match(/^ObjectId\("([a-fA-F0-9]{24})"\)$/)
+      if (objectIdMatch?.[1]) return objectIdMatch[1]
+      if (asString && asString !== '[object Object]') return asString
+    }
   }
   return String(value)
 }
@@ -564,6 +575,7 @@ const RankedGamePage = () => {
   const [chatMessages, setChatMessages] = useState([
     { text: 'Game started. Good luck!', isSystem: true },
   ])
+  const chatSeenIdsRef = useRef(new Set())
 
   // ─── Sound ───
   const [soundEnabled, setSoundEnabled] = useState(true)
@@ -946,6 +958,30 @@ const RankedGamePage = () => {
       endGame(reason, result)
     }
 
+    const handleChatMessage = (payload) => {
+      const text = String(payload?.text || '').trim()
+      if (!text) return
+
+      const senderId = normalizeId(payload?.fromUserId)
+      const messageId =
+        typeof payload?.messageId === 'string' && payload.messageId.trim()
+          ? payload.messageId.trim()
+          : `${senderId || 'unknown'}-${payload?.at || Date.now()}`
+
+      if (chatSeenIdsRef.current.has(messageId)) return
+      chatSeenIdsRef.current.add(messageId)
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: messageId,
+          sender: senderId && senderId === currentUserId ? player.username : opponent.username,
+          text,
+          isMine: Boolean(senderId && senderId === currentUserId),
+        },
+      ])
+    }
+
     const handleDrawOfferEvent = (payload) => {
       const eventType = String(payload?.type || '').toLowerCase()
       const actorId = String(payload?.fromUserId || payload?.byUserId || '')
@@ -983,16 +1019,27 @@ const RankedGamePage = () => {
     gameSocket.onMoveUpdate(handleMoveUpdate)
     gameSocket.onGameEnd(handleGameEnd)
     gameSocket.onDrawOffer(handleDrawOfferEvent)
+    gameSocket.onChatMessage?.(handleChatMessage)
     gameSocket.onOpponentDisconnected(handleOpponentDisconnect)
     gameSocket.onOpponentReconnected(handleOpponentReconnect)
     return () => {
       gameSocket.off('game:moveUpdate', handleMoveUpdate)
       gameSocket.off('game:end', handleGameEnd)
       gameSocket.off('game:drawOffer', handleDrawOfferEvent)
+      gameSocket.off('game:chat', handleChatMessage)
       gameSocket.off('game:opponentDisconnected', handleOpponentDisconnect)
       gameSocket.off('game:opponentReconnected', handleOpponentReconnect)
     }
-  }, [gameSocket, checkGameEnd, playSound, playerColor, endGame, currentUserId, opponent.username])
+  }, [
+    gameSocket,
+    checkGameEnd,
+    playSound,
+    playerColor,
+    endGame,
+    currentUserId,
+    opponent.username,
+    player.username,
+  ])
 
   // ═══════════════════════════════════════════
   // COMMIT MOVE  — shared by drag-drop & click
@@ -1082,9 +1129,24 @@ const RankedGamePage = () => {
 
   const handleSendChat = useCallback(
     (text) => {
-      setChatMessages((prev) => [...prev, { sender: player.username, text, isMine: true }])
+      const message = String(text || '').trim()
+      if (!message) return
+
+      const messageId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      chatSeenIdsRef.current.add(messageId)
+      setChatMessages((prev) => [
+        ...prev,
+        { id: messageId, sender: player.username, text: message, isMine: true },
+      ])
+
+      if (gameSocket?.isConnected && matchId) {
+        gameSocket.sendChat?.({
+          text: message,
+          messageId,
+        })
+      }
     },
-    [player.username]
+    [gameSocket, matchId, player.username]
   )
 
   // ═══════════════════════════════════════════

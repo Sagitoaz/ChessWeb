@@ -204,12 +204,12 @@ export class StockfishService {
     if (normalizedDifficulty === "easy") {
       return {
         normalizedDifficulty,
-        skillLevel: 2,
+        skillLevel: 1,
         limitStrength: true,
-        targetElo: 700,
-        depth: 8,
-        moveTimeMs: 250,
-        timeoutMs: Math.max(baseTimeout, 2500),
+        targetElo: 650,
+        depth: 6,
+        moveTimeMs: 120,
+        timeoutMs: Math.max(baseTimeout, 2200),
         searchMode: "movetime",
       };
     }
@@ -217,12 +217,12 @@ export class StockfishService {
     if (normalizedDifficulty === "hard") {
       return {
         normalizedDifficulty,
-        skillLevel: 15,
+        skillLevel: 16,
         limitStrength: true,
-        targetElo: 1850,
-        depth: 20,
-        moveTimeMs: 1800,
-        timeoutMs: Math.max(baseTimeout, 6000),
+        targetElo: 2000,
+        depth: 22,
+        moveTimeMs: 2200,
+        timeoutMs: Math.max(baseTimeout, 8000),
         searchMode: "movetime",
       };
     }
@@ -233,21 +233,21 @@ export class StockfishService {
         skillLevel: 20,
         limitStrength: false,
         targetElo: null,
-        depth: 40,
-        moveTimeMs: 15000,
-        timeoutMs: Math.max(baseTimeout, 35000),
+        depth: 99,
+        moveTimeMs: 30000,
+        timeoutMs: Math.max(baseTimeout, 70000),
         searchMode: "depth",
       };
     }
 
     return {
       normalizedDifficulty: "normal",
-      skillLevel: 8,
+      skillLevel: 9,
       limitStrength: true,
-      targetElo: 1250,
-      depth: 14,
-      moveTimeMs: 800,
-      timeoutMs: Math.max(baseTimeout, 4500),
+      targetElo: 1300,
+      depth: 12,
+      moveTimeMs: 500,
+      timeoutMs: Math.max(baseTimeout, 4200),
       searchMode: "movetime",
     };
   }

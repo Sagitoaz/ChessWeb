@@ -128,6 +128,7 @@ export class SocialBotService {
 
   private getFallbackLegalMove(
     fen: string,
+    difficulty: string = "normal",
   ): { bestMoveUci: string; evaluation: number | null } | null {
     try {
       const chess = new Chess(fen);
@@ -135,13 +136,154 @@ export class SocialBotService {
       if (legalMoves.length === 0) {
         return null;
       }
+      const normalizedDifficulty = (() => {
+        const value = String(difficulty || "").trim().toLowerCase();
+        if (value === "easy" || value === "beginner") return "easy";
+        if (value === "hard" || value === "advanced") return "hard";
+        if (
+          value === "super_hard" ||
+          value === "superhard" ||
+          value === "expert"
+        ) {
+          return "super_hard";
+        }
+        return "normal";
+      })();
 
-      const picked = legalMoves[Math.floor(Math.random() * legalMoves.length)];
-      const promotion = picked.promotion ? String(picked.promotion) : "";
+      if (normalizedDifficulty === "easy") {
+        const picked = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+        const promotion = picked.promotion ? String(picked.promotion) : "";
+        return {
+          bestMoveUci: `${picked.from}${picked.to}${promotion}`,
+          evaluation: null,
+        };
+      }
 
+      const evaluateBoard = (position: Chess, maximizingColor: "w" | "b") => {
+        if (position.isCheckmate()) {
+          return position.turn() === maximizingColor ? -100000 : 100000;
+        }
+        if (
+          position.isDraw() ||
+          position.isStalemate() ||
+          position.isThreefoldRepetition() ||
+          position.isInsufficientMaterial()
+        ) {
+          return 0;
+        }
+
+        const values: Record<string, number> = {
+          p: 100,
+          n: 320,
+          b: 330,
+          r: 500,
+          q: 900,
+          k: 0,
+        };
+        const board = position.board();
+        let score = 0;
+        for (const row of board) {
+          for (const piece of row) {
+            if (!piece) continue;
+            const value = values[piece.type] || 0;
+            score += piece.color === maximizingColor ? value : -value;
+          }
+        }
+        const mobility =
+          position.moves().length *
+          (position.turn() === maximizingColor ? 1 : -1);
+        return score + mobility * 2;
+      };
+
+      const minimax = (
+        position: Chess,
+        depth: number,
+        alpha: number,
+        beta: number,
+        maximizingPlayer: boolean,
+        maximizingColor: "w" | "b",
+      ): number => {
+        if (depth <= 0 || position.isGameOver()) {
+          return evaluateBoard(position, maximizingColor);
+        }
+
+        const moves = position.moves({ verbose: true });
+        if (moves.length === 0) {
+          return evaluateBoard(position, maximizingColor);
+        }
+
+        if (maximizingPlayer) {
+          let bestScore = -Infinity;
+          for (const mv of moves) {
+            position.move(mv);
+            const score = minimax(
+              position,
+              depth - 1,
+              alpha,
+              beta,
+              false,
+              maximizingColor,
+            );
+            position.undo();
+            bestScore = Math.max(bestScore, score);
+            alpha = Math.max(alpha, score);
+            if (beta <= alpha) break;
+          }
+          return bestScore;
+        }
+
+        let bestScore = Infinity;
+        for (const mv of moves) {
+          position.move(mv);
+          const score = minimax(
+            position,
+            depth - 1,
+            alpha,
+            beta,
+            true,
+            maximizingColor,
+          );
+          position.undo();
+          bestScore = Math.min(bestScore, score);
+          beta = Math.min(beta, score);
+          if (beta <= alpha) break;
+        }
+        return bestScore;
+      };
+
+      const depth =
+        normalizedDifficulty === "super_hard"
+          ? 3
+          : normalizedDifficulty === "hard"
+            ? 2
+            : 2;
+
+      const sideToMove = chess.turn();
+      let bestMove = legalMoves[0];
+      let bestScore = -Infinity;
+
+      for (const mv of legalMoves) {
+        chess.move(mv);
+        const score = minimax(
+          chess,
+          depth - 1,
+          -Infinity,
+          Infinity,
+          false,
+          sideToMove,
+        );
+        chess.undo();
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = mv;
+        }
+      }
+
+      const promotion = bestMove.promotion ? String(bestMove.promotion) : "";
       return {
-        bestMoveUci: `${picked.from}${picked.to}${promotion}`,
-        evaluation: null,
+        bestMoveUci: `${bestMove.from}${bestMove.to}${promotion}`,
+        evaluation: Math.round(bestScore / 100),
       };
     } catch {
       return null;
@@ -1190,6 +1332,10 @@ export class SocialBotService {
     if (!room) {
       throw new NotFoundException("Room not found");
     }
+    const roomStatus = String(room.status || "waiting").toLowerCase();
+    if (roomStatus === "finished" || roomStatus === "cancelled") {
+      throw new BadRequestException("Room is no longer available");
+    }
 
     const members = await this.repo.findRoomMembers(room._id);
     const alreadyJoined = members.some((m: any) => m.userId === userId);
@@ -1347,7 +1493,14 @@ export class SocialBotService {
         ownerUserId ? 1 : 0,
       );
       const maxPlayers = Number(room?.maxPlayers || 2);
-      const status = String(room?.status || "waiting");
+      const rawStatus = String(room?.status || "waiting").toLowerCase();
+      const hasActiveGame = Boolean(String(room?.activeGameId || "").trim());
+      const status =
+        rawStatus === "finished" || rawStatus === "cancelled"
+          ? rawStatus
+          : hasActiveGame
+            ? "playing"
+            : rawStatus || "waiting";
       const roomCode = String(room?.roomCode || room?.code || "");
 
       return {
@@ -1364,7 +1517,7 @@ export class SocialBotService {
         initialTimeSeconds: Number(room?.initialTimeSeconds || 600),
         playerCount,
         maxPlayers,
-        canJoin: status === "waiting" && playerCount < maxPlayers,
+        canJoin: status === "waiting" && !hasActiveGame && playerCount < maxPlayers,
         host: {
           userId: ownerUserId || null,
           username:
@@ -1383,9 +1536,14 @@ export class SocialBotService {
       };
     });
 
+    const allowedStatuses = new Set(statuses.map((status) => status.toLowerCase()));
+    const filteredItems = items.filter((item) =>
+      allowedStatuses.has(String(item?.status || "").toLowerCase()),
+    );
+
     return {
-      items,
-      total: items.length,
+      items: filteredItems,
+      total: filteredItems.length,
     };
   }
 
@@ -1393,6 +1551,20 @@ export class SocialBotService {
     const room = await this.repo.findRoomByCode(code);
     if (!room) {
       throw new NotFoundException("Room not found");
+    }
+
+    const roomCode = String(room.roomCode || room.code || code);
+    const isOwner = String(room.ownerUserId || "") === String(userId);
+    if (isOwner) {
+      await this.repo.deleteRoomByCode(code);
+      await this.repo.removeRoomMembers(room._id);
+      this.rankedGateway.emitRoomCancelled({
+        roomCode,
+        code: roomCode,
+        cancelledByUserId: userId,
+        reason: "owner_left",
+      });
+      return { left: true, cancelled: true, reason: "owner_left" };
     }
 
     const result = await this.repo.removeRoomMember(room._id, userId);
@@ -1407,8 +1579,8 @@ export class SocialBotService {
     });
 
     this.rankedGateway.emitRoomPlayerLeft({
-      roomCode: String(room.roomCode || room.code || code),
-      code: String(room.roomCode || room.code || code),
+      roomCode,
+      code: roomCode,
       userId,
       username: null,
       playerCount: members.length,
@@ -2550,7 +2722,7 @@ export class SocialBotService {
     const move =
       stockfishMove && this.isLegalUciMove(dto.fen, stockfishMove.bestMoveUci)
         ? stockfishMove
-        : this.getFallbackLegalMove(dto.fen);
+        : this.getFallbackLegalMove(dto.fen, String(difficulty));
 
     if (!move) {
       await this.repo.updateBotMoveRequestResponse(
@@ -2807,6 +2979,24 @@ export class SocialBotService {
           : now.toISOString(),
         game: latest,
       };
+    }
+
+    if (normalizedMode === "room") {
+      const roomCodeRaw =
+        typeof payload?.metadata?.roomCode === "string"
+          ? payload.metadata.roomCode
+          : typeof game?.roomCode === "string"
+            ? game.roomCode
+            : "";
+      const roomCode = String(roomCodeRaw || "").trim();
+      if (roomCode) {
+        await this.repo.updateRoomByCode(roomCode, {
+          status: "finished",
+          activeGameId: null,
+          updatedAt: now,
+          finishedAt: now,
+        });
+      }
     }
 
     if (
