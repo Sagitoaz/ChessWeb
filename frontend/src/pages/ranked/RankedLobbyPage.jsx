@@ -26,6 +26,7 @@ import gameService from '@services/gameService'
 import { RANKS, INACTIVITY_TIMEOUT } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor, formatRelativeTime } from '@utils/formatters'
 import { THEME } from '@/styles/theme'
+import { useNotification } from '@/components/common/Notification'
 
 // ─────────────── Helper: get rank info by rating ───────────────
 const getRankInfo = (rating) => {
@@ -225,6 +226,7 @@ const RankedLobbyPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const isDemo = location.pathname.startsWith('/demo')
+  const { showNotification } = useNotification()
 
   // ──── Auth/User State ────
   const storeUser = useAuthStore((s) => s.user)
@@ -268,7 +270,7 @@ const RankedLobbyPage = () => {
   const matchFoundRef = useRef(false) // guard against double-navigation
 
   // ──── WebSocket Hook ────
-  const { isConnected, connect, joinQueue, leaveQueue, onMatchFound, onQueueUpdate } =
+  const { isConnected, connect, joinQueue, leaveQueue, onMatchFound, onQueueUpdate, onRankedError } =
     useRankedSocket()
 
   // ──── Load Recent Games ────
@@ -320,9 +322,27 @@ const RankedLobbyPage = () => {
       }
     }
 
+    const handleRankedError = (payload) => {
+      const code = String(payload?.code || '')
+      const message = String(payload?.message || 'Không thể tham gia hàng chờ đấu hạng.')
+
+      if (code === 'ALREADY_IN_MATCH' || code === 'MATCHING_IN_PROGRESS') {
+        setQueueStatus(QUEUE_STATUS.IDLE)
+        setSearchTime(0)
+        setMatchData(null)
+      }
+
+      showNotification({
+        type: 'warning',
+        title: 'Không thể vào hàng chờ',
+        message,
+      })
+    }
+
     onMatchFound(handleMatchFound)
     onQueueUpdate(handleQueueUpdate)
-  }, [onMatchFound, onQueueUpdate, navigate])
+    onRankedError(handleRankedError)
+  }, [navigate, onMatchFound, onQueueUpdate, onRankedError, showNotification])
 
   // ──── Search Timer ────
   useEffect(() => {

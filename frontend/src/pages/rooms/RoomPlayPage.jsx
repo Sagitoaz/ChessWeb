@@ -218,9 +218,11 @@ export default function RoomPlayPage() {
       resultPersistedRef.current = true
 
       const members = Array.isArray(room.members) ? room.members : []
+      const expectedOpponentId =
+        playerColor === 'white' ? normalizeId(room.blackPlayerId) : normalizeId(room.whitePlayerId)
       const opponent = members.find(
-        (member) => member?.userId && normalizeId(member.userId) !== currentUserId
-      )
+        (member) => member?.userId && normalizeId(member.userId) === expectedOpponentId
+      ) || members.find((member) => member?.userId && normalizeId(member.userId) !== currentUserId)
       const meName = user?.username || user?.displayName || 'Bạn'
       const oppName = opponent?.username || 'Đối thủ'
       const whiteName = playerColor === 'white' ? meName : oppName
@@ -255,7 +257,17 @@ export default function RoomPlayPage() {
         resultPersistedRef.current = false
       }
     },
-    [activeGameId, currentUserId, playerColor, room.code, room.members, roomId, user]
+    [
+      activeGameId,
+      currentUserId,
+      playerColor,
+      room.blackPlayerId,
+      room.code,
+      room.members,
+      room.whitePlayerId,
+      roomId,
+      user,
+    ]
   )
 
   const endGame = useCallback(
@@ -500,9 +512,11 @@ export default function RoomPlayPage() {
     if (!activeGameId || endedRef.current) return
 
     const members = Array.isArray(room.members) ? room.members : []
+    const expectedOpponentId =
+      playerColor === 'white' ? normalizeId(room.blackPlayerId) : normalizeId(room.whitePlayerId)
     const opponent = members.find(
-      (member) => member?.userId && normalizeId(member.userId) !== currentUserId
-    )
+      (member) => member?.userId && normalizeId(member.userId) === expectedOpponentId
+    ) || members.find((member) => member?.userId && normalizeId(member.userId) !== currentUserId)
     const meName = user?.username || user?.displayName || 'Bạn'
     const oppName = opponent?.username || 'Đối thủ'
     const whiteName = playerColor === 'white' ? meName : oppName
@@ -523,7 +537,17 @@ export default function RoomPlayPage() {
         forfeit: true,
       },
     })
-  }, [activeGameId, currentUserId, playerColor, room.code, room.members, roomId, user])
+  }, [
+    activeGameId,
+    currentUserId,
+    playerColor,
+    room.blackPlayerId,
+    room.code,
+    room.members,
+    room.whitePlayerId,
+    roomId,
+    user,
+  ])
 
   const leaveRoomViaApi = useCallback(async () => {
     if (!room.code) return
@@ -638,8 +662,12 @@ export default function RoomPlayPage() {
 
   const roomMembers = room.members || []
   const host = roomMembers.find((member) => member.role === 'owner') || roomMembers[0]
+  const expectedOpponentId =
+    playerColor === 'white' ? normalizeId(room.blackPlayerId) : normalizeId(room.whitePlayerId)
   const opponentMember =
-    roomMembers.find((member) => normalizeId(member.userId) !== currentUserId) || null
+    roomMembers.find((member) => normalizeId(member.userId) === expectedOpponentId) ||
+    roomMembers.find((member) => normalizeId(member.userId) !== currentUserId) ||
+    null
   const isPlayerTurn =
     gamePhase === 'playing' && chessRef.current.turn() === myColorCode && !endedRef.current
   const boardDisabled = gamePhase !== 'playing' || !activeGameId || !isPlayerTurn

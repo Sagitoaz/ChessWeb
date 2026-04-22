@@ -342,10 +342,28 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       preferredColor: body?.preferredColor || PreferredColor.RANDOM,
     };
 
-    await this.competitionService.joinQueue(
+    const joinResult = await this.competitionService.joinQueue(
       { userId: user.userId, roles: user.roles || [] },
       payload,
     );
+
+    const joinStatus = String(joinResult?.status || "").toLowerCase();
+    if (joinStatus === "in_match") {
+      client.emit("ranked:error", {
+        code: "ALREADY_IN_MATCH",
+        message: "Bạn đang trong một trận rank khác, không thể vào hàng chờ.",
+        matchId: joinResult?.matchId || null,
+      });
+      return;
+    }
+    if (joinStatus === "matching") {
+      client.emit("ranked:error", {
+        code: "MATCHING_IN_PROGRESS",
+        message:
+          "Đang xử lý ghép trận hiện tại, vui lòng chờ vài giây rồi thử lại.",
+      });
+      return;
+    }
 
     await this.runMatchmakingCycle(payload.timeControl);
 

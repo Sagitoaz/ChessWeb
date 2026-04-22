@@ -243,6 +243,7 @@ export function useRankedSocket() {
   // Subscribe to ranked events
   const onMatchFound = useCallback((callback) => on('ranked:matchFound', callback), [on])
   const onQueueUpdate = useCallback((callback) => on('ranked:queueUpdate', callback), [on])
+  const onRankedError = useCallback((callback) => on('ranked:error', callback), [on])
 
   return {
     isConnected,
@@ -251,6 +252,7 @@ export function useRankedSocket() {
     leaveQueue,
     onMatchFound,
     onQueueUpdate,
+    onRankedError,
   }
 }
 

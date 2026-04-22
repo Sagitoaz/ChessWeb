@@ -56,6 +56,12 @@ interface WaitingQueueEntry {
   preferredColor: PreferredColor;
 }
 
+type ActiveRankedMatchInfo = {
+  matchId: string;
+  whitePlayerId: string;
+  blackPlayerId: string;
+};
+
 @Injectable()
 export class CompetitionService {
   constructor(private readonly mongoService: MongoService) {
@@ -109,6 +115,89 @@ export class CompetitionService {
       rating?: number;
       updatedAt?: Date;
     }>("user_profiles");
+  }
+
+  private async getActiveRankedMatchForUser(
+    userId: string,
+  ): Promise<ActiveRankedMatchInfo | null> {
+    const match = await this.matchesCollection().findOne(
+      {
+        $or: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
+        status: { $in: ["active", "in_progress", "playing", "matched"] },
+      },
+      {
+        sort: { createdAt: -1, _id: -1 },
+        projection: {
+          _id: 1,
+          matchId: 1,
+          gameId: 1,
+          status: 1,
+          whitePlayerId: 1,
+          blackPlayerId: 1,
+        },
+      },
+    );
+
+    if (!match) return null;
+
+    const whitePlayerId = String(match.whitePlayerId || "");
+    const blackPlayerId = String(match.blackPlayerId || "");
+    if (!whitePlayerId || !blackPlayerId) return null;
+
+    const gameRef = match.gameId ?? match.matchId ?? match._id;
+    const gameQuery =
+      gameRef instanceof ObjectId
+        ? { _id: gameRef }
+        : typeof gameRef === "string" && ObjectId.isValid(gameRef)
+          ? { _id: new ObjectId(gameRef) }
+          : null;
+
+    if (gameQuery) {
+      const game = await this.gamesCollection().findOne(gameQuery, {
+        projection: {
+          _id: 1,
+          status: 1,
+          state: 1,
+          result: 1,
+          finishedAt: 1,
+          endReason: 1,
+        },
+      });
+
+      const gameCompleted = Boolean(
+        game?.finishedAt ||
+          String(game?.status || "").toLowerCase() === "completed" ||
+          String(game?.state || "").toLowerCase() === "finished" ||
+          game?.result,
+      );
+
+      if (gameCompleted) {
+        await this.matchesCollection().updateOne(
+          { _id: match._id },
+          {
+            $set: {
+              status: "completed",
+              finishedAt: game?.finishedAt ? new Date(game.finishedAt) : new Date(),
+              updatedAt: new Date(),
+              endReason:
+                typeof game?.endReason === "string" && game.endReason.length > 0
+                  ? game.endReason
+                  : "completed",
+            },
+          },
+        );
+        return null;
+      }
+    }
+
+    return {
+      matchId:
+        typeof match.matchId === "string" && match.matchId.length > 0
+          ? match.matchId
+          : match._id.toString(),
+      whitePlayerId,
+      blackPlayerId,
+    };
   }
 
   private initializeQueueIndexes(): void {
@@ -538,6 +627,45 @@ export class CompetitionService {
     payload: JoinRankedQueueDto,
   ): Promise<Record<string, unknown>> {
     const rankedQueue = this.queueCollection();
+    const activeMatch = await this.getActiveRankedMatchForUser(user.userId);
+    if (activeMatch) {
+      // Ensure we do not keep stale waiting entries while user is already in a live ranked match.
+      await rankedQueue.updateMany(
+        { userId: user.userId, status: "waiting" },
+        {
+          $set: {
+            status: "cancelled",
+            cancelledAt: new Date(),
+            updatedAt: new Date(),
+            cancelReason: "already_in_active_ranked_match",
+          },
+        },
+      );
+
+      return {
+        queueEntryId: null,
+        userId: user.userId,
+        status: "in_match",
+        matchId: activeMatch.matchId,
+        message: "User already has an active ranked match",
+      };
+    }
+
+    // If a previous matchmaking cycle already claimed this user but has not finished creating matchId yet,
+    // do not allow creating a fresh waiting row (prevents duplicate parallel matches).
+    const pendingClaim = await rankedQueue.findOne({
+      userId: user.userId,
+      status: "matched",
+      $or: [{ matchId: { $exists: false } }, { matchId: null }],
+    });
+    if (pendingClaim) {
+      return {
+        queueEntryId: pendingClaim._id?.toString?.() || null,
+        userId: user.userId,
+        status: "matching",
+        message: "User is already being matched",
+      };
+    }
 
     const existingWaitingEntries = (await rankedQueue
       .find({
@@ -1144,6 +1272,12 @@ export class CompetitionService {
     userId: string,
     timeControl?: RankedTimeControl,
   ): Promise<RankedMatchResult | null> {
+    const userActiveMatch = await this.getActiveRankedMatchForUser(userId);
+    if (userActiveMatch) {
+      await this.cancelWaitingQueueEntry(userId);
+      return null;
+    }
+
     const queue = this.queueCollection();
 
     const self = (await queue.findOne({
@@ -1179,15 +1313,25 @@ export class CompetitionService {
       })),
     );
 
-    const colorCompatibleCandidates = candidateRatings.filter(({ entry }) =>
-      this.isColorCompatible(self.preferredColor, entry.preferredColor),
+    const candidateRatingsWithoutActiveMatches = [];
+    for (const candidate of candidateRatings) {
+      const active = await this.getActiveRankedMatchForUser(candidate.entry.userId);
+      if (active) {
+        await this.cancelWaitingQueueEntry(candidate.entry.userId);
+        continue;
+      }
+      candidateRatingsWithoutActiveMatches.push(candidate);
+    }
+
+    const colorCompatibleCandidates = candidateRatingsWithoutActiveMatches.filter(
+      ({ entry }) => this.isColorCompatible(self.preferredColor, entry.preferredColor),
     );
 
     const candidatePool =
       colorCompatibleCandidates.length > 0 ||
       !this.shouldRelaxColorPreference(selfWaitSeconds)
         ? colorCompatibleCandidates
-        : candidateRatings;
+        : candidateRatingsWithoutActiveMatches;
 
     const validCandidates = candidatePool
       .map(({ entry, rating }) => {
@@ -1244,6 +1388,26 @@ export class CompetitionService {
     if (claimedOpponent.modifiedCount === 0) {
       await queue.updateOne(
         { _id: self._id, status: "matched" },
+        {
+          $set: {
+            status: "waiting",
+            updatedAt: new Date(),
+          },
+          $unset: {
+            matchedAt: "",
+          },
+        },
+      );
+      return null;
+    }
+
+    const [selfActiveAfterClaim, opponentActiveAfterClaim] = await Promise.all([
+      this.getActiveRankedMatchForUser(self.userId),
+      this.getActiveRankedMatchForUser(opponent.userId),
+    ]);
+    if (selfActiveAfterClaim || opponentActiveAfterClaim) {
+      await queue.updateMany(
+        { _id: { $in: [self._id, opponent._id] }, status: "matched" },
         {
           $set: {
             status: "waiting",
@@ -1337,6 +1501,7 @@ export class CompetitionService {
 
     const ratingCache = new Map<string, number | null>();
     const waitCache = new Map<string, number>();
+    const activeMatchCache = new Map<string, ActiveRankedMatchInfo | null>();
 
     const getWaitSeconds = (entry: WaitingQueueEntry): number => {
       const key = entry._id.toString();
@@ -1373,8 +1538,21 @@ export class CompetitionService {
       }
     };
 
+    const hasActiveMatch = async (userId: string): Promise<boolean> => {
+      if (activeMatchCache.has(userId)) {
+        return Boolean(activeMatchCache.get(userId));
+      }
+      const active = await this.getActiveRankedMatchForUser(userId);
+      activeMatchCache.set(userId, active);
+      return Boolean(active);
+    };
+
     for (let i = 0; i < waitingEntries.length - 1; i += 1) {
       const first = waitingEntries[i];
+      if (await hasActiveMatch(first.userId)) {
+        await this.cancelWaitingQueueEntry(first.userId);
+        continue;
+      }
       const firstRating = await getRatingSafe(first);
       if (firstRating === null) continue;
 
@@ -1382,6 +1560,10 @@ export class CompetitionService {
         const second = waitingEntries[j];
         if (first.userId === second.userId) continue;
         if (first.timeControl !== second.timeControl) continue;
+        if (await hasActiveMatch(second.userId)) {
+          await this.cancelWaitingQueueEntry(second.userId);
+          continue;
+        }
 
         const secondRating = await getRatingSafe(second);
         if (secondRating === null) continue;
@@ -1430,6 +1612,54 @@ export class CompetitionService {
         ]);
 
         if (claimed[0].modifiedCount === 0 || claimed[1].modifiedCount === 0) {
+          if (claimed[0].modifiedCount > 0) {
+            await this.queueCollection().updateOne(
+              { _id: first._id, status: "matched" },
+              {
+                $set: {
+                  status: "waiting",
+                  updatedAt: new Date(),
+                },
+                $unset: {
+                  matchedAt: "",
+                },
+              },
+            );
+          }
+          if (claimed[1].modifiedCount > 0) {
+            await this.queueCollection().updateOne(
+              { _id: second._id, status: "matched" },
+              {
+                $set: {
+                  status: "waiting",
+                  updatedAt: new Date(),
+                },
+                $unset: {
+                  matchedAt: "",
+                },
+              },
+            );
+          }
+          continue;
+        }
+
+        const [firstActiveAfterClaim, secondActiveAfterClaim] = await Promise.all([
+          this.getActiveRankedMatchForUser(first.userId),
+          this.getActiveRankedMatchForUser(second.userId),
+        ]);
+        if (firstActiveAfterClaim || secondActiveAfterClaim) {
+          await this.queueCollection().updateMany(
+            { _id: { $in: [first._id, second._id] }, status: "matched" },
+            {
+              $set: {
+                status: "waiting",
+                updatedAt: new Date(),
+              },
+              $unset: {
+                matchedAt: "",
+              },
+            },
+          );
           continue;
         }
 

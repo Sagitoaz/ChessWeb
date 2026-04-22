@@ -35,6 +35,23 @@ const findMatchByGameId = (rounds, targetGameId) => {
   return null
 }
 
+const normalizeId = (value) => {
+  if (!value) return ''
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    const objectIdMatch = trimmed.match(/^ObjectId\("([a-fA-F0-9]{24})"\)$/)
+    return objectIdMatch?.[1] || trimmed
+  }
+  if (typeof value === 'object') {
+    if (typeof value.$oid === 'string') return value.$oid
+    if (typeof value.id === 'string') return value.id
+    if (typeof value._id === 'string') return value._id
+    if (typeof value.userId === 'string') return value.userId
+    if (typeof value.sub === 'string') return value.sub
+  }
+  return String(value)
+}
+
 export default function TournamentMatchPlayPage() {
   const navigate = useNavigate()
   const { tournamentId, gameId } = useParams()
@@ -60,7 +77,9 @@ export default function TournamentMatchPlayPage() {
 
   const chessRef = useRef(new Chess(INITIAL_FEN))
 
-  const currentUserId = authUser?.id || authUser?.userId || authUser?._id || authUser?.sub || null
+  const currentUserId = normalizeId(
+    authUser?.id || authUser?.userId || authUser?._id || authUser?.sub || null
+  )
 
   const {
     isConnected: isSocketConnected,
@@ -84,13 +103,13 @@ export default function TournamentMatchPlayPage() {
       const payload = await gameService.getGameById(gameId)
       const game = payload?.data ?? payload
 
-      const whitePlayerId = String(game?.whitePlayerId || '')
-      const blackPlayerId = String(game?.blackPlayerId || '')
+      const whitePlayerId = normalizeId(game?.whitePlayerId)
+      const blackPlayerId = normalizeId(game?.blackPlayerId)
 
       if (
         currentUserId &&
-        whitePlayerId !== String(currentUserId) &&
-        blackPlayerId !== String(currentUserId)
+        whitePlayerId !== currentUserId &&
+        blackPlayerId !== currentUserId
       ) {
         showNotification({
           type: 'error',
@@ -102,7 +121,11 @@ export default function TournamentMatchPlayPage() {
 
       setWhitePlayerId(whitePlayerId)
       setBlackPlayerId(blackPlayerId)
-      setPlayerColor(whitePlayerId === String(currentUserId) ? 'white' : 'black')
+      if (whitePlayerId && whitePlayerId === currentUserId) {
+        setPlayerColor('white')
+      } else if (blackPlayerId && blackPlayerId === currentUserId) {
+        setPlayerColor('black')
+      }
       setWhiteName(game?.whitePlayer?.username || game?.whiteUsername || 'Người chơi Trắng')
       setBlackName(game?.blackPlayer?.username || game?.blackUsername || 'Người chơi Đen')
 
@@ -134,7 +157,7 @@ export default function TournamentMatchPlayPage() {
 
         const participants = Array.isArray(tournament?.participants) ? tournament.participants : []
         const me = participants.find(
-          (participant) => String(participant?.userId || '') === String(currentUserId || '')
+          (participant) => normalizeId(participant?.userId || '') === currentUserId
         )
         const status = me?.status || null
         setParticipantStatus(status)

@@ -1263,9 +1263,9 @@ const RankedGamePage = () => {
   const ratingChange = Number(persistedResultData?.player?.ratingDelta ?? fallbackRatingChange)
   const newRating = Number(persistedResultData?.player?.ratingAfter ?? player.rating + ratingChange)
 
-  // Board orientation: top = opponent, bottom = player
-  const topPlayer = isWhite ? opponent : player
-  const bottomPlayer = isWhite ? player : opponent
+  // Board orientation: luôn hiển thị đối thủ ở trên, người chơi ở dưới.
+  const topPlayer = opponent
+  const bottomPlayer = player
   const topTime = isWhite ? blackTime : whiteTime
   const bottomTime = isWhite ? whiteTime : blackTime
 
