@@ -105,6 +105,8 @@ export default function BotGamePage() {
   const [isHintLoading, setIsHintLoading] = useState(false)
   const [hintError, setHintError] = useState('')
   const abandonWithoutSaveRef = useRef(false)
+  const lastHintRequestedPlyRef = useRef(0)
+  const hintRequestSeqRef = useRef(0)
 
   const buildReplayMoves = useCallback(() => {
     try {
@@ -368,36 +370,101 @@ export default function BotGamePage() {
     setGameState('Finished')
   }
 
-  const handleRefreshHint = async () => {
-    if (gameState !== 'InGame' && gameState !== 'Paused') return
+  const requestTacticalHint = useCallback(
+    async ({ manual = false } = {}) => {
+      if (gameState !== 'InGame' && gameState !== 'Paused') return
+      if (isHintLoading) return
 
-    const pgn = chess.pgn()
-    if (!pgn || pgn.trim().length < 8) {
-      setTacticalHint(`Bạn đang cầm quân ${playerSideLabel}. Cần thêm vài nước đi nữa để đưa gợi ý ngắn gọn.`)
-      setHintError('')
-      setIsHintLoading(false)
-      return
-    }
-
-    setIsHintLoading(true)
-    setHintError('')
-
-    try {
-      const data = await botGameAPI.getTacticalHint(pgn, 'quick', {
-        playerSide: playerSideLabel,
-        playerColor,
-      })
-      const hint = String(data?.hint || '').trim()
-      if (!hint) {
-        throw new Error('empty hint')
+      const pgn = chess.pgn()
+      if (!pgn || pgn.trim().length < 8) {
+        setTacticalHint(
+          `Bạn đang cầm quân ${playerSideLabel}. Cần thêm vài nước đi nữa để đưa gợi ý ngắn gọn.`
+        )
+        setHintError('')
+        return
       }
-      setTacticalHint(`Bạn đang cầm quân ${playerSideLabel}. ${hint}`)
-    } catch {
-      setHintError('Gia sư đang bận, thử lại sau.')
-    } finally {
-      setIsHintLoading(false)
-    }
-  }
+
+      const requestId = hintRequestSeqRef.current + 1
+      hintRequestSeqRef.current = requestId
+      setIsHintLoading(true)
+      setHintError('')
+
+      try {
+        const responsePromise = botGameAPI.getTacticalHint(pgn, 'quick', {
+          playerSide: playerSideLabel,
+          playerColor,
+        })
+
+        const data = await Promise.race([
+          responsePromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('hint_timeout')), 12000)
+          ),
+        ])
+        if (requestId !== hintRequestSeqRef.current) return
+
+        const payload =
+          data && typeof data === 'object' && data.data && typeof data.data === 'object'
+            ? data.data
+            : data
+        const hint = String(
+          payload?.hint ||
+            payload?.coachHint ||
+            payload?.analysis?.hint ||
+            payload?.aiCommentary ||
+            payload?.message ||
+            ''
+        ).trim()
+        if (!hint) {
+          throw new Error('empty_hint')
+        }
+
+        setTacticalHint(`Bạn đang cầm quân ${playerSideLabel}. ${hint}`)
+        setHintError('')
+      } catch (error) {
+        if (requestId !== hintRequestSeqRef.current) return
+        const message =
+          error?.message === 'hint_timeout'
+            ? 'Phân tích đang chậm, bạn bấm "Xin gợi ý nhanh" để thử lại.'
+            : 'Gia sư đang bận, thử lại sau.'
+        setHintError(message)
+        if (manual) {
+          setTacticalHint((prev) =>
+            prev && prev.trim().length > 0
+              ? prev
+              : `Bạn đang cầm quân ${playerSideLabel}. Ưu tiên an toàn vua, phát triển quân nhẹ và kiểm soát trung tâm.`
+          )
+        }
+      } finally {
+        if (requestId === hintRequestSeqRef.current) {
+          setIsHintLoading(false)
+        }
+      }
+    },
+    [chess, gameState, isHintLoading, playerColor, playerSideLabel]
+  )
+
+  const handleRefreshHint = useCallback(() => {
+    void requestTacticalHint({ manual: true })
+  }, [requestTacticalHint])
+
+  useEffect(() => {
+    if (gameState !== 'InGame') return
+    if (isBotThinking) return
+    if (moveHistory.length < 1) return
+
+    const botColor = playerColor === 'White' ? 'Black' : 'White'
+    const lastMove = moveHistory[moveHistory.length - 1]
+    if (!lastMove || lastMove.color !== botColor) return
+    if (lastHintRequestedPlyRef.current === moveHistory.length) return
+
+    lastHintRequestedPlyRef.current = moveHistory.length
+    const timer = setTimeout(() => {
+      void requestTacticalHint({ manual: false })
+    }, 350)
+
+    return () => clearTimeout(timer)
+  }, [gameState, isBotThinking, moveHistory, playerColor, requestTacticalHint])
 
   // ── Navigate-away forfeit: block browser tab close/refresh ──
   const gameActive = gameState === 'InGame' || gameState === 'Paused'
@@ -711,8 +778,14 @@ export default function BotGamePage() {
                 </button>
               </div>
               <div className="mt-2 rounded-lg border border-amber-100 bg-white p-2.5 text-sm text-gray-700 max-h-32 overflow-y-auto">
-                {isHintLoading ? 'Đang tổng hợp gợi ý chiến thuật...' : hintError || tacticalHint}
+                {tacticalHint && tacticalHint.trim().length > 0
+                  ? tacticalHint
+                  : `Bạn đang cầm quân ${playerSideLabel}. Ưu tiên an toàn vua, phát triển quân nhẹ và kiểm soát trung tâm.`}
+                {isHintLoading && (
+                  <p className="mt-2 text-[11px] text-amber-600">Đang tổng hợp gợi ý chiến thuật...</p>
+                )}
               </div>
+              {hintError && <p className="mt-1 text-[11px] text-red-600">{hintError}</p>}
               <p className="mt-1 text-[11px] text-amber-700">
                 Gợi ý theo yêu cầu, tập trung lưu ý chiến thuật và cạm bẫy, không đưa nước đi cụ
                 thể.

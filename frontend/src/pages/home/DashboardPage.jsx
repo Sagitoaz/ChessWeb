@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Avatar } from '@/components/common'
 import { useAuthStore } from '@/store'
@@ -216,47 +216,73 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [rankedStats, setRankedStats] = useState(null)
   const [matches, setMatches] = useState([])
+  const loadSeqRef = useRef(0)
 
   useEffect(() => {
     if (!hasHydrated || !token) return
 
     let mounted = true
+    const requestSeq = loadSeqRef.current + 1
+    loadSeqRef.current = requestSeq
 
     const load = async () => {
       setLoading(true)
-      const profileTask = currentUserId ? Promise.resolve({ user }) : authService.getCurrentUser()
+      try {
+        const storeUser = useAuthStore.getState().user
+        const profileTask = currentUserId
+          ? Promise.resolve({ user: storeUser })
+          : authService.getCurrentUser()
 
-      const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
-        profileTask,
-        gameService.getAllUserGames(),
-        gameService.getRankedStats(),
-      ])
+        const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
+          profileTask,
+          gameService.getAllUserGames(),
+          gameService.getRankedStats(),
+        ])
 
-      if (!mounted) return
+        if (!mounted || loadSeqRef.current !== requestSeq) return
 
-      const gamesHistory = gamesResult.status === 'fulfilled' ? gamesResult.value : { items: [] }
-      setMatches(normalizeHistoryPayload(gamesHistory, currentUsername))
+        const gamesHistory = gamesResult.status === 'fulfilled' ? gamesResult.value : { items: [] }
+        setMatches(normalizeHistoryPayload(gamesHistory, currentUsername))
 
-      if (profileResult.status === 'fulfilled') {
-        const profileData = profileResult.value?.data ?? profileResult.value
-        const nextUser = profileData?.user ?? profileData
-        if (nextUser && token) {
-          const stats = rankedStatsResult.status === 'fulfilled' ? rankedStatsResult.value : null
-          setAuthLogin(
-            {
+        if (profileResult.status === 'fulfilled') {
+          const profileData = profileResult.value?.data ?? profileResult.value
+          const nextUser = profileData?.user ?? profileData
+          if (nextUser && token) {
+            const stats = rankedStatsResult.status === 'fulfilled' ? rankedStatsResult.value : null
+            const mergedUser = {
               ...nextUser,
               rating: Number(stats?.currentRating ?? nextUser.rating ?? 1200),
-            },
-            token
-          )
+            }
+            const currentStoreUser = useAuthStore.getState().user
+            const shouldSyncUser =
+              !currentStoreUser ||
+              currentStoreUser.id !== mergedUser.id ||
+              currentStoreUser.username !== mergedUser.username ||
+              Number(currentStoreUser.rating ?? 0) !== Number(mergedUser.rating ?? 0) ||
+              Number(currentStoreUser.gamesPlayed ?? 0) !== Number(mergedUser.gamesPlayed ?? 0) ||
+              Number(currentStoreUser.wins ?? 0) !== Number(mergedUser.wins ?? 0) ||
+              Number(currentStoreUser.losses ?? 0) !== Number(mergedUser.losses ?? 0) ||
+              Number(currentStoreUser.draws ?? 0) !== Number(mergedUser.draws ?? 0) ||
+              (currentStoreUser.avatarUrl || '') !== (mergedUser.avatarUrl || '')
+
+            if (shouldSyncUser) {
+              setAuthLogin(mergedUser, token)
+            }
+          }
+        }
+
+        if (rankedStatsResult.status === 'fulfilled') {
+          setRankedStats(rankedStatsResult.value)
+        }
+      } catch {
+        if (!mounted || loadSeqRef.current !== requestSeq) return
+        setMatches([])
+        setRankedStats(null)
+      } finally {
+        if (mounted && loadSeqRef.current === requestSeq) {
+          setLoading(false)
         }
       }
-
-      if (rankedStatsResult.status === 'fulfilled') {
-        setRankedStats(rankedStatsResult.value)
-      }
-
-      setLoading(false)
     }
 
     void load()
@@ -264,7 +290,7 @@ export default function DashboardPage() {
     return () => {
       mounted = false
     }
-  }, [currentUserId, currentUsername, hasHydrated, setAuthLogin, token, user])
+  }, [currentUserId, currentUsername, hasHydrated, setAuthLogin, token])
 
   const analytics = useMemo(() => {
     const totalGames = matches.length
