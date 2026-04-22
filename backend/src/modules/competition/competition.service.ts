@@ -58,7 +58,9 @@ interface WaitingQueueEntry {
 
 @Injectable()
 export class CompetitionService {
-  constructor(private readonly mongoService: MongoService) {}
+  constructor(private readonly mongoService: MongoService) {
+    this.initializeQueueIndexes();
+  }
 
   private readonly logger = new Logger(CompetitionService.name);
 
@@ -107,6 +109,76 @@ export class CompetitionService {
       rating?: number;
       updatedAt?: Date;
     }>("user_profiles");
+  }
+
+  private initializeQueueIndexes(): void {
+    void this.ensureQueueIndexes().catch((error) => {
+      this.logger.warn(
+        `Cannot initialize ranked queue indexes: ${(error as Error).message}`,
+      );
+    });
+  }
+
+  private async ensureQueueIndexes(): Promise<void> {
+    const queue = this.queueCollection();
+
+    // Best-effort cleanup to avoid unique-index creation failures caused by old duplicate rows.
+    await this.cleanupDuplicateWaitingEntries();
+
+    await Promise.all([
+      queue.createIndex(
+        { status: 1, timeControl: 1, joinedAt: 1, _id: 1 },
+        { name: "ranked_queue_waiting_scan" },
+      ),
+      queue.createIndex(
+        { userId: 1 },
+        {
+          name: "ranked_queue_unique_waiting_user",
+          unique: true,
+          partialFilterExpression: { status: "waiting" },
+        },
+      ),
+    ]);
+  }
+
+  private async cleanupDuplicateWaitingEntries(): Promise<void> {
+    const queue = this.queueCollection();
+    const waiting = (await queue
+      .find({ status: "waiting" })
+      .sort({ joinedAt: 1, _id: 1 })
+      .toArray()) as QueueEntryDoc[];
+
+    if (!Array.isArray(waiting) || waiting.length < 2) {
+      return;
+    }
+
+    const seenUsers = new Set<string>();
+    const duplicateIds: ObjectId[] = [];
+
+    for (const entry of waiting) {
+      if (seenUsers.has(entry.userId)) {
+        duplicateIds.push(entry._id);
+        continue;
+      }
+      seenUsers.add(entry.userId);
+    }
+
+    if (duplicateIds.length === 0) {
+      return;
+    }
+
+    const now = new Date();
+    await queue.updateMany(
+      { _id: { $in: duplicateIds }, status: "waiting" },
+      {
+        $set: {
+          status: "cancelled",
+          cancelledAt: now,
+          updatedAt: now,
+          cancelReason: "duplicate_waiting_entry",
+        },
+      },
+    );
   }
 
   private expectedScore(playerRating: number, opponentRating: number): number {
@@ -422,10 +494,43 @@ export class CompetitionService {
       match.timeControl = timeControl;
     }
 
-    return (await this.queueCollection()
+    const entries = (await this.queueCollection()
       .find(match)
       .sort({ joinedAt: 1, _id: 1 })
       .toArray()) as WaitingQueueEntry[];
+
+    if (!Array.isArray(entries) || entries.length < 2) {
+      return entries;
+    }
+
+    const seenUsers = new Set<string>();
+    const uniqueEntries: WaitingQueueEntry[] = [];
+    const duplicateIds: ObjectId[] = [];
+    for (const entry of entries) {
+      if (seenUsers.has(entry.userId)) {
+        duplicateIds.push(entry._id);
+        continue;
+      }
+      seenUsers.add(entry.userId);
+      uniqueEntries.push(entry);
+    }
+
+    if (duplicateIds.length > 0) {
+      const now = new Date();
+      await this.queueCollection().updateMany(
+        { _id: { $in: duplicateIds }, status: "waiting" },
+        {
+          $set: {
+            status: "cancelled",
+            cancelledAt: now,
+            updatedAt: now,
+            cancelReason: "duplicate_waiting_entry",
+          },
+        },
+      );
+    }
+
+    return uniqueEntries;
   }
 
   async joinQueue(
@@ -434,10 +539,32 @@ export class CompetitionService {
   ): Promise<Record<string, unknown>> {
     const rankedQueue = this.queueCollection();
 
-    const existingWaiting = await rankedQueue.findOne({
-      userId: user.userId,
-      status: "waiting",
-    });
+    const existingWaitingEntries = (await rankedQueue
+      .find({
+        userId: user.userId,
+        status: "waiting",
+      })
+      .sort({ joinedAt: 1, _id: 1 })
+      .toArray()) as QueueEntryDoc[];
+    const existingWaiting = existingWaitingEntries[0] || null;
+    if (existingWaitingEntries.length > 1) {
+      const duplicateIds = existingWaitingEntries
+        .slice(1)
+        .map((entry) => entry._id);
+      const now = new Date();
+      await rankedQueue.updateMany(
+        { _id: { $in: duplicateIds }, status: "waiting" },
+        {
+          $set: {
+            status: "cancelled",
+            cancelledAt: now,
+            updatedAt: now,
+            cancelReason: "duplicate_waiting_entry",
+          },
+        },
+      );
+    }
+
     if (existingWaiting) {
       return {
         queueEntryId: existingWaiting._id?.toString?.() || null,
@@ -464,15 +591,45 @@ export class CompetitionService {
     const preferredColor = payload.preferredColor || PreferredColor.RANDOM;
 
     const now = new Date();
-    const insertResult = await rankedQueue.insertOne({
-      userId: user.userId,
-      status: "waiting",
-      joinedAt: now,
-      updatedAt: now,
-      timeControl,
-      preferredColor,
-      ratingSnapshot: userRating,
-    });
+    let insertResult: { insertedId: ObjectId };
+    try {
+      insertResult = await rankedQueue.insertOne({
+        userId: user.userId,
+        status: "waiting",
+        joinedAt: now,
+        updatedAt: now,
+        timeControl,
+        preferredColor,
+        ratingSnapshot: userRating,
+      });
+    } catch (error: any) {
+      // When concurrent join requests happen, unique waiting index may reject duplicates.
+      if (error?.code === 11000) {
+        const existing = (await rankedQueue.findOne({
+          userId: user.userId,
+          status: "waiting",
+        })) as QueueEntryDoc | null;
+        if (existing) {
+          return {
+            queueEntryId: existing._id?.toString?.() || null,
+            userId: user.userId,
+            rating: userRating,
+            status: "waiting",
+            joinedAt:
+              existing.joinedAt instanceof Date
+                ? existing.joinedAt.toISOString()
+                : now.toISOString(),
+            timeControl:
+              existing.timeControl || payload.timeControl || RankedTimeControl.BLITZ,
+            preferredColor:
+              existing.preferredColor ||
+              payload.preferredColor ||
+              PreferredColor.RANDOM,
+          };
+        }
+      }
+      throw error;
+    }
 
     return {
       queueEntryId: insertResult.insertedId.toString(),
@@ -1223,6 +1380,7 @@ export class CompetitionService {
 
       for (let j = i + 1; j < waitingEntries.length; j += 1) {
         const second = waitingEntries[j];
+        if (first.userId === second.userId) continue;
         if (first.timeControl !== second.timeControl) continue;
 
         const secondRating = await getRatingSafe(second);

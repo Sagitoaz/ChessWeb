@@ -81,6 +81,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly matchBySocketId = new Map<string, string>();
   private readonly matchmakingTickMs = 3000;
   private matchmakingTimer: NodeJS.Timeout | null = null;
+  private isMatchmakingCycleRunning = false;
   private readonly logger = new Logger(RankedGateway.name);
 
   constructor(
@@ -374,6 +375,10 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private async runMatchmakingCycle(
     timeControl?: RankedTimeControl,
   ): Promise<void> {
+    if (this.isMatchmakingCycleRunning) {
+      return;
+    }
+    this.isMatchmakingCycleRunning = true;
     try {
       let created = 0;
       let match = await this.competitionService.tryMatchNextPair(timeControl);
@@ -395,6 +400,8 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.error(
         `Matchmaking cycle failed (tc=${timeControl || "all"}): ${(error as Error).message}`,
       );
+    } finally {
+      this.isMatchmakingCycleRunning = false;
     }
   }
 

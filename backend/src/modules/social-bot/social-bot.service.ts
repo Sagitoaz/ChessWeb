@@ -1482,10 +1482,17 @@ export class SocialBotService {
       profiles.map((profile: any) => [String(profile?._id || ""), profile]),
     );
 
-    const items = rooms.map((room: any) => {
+    const items = rooms
+      .map((room: any) => {
       const roomId = String(room?._id || "");
       const roomMembers = membersByRoomId.get(roomId) || [];
       const ownerUserId = String(room?.ownerUserId || "");
+      const ownerStillPresent = roomMembers.some(
+        (member) => String(member?.userId || "") === ownerUserId,
+      );
+      if (!ownerUserId || !ownerStillPresent) {
+        return null;
+      }
       const ownerProfile = profileMap.get(ownerUserId);
       const playerCount = Math.max(
         Number(room?.playerCount || 0),
@@ -1534,7 +1541,8 @@ export class SocialBotService {
         createdAt: room?.createdAt || null,
         updatedAt: room?.updatedAt || null,
       };
-    });
+      })
+      .filter((item) => item !== null) as Array<Record<string, unknown>>;
 
     const allowedStatuses = new Set(statuses.map((status) => status.toLowerCase()));
     const filteredItems = items.filter((item) =>

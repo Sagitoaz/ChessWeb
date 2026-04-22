@@ -10,11 +10,9 @@ const gameAPI = api
 
 const unwrapApiEnvelope = (payload) => payload?.data ?? payload
 const USER_GAMES_CACHE_TTL_MS = 20000
-const PUBLIC_ROOMS_CACHE_TTL_MS = 10000
 const userGamesCache = new Map()
-const publicRoomsCache = new Map()
 const clearPublicRoomsCache = () => {
-  publicRoomsCache.clear()
+  // No-op: public rooms should always be fetched fresh to avoid stale room visibility.
 }
 
 const normalizeRankedResult = (result) => {
@@ -712,13 +710,6 @@ const gameService = {
   getPublicRooms: async (filters = {}) => {
     const status = typeof filters.status === 'string' ? filters.status : 'waiting'
     const limit = Math.min(Math.max(Number(filters.limit || 30), 1), 100)
-    const forceRefresh = Boolean(filters.forceRefresh)
-    const cacheKey = JSON.stringify({ status, limit })
-    const cached = publicRoomsCache.get(cacheKey)
-
-    if (!forceRefresh && cached && Date.now() - cached.cachedAt < PUBLIC_ROOMS_CACHE_TTL_MS) {
-      return cached.data
-    }
 
     const response = await gameAPI.get('/rooms', {
       params: {
@@ -733,7 +724,6 @@ const gameService = {
       items,
       total: Number(data?.total ?? items.length),
     }
-    publicRoomsCache.set(cacheKey, { data: normalized, cachedAt: Date.now() })
     return normalized
   },
 

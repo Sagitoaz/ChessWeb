@@ -53,7 +53,7 @@ const BOT_LEVELS = [
     level: 4,
     name: 'Siêu cấp khó',
     icon: Skull,
-    ratingRange: 'Stockfish tối đa',
+    ratingRange: '3200+',
     depth: 40,
     timeLimitMs: 12000,
     description: 'Giới hạn cao nhất, chỉ để thử sức',
