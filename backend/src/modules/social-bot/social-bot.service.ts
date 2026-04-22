@@ -1273,7 +1273,11 @@ export class SocialBotService {
 
     return {
       ...room,
-      playerCount: Number(room?.playerCount || normalizedMembers.length || 0),
+      playerCount: Math.max(
+        Number(room?.playerCount || 0),
+        normalizedMembers.length,
+        room?.ownerUserId ? 1 : 0,
+      ),
       members: normalizedMembers,
     };
   }
@@ -1337,8 +1341,10 @@ export class SocialBotService {
       const roomMembers = membersByRoomId.get(roomId) || [];
       const ownerUserId = String(room?.ownerUserId || "");
       const ownerProfile = profileMap.get(ownerUserId);
-      const playerCount = Number(
-        room?.playerCount || roomMembers.length || (ownerUserId ? 1 : 0),
+      const playerCount = Math.max(
+        Number(room?.playerCount || 0),
+        roomMembers.length,
+        ownerUserId ? 1 : 0,
       );
       const maxPlayers = Number(room?.maxPlayers || 2);
       const status = String(room?.status || "waiting");

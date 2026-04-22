@@ -33,6 +33,53 @@ const normalizeRankedResult = (result) => {
   return 'draw'
 }
 
+const normalizeEndReason = (reason, result) => {
+  const value = typeof reason === 'string' ? reason.trim().toLowerCase() : ''
+
+  if (
+    value === 'checkmate' ||
+    value === 'resignation' ||
+    value === 'forfeit' ||
+    value === 'timeout' ||
+    value === 'stalemate' ||
+    value === 'draw' ||
+    value === 'aborted' ||
+    value === 'completed'
+  ) {
+    return value
+  }
+
+  if (
+    value === 'forfeit_leave' ||
+    value === 'forfeit_navigation' ||
+    value === 'manual_forfeit' ||
+    value === 'disconnect_forfeit' ||
+    value === 'no_show_forfeit'
+  ) {
+    return 'forfeit'
+  }
+
+  if (
+    value === 'draw_agreement' ||
+    value === 'agreement_draw' ||
+    value === 'threefold_repetition' ||
+    value === 'insufficient_material' ||
+    value === 'fifty_move_rule' ||
+    value === '1/2-1/2'
+  ) {
+    return 'draw'
+  }
+
+  if (value === 'time_out' || value === 'out_of_time' || value === 'flag') {
+    return 'timeout'
+  }
+
+  if (value === 'abort') return 'aborted'
+  if (value === 'game_end') return 'completed'
+
+  return result === 'draw' ? 'draw' : 'completed'
+}
+
 const normalizeRankedHistory = (payload) => {
   const data = unwrapApiEnvelope(payload)
   const items = Array.isArray(data?.matches)
@@ -41,27 +88,31 @@ const normalizeRankedHistory = (payload) => {
       ? data.items
       : []
 
-  const matches = items.map((item) => ({
-    id: item.id || item.gameId || item._id,
-    opponent: {
-      username:
-        item.opponent?.username ||
-        item.opponentUsername ||
-        item.blackUsername ||
-        item.whiteUsername ||
-        item.opponentId ||
-        'Unknown',
-      rating: Number(item.opponent?.rating ?? item.opponentRating ?? item.rating ?? 1200),
-      avatarUrl: item.opponent?.avatarUrl || item.opponentAvatarUrl || null,
-    },
-    result: normalizeRankedResult(item.result),
-    ratingChange: Number(item.ratingChange || item.eloChange || 0),
-    playerColor: item.playerColor || item.color || 'white',
-    endReason: item.endReason || item.finishReason || 'draw',
-    moves: Number(item.moves || item.totalMoves || 0),
-    duration: Number(item.duration || item.durationSeconds || 0),
-    playedAt: item.playedAt || item.finishedAt || item.createdAt || new Date().toISOString(),
-  }))
+  const matches = items.map((item) => {
+    const result = normalizeRankedResult(item.result)
+
+    return {
+      id: item.id || item.gameId || item._id,
+      opponent: {
+        username:
+          item.opponent?.username ||
+          item.opponentUsername ||
+          item.blackUsername ||
+          item.whiteUsername ||
+          item.opponentId ||
+          'Unknown',
+        rating: Number(item.opponent?.rating ?? item.opponentRating ?? item.rating ?? 1200),
+        avatarUrl: item.opponent?.avatarUrl || item.opponentAvatarUrl || null,
+      },
+      result,
+      ratingChange: Number(item.ratingChange || item.eloChange || 0),
+      playerColor: item.playerColor || item.color || 'white',
+      endReason: normalizeEndReason(item.endReason || item.finishReason || '', result),
+      moves: Number(item.moves || item.totalMoves || 0),
+      duration: Number(item.duration || item.durationSeconds || 0),
+      playedAt: item.playedAt || item.finishedAt || item.createdAt || new Date().toISOString(),
+    }
+  })
 
   const page = Number(data?.pagination?.page || data?.page || 1)
   const pageSize = Number(

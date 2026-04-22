@@ -143,6 +143,55 @@ export class CompetitionService {
     return userId === blackPlayerId ? "win" : "lose";
   }
 
+  private normalizeEndReason(
+    reason: unknown,
+    result?: "1-0" | "0-1" | "draw",
+  ): string {
+    const value =
+      typeof reason === "string" ? reason.trim().toLowerCase() : "";
+
+    if (!value) {
+      return result === "draw" ? "draw" : "completed";
+    }
+
+    if (value === "checkmate" || value === "mate") return "checkmate";
+    if (value === "resignation" || value === "resign") return "resignation";
+    if (
+      value === "forfeit" ||
+      value === "forfeit_leave" ||
+      value === "forfeit_navigation" ||
+      value === "disconnect_forfeit" ||
+      value === "manual_forfeit" ||
+      value === "no_show_forfeit"
+    ) {
+      return "forfeit";
+    }
+    if (
+      value === "timeout" ||
+      value === "time_out" ||
+      value === "out_of_time" ||
+      value === "flag"
+    ) {
+      return "timeout";
+    }
+    if (value === "stalemate") return "stalemate";
+    if (
+      value === "draw" ||
+      value === "draw_agreement" ||
+      value === "agreement_draw" ||
+      value === "threefold_repetition" ||
+      value === "insufficient_material" ||
+      value === "fifty_move_rule" ||
+      value === "1/2-1/2"
+    ) {
+      return "draw";
+    }
+    if (value === "aborted" || value === "abort") return "aborted";
+    if (value === "completed" || value === "game_end") return "completed";
+
+    return result === "draw" ? "draw" : "completed";
+  }
+
   private async updateUserRatingAfterMatch(
     userId: string,
     nextRating: number,
@@ -578,6 +627,10 @@ export class CompetitionService {
     const { persistedResult, whiteScore } = this.mapCompletionResult(
       payload.result,
     );
+    const normalizedEndReason = this.normalizeEndReason(
+      payload.reason,
+      persistedResult,
+    );
 
     const kFactor = 32;
     const whiteDelta = Math.round(
@@ -602,7 +655,7 @@ export class CompetitionService {
           result: persistedResult,
           status: "completed",
           state: "Finished",
-          endReason: payload.reason || null,
+          endReason: normalizedEndReason,
           moves: Array.isArray(payload.moves)
             ? payload.moves
             : game.moves || [],
@@ -618,7 +671,7 @@ export class CompetitionService {
         $set: {
           status: "completed",
           result: persistedResult,
-          endReason: payload.reason || null,
+          endReason: normalizedEndReason,
           finishedAt: now,
           whiteRatingBefore,
           blackRatingBefore,
@@ -664,7 +717,7 @@ export class CompetitionService {
       matchId: String(match.matchId || matchId),
       alreadyCompleted: false,
       result: persistedResult,
-      endReason: payload.reason || null,
+      endReason: normalizedEndReason,
       player: {
         userId: user.userId,
         outcome: playerOutcome,
@@ -1509,12 +1562,14 @@ export class CompetitionService {
           totalMoves: Array.isArray(item.moves)
             ? item.moves.length
             : Number(item?.metadata?.totalMoves ?? 0),
-          endReason:
+          endReason: this.normalizeEndReason(
             typeof item?.endReason === "string"
               ? item.endReason
               : typeof item?.metadata?.endReason === "string"
                 ? item.metadata.endReason
-                : "draw",
+                : null,
+            persistedResult,
+          ),
         };
       }),
       pagination: {

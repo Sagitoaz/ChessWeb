@@ -10,6 +10,7 @@ import {
   Crown,
   Flag,
   Handshake,
+  AlertTriangle,
   Timer,
   ArrowLeft,
   Eye,
@@ -38,9 +39,12 @@ const RESULT_FILTERS = [
 const END_REASON_ICONS = {
   checkmate: { icon: Crown, label: 'Checkmate', color: 'text-yellow-400' },
   resignation: { icon: Flag, label: 'Resignation', color: 'text-red-400' },
+  forfeit: { icon: Flag, label: 'Forfeit', color: 'text-red-500' },
   timeout: { icon: Timer, label: 'Timeout', color: 'text-orange-400' },
   draw: { icon: Handshake, label: 'Draw', color: 'text-blue-400' },
   stalemate: { icon: Handshake, label: 'Stalemate', color: 'text-gray-400' },
+  completed: { icon: Swords, label: 'Completed', color: 'text-gray-400' },
+  aborted: { icon: AlertTriangle, label: 'Aborted', color: 'text-amber-400' },
 }
 
 const RESULT_BADGE = {

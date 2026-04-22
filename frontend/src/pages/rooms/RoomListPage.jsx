@@ -64,19 +64,24 @@ const saveRecentRoomCode = (code) => {
 const mapRoomCard = (room) => {
   const members = Array.isArray(room?.members) ? room.members : []
   const ownerMember = members.find((member) => String(member?.role || '').toLowerCase() === 'owner')
+  const playerCount = Math.max(
+    Number(room?.playerCount || 0),
+    members.length,
+    room?.host?.userId || room?.ownerUserId ? 1 : 0
+  )
+  const maxPlayers = Number(room?.maxPlayers || 2)
   return {
     id: String(room?.id || room?._id || room?.code || room?.roomCode || ''),
     code: String(room?.code || room?.roomCode || ''),
     name: room?.name || null,
     status: room?.status || 'waiting',
-    playerCount: Number(room?.playerCount || members.length || 0),
-    maxPlayers: Number(room?.maxPlayers || 2),
+    playerCount,
+    maxPlayers,
     isPrivate: Boolean(room?.isPrivate),
     timeControl: room?.timeControl || 'rapid',
     canJoin: Boolean(
       room?.canJoin ??
-        (room?.status === 'waiting' &&
-          Number(room?.playerCount || members.length || 0) < Number(room?.maxPlayers || 2))
+        (room?.status === 'waiting' && playerCount < maxPlayers)
     ),
     host: {
       username:

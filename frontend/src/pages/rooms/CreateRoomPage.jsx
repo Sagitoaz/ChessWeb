@@ -24,6 +24,23 @@ const saveRecentRoomCode = (code) => {
   }
 }
 
+const normalizeId = (value) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') {
+    if (typeof value.id === 'string') return value.id
+    if (typeof value._id === 'string') return value._id
+    if (typeof value.userId === 'string') return value.userId
+    if (typeof value.sub === 'string') return value.sub
+  }
+  return String(value)
+}
+
+const resolvePlayerCount = (room) => {
+  const members = Array.isArray(room?.members) ? room.members : []
+  return Math.max(Number(room?.playerCount || 0), members.length, 1)
+}
+
 // Time control options
 const TIME_CONTROLS = [
   { value: 'blitz', label: '5 min', description: 'Blitz', initialTimeSeconds: 300 },
@@ -42,6 +59,7 @@ export default function CreateRoomPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const token = useAuthStore((state) => state.token)
+  const currentUserId = normalizeId(user?.id || user?.userId || user?._id || user?.sub)
   const { showNotification } = useNotification()
   const { on, off } = useWebSocket()
 
@@ -69,7 +87,7 @@ export default function CreateRoomPage() {
         const response = await gameService.getRoom(code)
         const room = response?.data ?? response
         const members = Array.isArray(room?.members) ? room.members : []
-        const nextCount = Number(room?.playerCount ?? members.length ?? 0)
+        const nextCount = resolvePlayerCount(room)
 
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
@@ -88,8 +106,8 @@ export default function CreateRoomPage() {
           }
         }
 
-        memberCountRef.current = nextCount || memberCountRef.current
-        setMemberCount(nextCount || 1)
+        memberCountRef.current = nextCount
+        setMemberCount(nextCount)
         setWaitingForPlayer((room?.status || 'waiting') !== 'playing')
       } catch (error) {
         if (import.meta.env.DEV) {
@@ -246,11 +264,12 @@ export default function CreateRoomPage() {
     const handlePlayerJoined = (payload) => {
       const payloadCode = String(payload?.roomCode || payload?.code || '').toUpperCase()
       if (payloadCode !== roomCode.toUpperCase()) return
-      if (payload?.userId && payload.userId === user?.id) return
+      const joinedUserId = normalizeId(payload?.userId)
+      if (joinedUserId && joinedUserId === currentUserId) return
 
-      const nextCount = Number(payload?.playerCount ?? memberCountRef.current + 1)
-      memberCountRef.current = nextCount || memberCountRef.current
-      setMemberCount(nextCount || 2)
+      const nextCount = Math.max(Number(payload?.playerCount || 0), memberCountRef.current + 1, 2)
+      memberCountRef.current = nextCount
+      setMemberCount(nextCount)
       setWaitingForPlayer(true)
 
       if (import.meta.env.DEV) {
@@ -270,7 +289,7 @@ export default function CreateRoomPage() {
     return () => {
       off('room:playerJoined', handlePlayerJoined)
     }
-  }, [off, on, roomCode, showNotification, user?.id])
+  }, [currentUserId, off, on, roomCode, showNotification])
 
   // Waiting for player screen
   if (roomCreated && waitingForPlayer) {
