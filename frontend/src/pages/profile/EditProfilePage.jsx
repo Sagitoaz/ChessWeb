@@ -73,7 +73,7 @@ const EditProfilePage = () => {
         displayName: nextDisplayName,
       })
 
-      if (nextAvatarUrl && nextAvatarUrl !== (user?.avatarUrl || '')) {
+      if (nextAvatarUrl) {
         await authService.uploadAvatar({
           avatarUrl: nextAvatarUrl,
         })
@@ -86,10 +86,14 @@ const EditProfilePage = () => {
           {
             ...user,
             ...normalizedUser,
-            avatarUrl: normalizedUser.avatarUrl || nextAvatarUrl || user?.avatarUrl || null,
+            avatarUrl: normalizedUser.avatarUrl ?? null,
           },
           token
         )
+      }
+
+      if (nextAvatarUrl && normalizedUser?.avatarUrl !== nextAvatarUrl) {
+        throw new Error('Ảnh đại diện chưa được lưu. Hãy kiểm tra lại link ảnh trực tiếp.')
       }
 
       showNotification({ type: 'success', title: 'Đã lưu', message: 'Hồ sơ cập nhật thành công.' })

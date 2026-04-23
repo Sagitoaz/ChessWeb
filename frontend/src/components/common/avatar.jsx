@@ -1,10 +1,10 @@
-import PropTypes from 'prop-types';
-import { User } from 'lucide-react';
-import { useState } from 'react';
+import PropTypes from 'prop-types'
+import { User } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 /**
  * Avatar Component - User avatar với fallback
- * 
+ *
  * @example
  * <Avatar src="/avatar.jpg" alt="John Doe" />
  * <Avatar name="John Doe" size="lg" />
@@ -22,8 +22,13 @@ const Avatar = ({
   onClick,
   ...props
 }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false)
+  const [imageLoading, setImageLoading] = useState(true)
+
+  useEffect(() => {
+    setImageError(false)
+    setImageLoading(Boolean(src))
+  }, [src])
 
   // Size styles
   const sizes = {
@@ -33,14 +38,14 @@ const Avatar = ({
     lg: 'w-12 h-12 text-lg',
     xl: 'w-16 h-16 text-xl',
     '2xl': 'w-20 h-20 text-2xl',
-  };
+  }
 
   // Shape styles
   const shapes = {
     circle: 'rounded-full',
     square: 'rounded-md',
     rounded: 'rounded-lg',
-  };
+  }
 
   // Status indicator size
   const statusSizes = {
@@ -50,7 +55,7 @@ const Avatar = ({
     lg: 'w-3 h-3',
     xl: 'w-3.5 h-3.5',
     '2xl': 'w-4 h-4',
-  };
+  }
 
   // Status colors
   const statusColors = {
@@ -58,7 +63,7 @@ const Avatar = ({
     offline: 'bg-gray-400',
     away: 'bg-yellow-500',
     busy: 'bg-red-500',
-  };
+  }
 
   // Fallback colors
   const fallbackColors = {
@@ -70,22 +75,22 @@ const Avatar = ({
     pink: 'bg-pink-500',
     indigo: 'bg-indigo-500',
     gray: 'bg-gray-500',
-  };
+  }
 
   // Get initials from name
   const getInitials = (name) => {
-    if (!name) return '';
-    const parts = name.trim().split(' ');
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-  };
+    if (!name) return ''
+    const parts = name.trim().split(' ')
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+  }
 
   // Interactive
-  const interactiveStyles = onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : '';
+  const interactiveStyles = onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''
 
-  const avatarStyles = `${sizes[size]} ${shapes[shape]} ${interactiveStyles} ${className} relative inline-flex items-center justify-center overflow-hidden`;
+  const avatarStyles = `${sizes[size]} ${shapes[shape]} ${interactiveStyles} ${className} relative inline-flex items-center justify-center overflow-hidden`
 
-  const showFallback = !src || imageError;
+  const showFallback = !src || imageError
 
   return (
     <div className={avatarStyles} onClick={onClick} {...props}>
@@ -100,8 +105,8 @@ const Avatar = ({
             alt={alt}
             className="w-full h-full object-cover"
             onError={() => {
-              setImageError(true);
-              setImageLoading(false);
+              setImageError(true)
+              setImageLoading(false)
             }}
             onLoad={() => setImageLoading(false)}
           />
@@ -110,8 +115,26 @@ const Avatar = ({
 
       {/* Fallback */}
       {showFallback && (
-        <div className={`w-full h-full flex items-center justify-center ${fallbackColors[fallbackColor]} text-white font-semibold`}>
-          {name ? getInitials(name) : <User size={size === 'xs' ? 12 : size === 'sm' ? 14 : size === 'md' ? 16 : size === 'lg' ? 20 : 24} />}
+        <div
+          className={`w-full h-full flex items-center justify-center ${fallbackColors[fallbackColor]} text-white font-semibold`}
+        >
+          {name ? (
+            getInitials(name)
+          ) : (
+            <User
+              size={
+                size === 'xs'
+                  ? 12
+                  : size === 'sm'
+                    ? 14
+                    : size === 'md'
+                      ? 16
+                      : size === 'lg'
+                        ? 20
+                        : 24
+              }
+            />
+          )}
         </div>
       )}
 
@@ -123,8 +146,8 @@ const Avatar = ({
         />
       )}
     </div>
-  );
-};
+  )
+}
 
 Avatar.propTypes = {
   src: PropTypes.string,
@@ -133,18 +156,27 @@ Avatar.propTypes = {
   size: PropTypes.oneOf(['xs', 'sm', 'md', 'lg', 'xl', '2xl']),
   status: PropTypes.oneOf(['online', 'offline', 'away', 'busy']),
   shape: PropTypes.oneOf(['circle', 'square', 'rounded']),
-  fallbackColor: PropTypes.oneOf(['blue', 'green', 'red', 'yellow', 'purple', 'pink', 'indigo', 'gray']),
+  fallbackColor: PropTypes.oneOf([
+    'blue',
+    'green',
+    'red',
+    'yellow',
+    'purple',
+    'pink',
+    'indigo',
+    'gray',
+  ]),
   className: PropTypes.string,
   onClick: PropTypes.func,
-};
+}
 
 /**
  * AvatarGroup - Nhóm avatars chồng lên nhau
  */
 export const AvatarGroup = ({ children, max = 3, size = 'md', className = '' }) => {
-  const childArray = Array.isArray(children) ? children : [children];
-  const displayedChildren = childArray.slice(0, max);
-  const remaining = childArray.length - max;
+  const childArray = Array.isArray(children) ? children : [children]
+  const displayedChildren = childArray.slice(0, max)
+  const remaining = childArray.length - max
 
   // Spacing based on size
   const spacings = {
@@ -154,7 +186,7 @@ export const AvatarGroup = ({ children, max = 3, size = 'md', className = '' }) 
     lg: '-space-x-4',
     xl: '-space-x-5',
     '2xl': '-space-x-6',
-  };
+  }
 
   return (
     <div className={`flex items-center ${spacings[size]} ${className}`}>
@@ -172,14 +204,14 @@ export const AvatarGroup = ({ children, max = 3, size = 'md', className = '' }) 
         />
       )}
     </div>
-  );
-};
+  )
+}
 
 AvatarGroup.propTypes = {
   children: PropTypes.node.isRequired,
   max: PropTypes.number,
   size: PropTypes.oneOf(['xs', 'sm', 'md', 'lg', 'xl', '2xl']),
   className: PropTypes.string,
-};
+}
 
-export default Avatar;
+export default Avatar
