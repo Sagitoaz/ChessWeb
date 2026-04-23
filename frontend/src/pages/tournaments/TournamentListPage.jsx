@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Input, Loader, Pagination } from '@/components/common'
 import gameService from '@/services/gameService'
@@ -60,6 +60,10 @@ export default function TournamentListPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [tabCounts, setTabCounts] = useState({ upcoming: 0, ongoing: 0, completed: 0 })
+  const [isNavigatingToCreate, setIsNavigatingToCreate] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const hasLoadedRef = useRef(false)
+  const requestSeqRef = useRef(0)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -78,7 +82,13 @@ export default function TournamentListPage() {
 
   useEffect(() => {
     const loadTournaments = async () => {
-      setLoading(true)
+      const requestSeq = requestSeqRef.current + 1
+      requestSeqRef.current = requestSeq
+      if (!hasLoadedRef.current) {
+        setLoading(true)
+      } else {
+        setIsRefreshing(true)
+      }
       try {
         const response = await gameService.getTournaments({
           page: currentPage,
@@ -86,6 +96,7 @@ export default function TournamentListPage() {
           status: activeStatusFilter,
           search: debouncedSearch || undefined,
         })
+        if (requestSeq !== requestSeqRef.current) return
         const payload = response?.data ?? response
         const items = payload?.items || payload?.tournaments || payload || []
         setTournaments(Array.isArray(items) ? items.map((item) => normalizeTournament(item)) : [])
@@ -97,22 +108,33 @@ export default function TournamentListPage() {
           ongoing: Number(payload?.counts?.ongoing || 0),
           completed: Number(payload?.counts?.completed || 0),
         })
+        hasLoadedRef.current = true
       } catch (_error) {
+        if (requestSeq !== requestSeqRef.current) return
         setTournaments([])
         setTotalItems(0)
         setTotalPages(1)
         setTabCounts({ upcoming: 0, ongoing: 0, completed: 0 })
       } finally {
-        setLoading(false)
+        if (requestSeq === requestSeqRef.current) {
+          setLoading(false)
+          setIsRefreshing(false)
+        }
       }
     }
 
-    loadTournaments()
+    void loadTournaments()
   }, [activeStatusFilter, currentPage, debouncedSearch])
 
   useEffect(() => {
     setCurrentPage(1)
   }, [activeTab, debouncedSearch])
+
+  const handleNavigateToCreate = () => {
+    if (isNavigatingToCreate) return
+    setIsNavigatingToCreate(true)
+    navigate('/tournaments/create')
+  }
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -317,13 +339,22 @@ export default function TournamentListPage() {
               </div>
               <Button
                 variant="primary"
-                onClick={() => navigate('/tournaments/create')}
+                onClick={handleNavigateToCreate}
+                loading={isNavigatingToCreate}
+                disabled={isNavigatingToCreate}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 <Plus size={18} />
                 Tạo giải đấu
               </Button>
             </div>
+
+            {isRefreshing && (
+              <div className="mb-4 flex items-center gap-2 text-sm text-blue-700">
+                <Loader size="sm" />
+                Đang cập nhật danh sách giải đấu...
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="flex border-b border-gray-200 mb-6">
@@ -334,6 +365,7 @@ export default function TournamentListPage() {
               ].map((tab) => (
                 <button
                   key={tab.key}
+                  type="button"
                   onClick={() => setActiveTab(tab.key)}
                   className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${
                     activeTab === tab.key
@@ -367,7 +399,9 @@ export default function TournamentListPage() {
                 {!debouncedSearch && (
                   <Button
                     variant="primary"
-                    onClick={() => navigate('/tournaments/create')}
+                    onClick={handleNavigateToCreate}
+                    loading={isNavigatingToCreate}
+                    disabled={isNavigatingToCreate}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     <Plus size={18} />

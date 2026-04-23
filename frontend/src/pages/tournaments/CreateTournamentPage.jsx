@@ -120,16 +120,19 @@ export default function CreateTournamentPage() {
   }
 
   const handleNext = () => {
+    if (isCreating) return
     if (validateStep(currentStep)) {
       setCurrentStep((prev) => Math.min(4, prev + 1))
     }
   }
 
   const handleBack = () => {
+    if (isCreating) return
     setCurrentStep((prev) => Math.max(1, prev - 1))
   }
 
   const handleCreate = async () => {
+    if (isCreating) return
     if (!validateStep(currentStep)) return
 
     setIsCreating(true)
@@ -313,7 +316,9 @@ export default function CreateTournamentPage() {
                     {FORMATS.map((format) => (
                       <button
                         key={format.value}
+                        type="button"
                         onClick={() => updateField('format', format.value)}
+                        disabled={isCreating}
                         className={`p-4 rounded-lg border-2 transition-all text-left ${
                           formData.format === format.value
                             ? 'border-blue-500 bg-blue-50'
@@ -340,7 +345,9 @@ export default function CreateTournamentPage() {
                     {PARTICIPANT_OPTIONS.map((num) => (
                       <button
                         key={num}
+                        type="button"
                         onClick={() => updateField('maxParticipants', num)}
+                        disabled={isCreating}
                         className={`p-3 rounded-lg border-2 transition-all font-semibold ${
                           formData.maxParticipants === num
                             ? 'border-blue-500 bg-blue-50 text-blue-600'
@@ -364,7 +371,9 @@ export default function CreateTournamentPage() {
                     {TIME_CONTROLS.map((time) => (
                       <button
                         key={time.value}
+                        type="button"
                         onClick={() => updateField('timeControl', time.value)}
+                        disabled={isCreating}
                         className={`p-3 rounded-lg border-2 transition-all ${
                           formData.timeControl === time.value
                             ? 'border-blue-500 bg-blue-50'
@@ -545,6 +554,7 @@ export default function CreateTournamentPage() {
                 <Button
                   variant="primary"
                   onClick={handleNext}
+                  disabled={isCreating}
                   fullWidth
                   className="bg-blue-600 hover:bg-blue-700"
                 >

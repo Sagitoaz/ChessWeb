@@ -137,6 +137,8 @@ export default function TournamentDetailPage() {
   const [standingsPage, setStandingsPage] = useState(1)
   const [expandedRounds, setExpandedRounds] = useState([])
   const [checkInMinutes, setCheckInMinutes] = useState(3)
+  const [pendingAction, setPendingAction] = useState(null)
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false)
   const participantStatusRef = useRef(null)
   const hasTournamentSnapshotRef = useRef(false)
   const isRefreshingRef = useRef(false)
@@ -153,6 +155,11 @@ export default function TournamentDetailPage() {
   } = useTournamentSocket(tournamentId)
   const skipSocketRefreshUntilRef = useRef(0)
   const lastSocketEventKeyRef = useRef('')
+
+  const isActionPending = useCallback(
+    (actionKey) => pendingAction === actionKey,
+    [pendingAction]
+  )
 
   const authRoles = Array.isArray(authUser?.roles)
     ? authUser.roles.filter((role) => typeof role === 'string')
@@ -179,6 +186,9 @@ export default function TournamentDetailPage() {
     isRefreshingRef.current = true
     if (!background || !hasTournamentSnapshotRef.current) {
       setLoading(true)
+      setIsBackgroundRefreshing(false)
+    } else {
+      setIsBackgroundRefreshing(true)
     }
     try {
       const response = await gameService.getTournament(tournamentId)
@@ -229,6 +239,7 @@ export default function TournamentDetailPage() {
       if (!background || !hasTournamentSnapshotRef.current) {
         setLoading(false)
       }
+      setIsBackgroundRefreshing(false)
       isRefreshingRef.current = false
     }
   }, [currentUserId, tournamentId, showNotification])
@@ -354,11 +365,17 @@ export default function TournamentDetailPage() {
   ])
 
   const handleRegister = async () => {
-    if (!tournamentId) return
+    if (!tournamentId || pendingAction) return
+    setPendingAction('register')
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.joinTournament(tournamentId)
       await loadTournament({ background: true })
+      showNotification({
+        type: 'success',
+        title: 'Đăng ký thành công',
+        message: 'Yêu cầu tham gia giải đã được gửi.',
+      })
     } catch (_error) {
       const message =
         _error?.response?.data?.message ||
@@ -369,42 +386,61 @@ export default function TournamentDetailPage() {
         title: 'Lỗi đăng ký',
         message: String(message),
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleWithdraw = async () => {
-    if (!tournamentId) return
+    if (!tournamentId || pendingAction) return
+    setPendingAction('withdraw')
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.withdrawTournament(tournamentId)
       await loadTournament({ background: true })
+      showNotification({
+        type: 'success',
+        title: 'Đã rút lui',
+        message: 'Bạn đã rút khỏi giải đấu.',
+      })
     } catch (_error) {
       showNotification({
         type: 'error',
         title: 'Lỗi rút lui',
         message: 'Không thể rút lui khỏi giải đấu. Vui lòng thử lại.',
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleStartTournament = async () => {
-    if (!tournamentId) return
+    if (!tournamentId || pendingAction) return
+    setPendingAction('start-tournament')
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.startTournament(tournamentId)
       await loadTournament({ background: true })
+      showNotification({
+        type: 'success',
+        title: 'Đã bắt đầu giải',
+        message: 'Giải đấu đã chuyển sang trạng thái đang diễn ra.',
+      })
     } catch (_error) {
       showNotification({
         type: 'error',
         title: 'Lỗi bắt đầu giải',
         message: 'Không thể bắt đầu giải đấu. Vui lòng kiểm tra số người chơi.',
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleCancelTournament = async () => {
-    if (!tournamentId) return
+    if (!tournamentId || pendingAction) return
     if (!window.confirm('Bạn có chắc muốn hủy giải đấu này?')) return
+    setPendingAction('cancel-tournament')
     try {
       await gameService.cancelTournament(tournamentId)
       showNotification({
@@ -419,28 +455,39 @@ export default function TournamentDetailPage() {
         title: 'Lỗi hủy giải',
         message: 'Không thể hủy giải đấu. Vui lòng thử lại.',
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleSetMatchResult = async (matchId, winnerSlot) => {
-    if (!tournamentId) return
+    if (!tournamentId || pendingAction) return
+    setPendingAction(`set-result:${matchId}:${winnerSlot}`)
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.recordTournamentMatchResult(tournamentId, matchId, {
         winnerSlot,
       })
       await loadTournament({ background: true })
+      showNotification({
+        type: 'success',
+        title: 'Đã lưu kết quả',
+        message: 'Kết quả trận đấu đã được cập nhật.',
+      })
     } catch (_error) {
       showNotification({
         type: 'error',
         title: 'Lỗi lưu kết quả',
         message: 'Không thể lưu kết quả trận đấu. Vui lòng thử lại.',
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleOpenCurrentRound = async () => {
-    if (!tournamentId) return
+    if (!tournamentId || pendingAction) return
+    setPendingAction('open-current-round')
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.openTournamentRound(tournamentId, {
@@ -459,11 +506,14 @@ export default function TournamentDetailPage() {
         title: 'Lỗi mở vòng',
         message: 'Không thể mở vòng hiện tại. Có thể vòng trước chưa hoàn thành.',
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleMatchCheckIn = async (matchId) => {
-    if (!tournamentId || !matchId) return
+    if (!tournamentId || !matchId || pendingAction) return
+    setPendingAction(`check-in:${matchId}`)
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.checkInTournamentMatch(tournamentId, matchId)
@@ -479,11 +529,14 @@ export default function TournamentDetailPage() {
         title: 'Lỗi check-in',
         message: 'Không thể check-in cho trận này.',
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleApproveParticipant = async (participantUserId) => {
-    if (!tournamentId) return
+    if (!tournamentId || pendingAction) return
+    setPendingAction(`approve:${participantUserId}`)
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.approveTournamentParticipant(tournamentId, participantUserId)
@@ -498,11 +551,14 @@ export default function TournamentDetailPage() {
         title: 'Lỗi duyệt người chơi',
         message: String(message),
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleRejectParticipant = async (participantUserId) => {
-    if (!tournamentId) return
+    if (!tournamentId || pendingAction) return
+    setPendingAction(`reject:${participantUserId}`)
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.rejectTournamentParticipant(tournamentId, participantUserId)
@@ -517,11 +573,14 @@ export default function TournamentDetailPage() {
         title: 'Lỗi từ chối người chơi',
         message: String(message),
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
   const handleStartMatch = async (matchId) => {
-    if (!tournamentId || !matchId) return
+    if (!tournamentId || !matchId || pendingAction) return
+    setPendingAction(`start-match:${matchId}`)
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
       await gameService.startTournamentMatch(tournamentId, matchId)
@@ -541,6 +600,8 @@ export default function TournamentDetailPage() {
         title: 'Lỗi bắt đầu trận',
         message: String(message),
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -751,6 +812,8 @@ export default function TournamentDetailPage() {
                 <Button
                   variant="primary"
                   onClick={handleRegister}
+                  loading={isActionPending('register')}
+                  disabled={Boolean(pendingAction)}
                   size="lg"
                   className="bg-blue-600 hover:bg-blue-700"
                 >
@@ -764,7 +827,12 @@ export default function TournamentDetailPage() {
                 </div>
               )}
               {isRegistered && isRegistrationPhase && (
-                <Button variant="outline" onClick={handleWithdraw}>
+                <Button
+                  variant="outline"
+                  onClick={handleWithdraw}
+                  loading={isActionPending('withdraw')}
+                  disabled={Boolean(pendingAction)}
+                >
                   <UserX size={18} />
                   Rút lui
                 </Button>
@@ -789,7 +857,12 @@ export default function TournamentDetailPage() {
                     onChange={(event) => setCheckInMinutes(Number(event.target.value || 3))}
                     className="w-20 rounded-lg border border-gray-300 px-2 py-2 text-sm"
                   />
-                  <Button variant="outline" onClick={handleOpenCurrentRound}>
+                  <Button
+                    variant="outline"
+                    onClick={handleOpenCurrentRound}
+                    loading={isActionPending('open-current-round')}
+                    disabled={Boolean(pendingAction)}
+                  >
                     <Play size={16} />
                     Mở bàn vòng {Number(tournament.currentRound || 1)}
                   </Button>
@@ -801,20 +874,33 @@ export default function TournamentDetailPage() {
                     <Button
                       variant="primary"
                       onClick={handleStartTournament}
-                      disabled={tournament.participants.length < 2}
+                      loading={isActionPending('start-tournament')}
+                      disabled={Boolean(pendingAction) || tournament.participants.length < 2}
                       className="bg-green-600 hover:bg-green-700"
                     >
                       <Play size={18} />
                       Bắt đầu giải đấu
                     </Button>
                   )}
-                  <Button variant="danger" onClick={handleCancelTournament}>
+                  <Button
+                    variant="danger"
+                    onClick={handleCancelTournament}
+                    loading={isActionPending('cancel-tournament')}
+                    disabled={Boolean(pendingAction)}
+                  >
                     <XCircle size={18} />
                     Hủy giải đấu
                   </Button>
                 </>
               )}
             </div>
+
+            {isBackgroundRefreshing && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-blue-700">
+                <Loader size="sm" />
+                Đang cập nhật thông tin giải đấu...
+              </div>
+            )}
 
             {/* Notifications are now global toasts, not local banners */}
 
@@ -849,6 +935,7 @@ export default function TournamentDetailPage() {
                 return (
                   <button
                     key={tab.key}
+                    type="button"
                     onClick={() => setActiveTab(tab.key)}
                     className={`flex items-center gap-2 px-6 py-4 font-semibold text-sm border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === tab.key
@@ -940,6 +1027,8 @@ export default function TournamentDetailPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleApproveParticipant(participant.userId)}
+                                loading={isActionPending(`approve:${participant.userId}`)}
+                                disabled={Boolean(pendingAction)}
                               >
                                 Duyệt
                               </Button>
@@ -947,6 +1036,8 @@ export default function TournamentDetailPage() {
                                 variant="danger"
                                 size="sm"
                                 onClick={() => handleRejectParticipant(participant.userId)}
+                                loading={isActionPending(`reject:${participant.userId}`)}
+                                disabled={Boolean(pendingAction)}
                               >
                                 Từ chối
                               </Button>
@@ -1101,6 +1192,8 @@ export default function TournamentDetailPage() {
                                     variant="primary"
                                     size="sm"
                                     onClick={() => handleMatchCheckIn(match.id)}
+                                    loading={isActionPending(`check-in:${match.id}`)}
+                                    disabled={Boolean(pendingAction)}
                                     className="bg-emerald-600 hover:bg-emerald-700"
                                   >
                                     <CheckCircle size={14} />
@@ -1115,6 +1208,8 @@ export default function TournamentDetailPage() {
                                         <Button
                                           variant="primary"
                                           size="sm"
+                                          loading={isActionPending(`start-match:${match.id}`)}
+                                          disabled={Boolean(pendingAction)}
                                           className="bg-indigo-600 hover:bg-indigo-700"
                                           onClick={() => handleStartMatch(match.id)}
                                         >
@@ -1126,6 +1221,8 @@ export default function TournamentDetailPage() {
                                       variant="outline"
                                       size="sm"
                                       onClick={() => handleSetMatchResult(match.id, 'player1')}
+                                      loading={isActionPending(`set-result:${match.id}:player1`)}
+                                      disabled={Boolean(pendingAction)}
                                     >
                                       Xác nhận {player1Name} thắng
                                     </Button>
@@ -1133,6 +1230,8 @@ export default function TournamentDetailPage() {
                                       variant="outline"
                                       size="sm"
                                       onClick={() => handleSetMatchResult(match.id, 'player2')}
+                                      loading={isActionPending(`set-result:${match.id}:player2`)}
+                                      disabled={Boolean(pendingAction)}
                                     >
                                       Xác nhận {player2Name} thắng
                                     </Button>
