@@ -495,6 +495,73 @@ export class CompetitionService {
     };
   }
 
+  private async replaceGameMoves(
+    gameId: string,
+    moves: Array<Record<string, unknown>>,
+    now: Date,
+  ): Promise<void> {
+    const collection = this.mongoService.getDb().collection("game_moves");
+    await collection.deleteMany({ gameId });
+
+    if (!Array.isArray(moves) || moves.length === 0) {
+      return;
+    }
+
+    await collection.bulkWrite(
+      moves.map((move, index) => {
+        const ply =
+          typeof move?.ply === "number" && Number.isFinite(move.ply)
+            ? Number(move.ply)
+            : index + 1;
+
+        return {
+          insertOne: {
+            document: {
+              gameId,
+              ply,
+              san:
+                typeof move?.san === "string" ? String(move.san).trim() : null,
+              uci:
+                typeof move?.uci === "string" ? String(move.uci).trim() : null,
+              from:
+                typeof move?.from === "string"
+                  ? String(move.from).trim()
+                  : null,
+              to:
+                typeof move?.to === "string" ? String(move.to).trim() : null,
+              piece:
+                typeof move?.piece === "string"
+                  ? String(move.piece).trim()
+                  : null,
+              color:
+                typeof move?.color === "string"
+                  ? String(move.color).trim()
+                  : null,
+              captured:
+                typeof move?.captured === "string"
+                  ? String(move.captured).trim()
+                  : null,
+              promotion:
+                typeof move?.promotion === "string"
+                  ? String(move.promotion).trim()
+                  : null,
+              isCheck: Boolean(move?.isCheck),
+              isCheckmate: Boolean(move?.isCheckmate),
+              timestamp:
+                typeof move?.timestamp === "string"
+                  ? move.timestamp
+                  : now.toISOString(),
+              rawMove: move,
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+        };
+      }),
+      { ordered: true },
+    );
+  }
+
   private isColorCompatible(a: PreferredColor, b: PreferredColor): boolean {
     if (a === PreferredColor.RANDOM || b === PreferredColor.RANDOM) return true;
     return a !== b;
@@ -948,6 +1015,16 @@ export class CompetitionService {
           finishedAt: now,
         },
       },
+    );
+
+    await this.replaceGameMoves(
+      String(game._id),
+      Array.isArray(payload.moves)
+        ? (payload.moves as Array<Record<string, unknown>>)
+        : Array.isArray(game.moves)
+          ? (game.moves as Array<Record<string, unknown>>)
+          : [],
+      now,
     );
 
     await this.matchesCollection().updateOne(

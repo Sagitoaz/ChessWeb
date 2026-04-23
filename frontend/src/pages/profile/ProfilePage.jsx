@@ -121,41 +121,6 @@ const normalizeHistoryPayload = (payload, username) => {
     .sort((a, b) => new Date(b.playedAt || 0) - new Date(a.playedAt || 0))
 }
 
-const resolvePlayerSide = (item, username) => {
-  const explicit = String(item?.playerSide || item?.playerColor || '').toLowerCase()
-  if (explicit === 'white' || explicit === 'black') return explicit
-
-  if (!username) return null
-
-  const whiteName = String(item?.whitePlayer?.username || '')
-    .trim()
-    .toLowerCase()
-  const blackName = String(item?.blackPlayer?.username || '')
-    .trim()
-    .toLowerCase()
-  const self = String(username).trim().toLowerCase()
-
-  if (whiteName && self === whiteName) return 'white'
-  if (blackName && self === blackName) return 'black'
-  return null
-}
-
-const resolveOpponent = (item, username) => {
-  const explicit =
-    item?.opponent?.username || item?.opponentUsername || item?.opponentId || item?.opponent || null
-  if (explicit) return explicit
-
-  const white = item?.whitePlayer?.username || item?.whitePlayerId || 'White'
-  const black = item?.blackPlayer?.username || item?.blackPlayerId || 'Black'
-
-  if (!username) return `${white} vs ${black}`
-
-  const self = String(username).toLowerCase()
-  if (String(white).toLowerCase() === self) return black
-  if (String(black).toLowerCase() === self) return white
-  return `${white} vs ${black}`
-}
-
 const relativeTime = (value) => {
   if (!value) return 'vừa xong'
   const ts = new Date(value).getTime()
@@ -173,6 +138,10 @@ const relativeTime = (value) => {
 }
 
 const calculateRadar = ({ total, winRate, avgDuration, currentRating, winStreak }) => {
+  if (total <= 0) {
+    return []
+  }
+
   const gamesFactor = Math.min(100, total * 2)
   const ratingFactor = Math.min(100, Math.max(0, (currentRating - 800) / 16))
   const speedFactor = avgDuration > 0 ? Math.max(25, Math.min(100, 110 - avgDuration / 18)) : 55
@@ -238,7 +207,8 @@ export default function ProfilePage() {
         profileResult.status === 'fulfilled'
           ? (profileResult.value?.data ?? profileResult.value)
           : null
-      const nextUser = profileData?.user ?? profileData ?? authUser
+      const storeUser = useAuthStore.getState().user
+      const nextUser = profileData?.user ?? profileData ?? storeUser
 
       const gamesHistory = gamesResult.status === 'fulfilled' ? gamesResult.value : { items: [] }
       setMatches(normalizeHistoryPayload(gamesHistory, nextUser?.username || authUser?.username))
@@ -402,7 +372,8 @@ export default function ProfilePage() {
                           cx="50%"
                           cy="50%"
                           outerRadius={95}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          label={false}
+                          labelLine={false}
                         >
                           {analytics.pieData.map((entry) => (
                             <Cell key={entry.key} fill={entry.color} />
@@ -446,22 +417,28 @@ export default function ProfilePage() {
                 <h2 className="text-xl font-bold text-gray-900">Biểu đồ năng lực</h2>
               </div>
 
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={analytics.radarData} outerRadius="68%">
-                    <PolarGrid stroke="#e5e7eb" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontSize: 12 }} />
-                    <Radar
-                      name="Skill"
-                      dataKey="score"
-                      stroke="#4f46e5"
-                      fill="#6366f1"
-                      fillOpacity={0.35}
-                    />
-                    <Tooltip formatter={(value) => [`${value}/100`, 'Điểm']} />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
+              {analytics.total === 0 ? (
+                <div className="h-80 flex items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500 text-center px-6">
+                  Chưa có dữ liệu để phân tích năng lực. Hãy chơi ít nhất 1 trận rồi quay lại xem biểu đồ.
+                </div>
+              ) : (
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={analytics.radarData} outerRadius="68%">
+                      <PolarGrid stroke="#e5e7eb" />
+                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontSize: 12 }} />
+                      <Radar
+                        name="Skill"
+                        dataKey="score"
+                        stroke="#4f46e5"
+                        fill="#6366f1"
+                        fillOpacity={0.35}
+                      />
+                      <Tooltip formatter={(value) => [`${value}/100`, 'Điểm']} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </section>
 
             <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
@@ -474,12 +451,6 @@ export default function ProfilePage() {
                   {recentMatches.map((match) => {
                     const mode = normalizeMode(match.mode)
                     const modeMeta = MODE_META[mode] || MODE_META.friendly
-                    const resultClass =
-                      match.result === 'win'
-                        ? 'text-green-600 bg-green-50'
-                        : match.result === 'lose'
-                          ? 'text-red-600 bg-red-50'
-                          : 'text-gray-600 bg-gray-100'
 
                     return (
                       <div

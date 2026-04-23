@@ -323,6 +323,84 @@ export class SocialBotService {
     return "registration";
   }
 
+  private normalizeReplayPlayer(
+    game: Record<string, unknown>,
+    color: "white" | "black",
+    profilesById: Map<string, { username?: string; rating?: number; avatarUrl?: string }>,
+  ) {
+    const playerKey = color === "white" ? "whitePlayer" : "blackPlayer";
+    const playerIdKey = color === "white" ? "whitePlayerId" : "blackPlayerId";
+    const existingPlayer =
+      game[playerKey] && typeof game[playerKey] === "object"
+        ? (game[playerKey] as Record<string, unknown>)
+        : null;
+    const playerId =
+      typeof game[playerIdKey] === "string" ? String(game[playerIdKey]) : null;
+    const isBot =
+      Boolean(existingPlayer?.isBot) || playerId === "bot";
+    const profile =
+      playerId && playerId !== "bot" ? profilesById.get(playerId) : undefined;
+
+    const username =
+      String(
+        existingPlayer?.username ||
+          profile?.username ||
+          (isBot ? "Bot" : color === "white" ? "Trắng" : "Đen"),
+      ).trim() || (isBot ? "Bot" : color === "white" ? "Trắng" : "Đen");
+
+    const rating =
+      typeof existingPlayer?.rating === "number"
+        ? Number(existingPlayer.rating)
+        : typeof profile?.rating === "number"
+          ? Number(profile.rating)
+          : undefined;
+
+    const avatarUrl =
+      typeof existingPlayer?.avatarUrl === "string" && existingPlayer.avatarUrl.trim().length > 0
+        ? existingPlayer.avatarUrl
+        : typeof profile?.avatarUrl === "string" && profile.avatarUrl.trim().length > 0
+          ? profile.avatarUrl
+          : null;
+
+    return {
+      ...(existingPlayer || {}),
+      username,
+      rating,
+      avatarUrl,
+      isBot,
+    };
+  }
+
+  private async enrichReplayGamePlayers(game: Record<string, unknown>) {
+    const playerIds = [
+      typeof game.whitePlayerId === "string" && game.whitePlayerId !== "bot"
+        ? game.whitePlayerId
+        : null,
+      typeof game.blackPlayerId === "string" && game.blackPlayerId !== "bot"
+        ? game.blackPlayerId
+        : null,
+    ].filter((value): value is string => Boolean(value));
+
+    const profiles =
+      playerIds.length > 0 ? await this.repo.findUserProfilesByIds(playerIds) : [];
+    const profilesById = new Map(
+      profiles.map((profile) => [
+        String(profile._id),
+        {
+          username: profile.username,
+          rating: profile.rating,
+          avatarUrl: profile.avatarUrl,
+        },
+      ]),
+    );
+
+    return {
+      ...game,
+      whitePlayer: this.normalizeReplayPlayer(game, "white", profilesById),
+      blackPlayer: this.normalizeReplayPlayer(game, "black", profilesById),
+    };
+  }
+
   private toTournamentFormatLabel(format: unknown): string {
     const value = typeof format === "string" ? format.toLowerCase() : "";
     if (value === "knockout") return "Single Elimination";
@@ -2815,7 +2893,12 @@ export class SocialBotService {
       playerColor?: string;
     },
   ) {
-    const game = await this.repo.findGameById(gameId);
+    const storedGame = await this.repo.findGameById(gameId);
+    const game = storedGame
+      ? await this.enrichReplayGamePlayers(
+          storedGame as Record<string, unknown>,
+        )
+      : null;
     if (!game) {
       throw new NotFoundException("Game not found");
     }
@@ -2905,6 +2988,13 @@ export class SocialBotService {
     }
 
     if (game.state === "Saved") {
+      await this.repo.replaceGameMoves(
+        gameId,
+        Array.isArray(game.moves)
+          ? (game.moves as Array<Record<string, unknown>>)
+          : [],
+        new Date(),
+      );
       return {
         gameId,
         state: "Saved",
@@ -2981,6 +3071,13 @@ export class SocialBotService {
 
     if (!updatedGame) {
       const latest = await this.repo.findGameById(gameId);
+      await this.repo.replaceGameMoves(
+        gameId,
+        Array.isArray(latest?.moves)
+          ? (latest.moves as Array<Record<string, unknown>>)
+          : [],
+        now,
+      );
       return {
         gameId,
         state: latest?.state || "Saved",
@@ -2992,6 +3089,12 @@ export class SocialBotService {
         game: latest,
       };
     }
+
+    await this.repo.replaceGameMoves(
+      gameId,
+      Array.isArray(moves) ? (moves as Array<Record<string, unknown>>) : [],
+      now,
+    );
 
     if (normalizedMode === "room") {
       const roomCodeRaw =

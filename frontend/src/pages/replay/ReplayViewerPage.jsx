@@ -8,6 +8,23 @@ import { Loader } from '@components/common'
 import { THEME } from '@/styles/theme'
 import { getMoveLabel } from '@/utils/moveNotation'
 
+const getReplayPlayer = (gameData, color) => {
+  const player = color === 'white' ? gameData?.whitePlayer : gameData?.blackPlayer
+  const playerId = color === 'white' ? gameData?.whitePlayerId : gameData?.blackPlayerId
+  const isBot = Boolean(player?.isBot) || playerId === 'bot'
+  const fallbackName = isBot ? 'Bot' : color === 'white' ? 'Trắng' : 'Đen'
+
+  return {
+    username:
+      (typeof player?.username === 'string' && player.username.trim()) ||
+      (typeof playerId === 'string' && playerId.trim() && playerId !== 'bot' ? playerId : '') ||
+      fallbackName,
+    rating: typeof player?.rating === 'number' ? player.rating : null,
+    avatarUrl: typeof player?.avatarUrl === 'string' ? player.avatarUrl : null,
+    isBot,
+  }
+}
+
 export default function ReplayViewerPage() {
   const navigate = useNavigate()
   const { gameId } = useParams()
@@ -94,6 +111,8 @@ export default function ReplayViewerPage() {
       return new Chess()
     }
   }, [currentFEN])
+  const whitePlayer = useMemo(() => getReplayPlayer(gameData, 'white'), [gameData])
+  const blackPlayer = useMemo(() => getReplayPlayer(gameData, 'black'), [gameData])
 
   // Keyboard navigation
   useEffect(() => {
@@ -214,7 +233,7 @@ export default function ReplayViewerPage() {
               ← Lịch sử
             </button>
             <h1 className="text-xl font-bold">
-              {gameData?.whitePlayer?.username} vs {gameData?.blackPlayer?.username}
+              {whitePlayer.username} vs {blackPlayer.username}
             </h1>
             {gameData?.metadata?.opening && (
               <p className="text-gray-400 text-sm">{gameData.metadata.opening}</p>
@@ -232,8 +251,9 @@ export default function ReplayViewerPage() {
             {/* Black player */}
             <div className="flex items-center gap-2 mb-2 px-1">
               <span>⬛</span>
-              <span className="font-medium">{gameData?.blackPlayer?.username}</span>
-              {gameData?.blackPlayer?.isBot && <span className="text-xs text-gray-500">🤖</span>}
+              <span className="font-medium">{blackPlayer.username}</span>
+              {blackPlayer.isBot && <span className="text-xs text-gray-500">🤖</span>}
+              {blackPlayer.rating ? <span className="text-xs text-gray-500">{blackPlayer.rating}</span> : null}
             </div>
 
             {/* Board — disabled (replay mode) */}
@@ -247,8 +267,9 @@ export default function ReplayViewerPage() {
             {/* White player */}
             <div className="flex items-center gap-2 mt-2 px-1">
               <span>⬜</span>
-              <span className="font-medium">{gameData?.whitePlayer?.username}</span>
-              {gameData?.whitePlayer?.isBot && <span className="text-xs text-gray-500">🤖</span>}
+              <span className="font-medium">{whitePlayer.username}</span>
+              {whitePlayer.isBot && <span className="text-xs text-gray-500">🤖</span>}
+              {whitePlayer.rating ? <span className="text-xs text-gray-500">{whitePlayer.rating}</span> : null}
             </div>
 
             {/* Progress bar — ReplaySession.getProgress() */}

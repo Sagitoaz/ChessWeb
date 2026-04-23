@@ -190,7 +190,7 @@ export class IdentityService {
         return this.errorResponse(
           requestId,
           'DB_CONSTRAINT_VIOLATION',
-          'Username hoac email da duoc su dung'
+          this.getRegisterConflictMessage(existingUser, { username, email })
         )
       }
 
@@ -265,8 +265,18 @@ export class IdentityService {
       const email = this.normalizeEmail(tokenInfo.email)
       const now = new Date()
 
-      let user =
-        (await users.findOne({ googleId: tokenInfo.sub })) || (await users.findOne({ email }))
+      const userByGoogleId = await users.findOne({ googleId: tokenInfo.sub })
+      const userByEmail = await users.findOne({ email })
+
+      if (userByGoogleId && userByEmail && userByGoogleId._id !== userByEmail._id) {
+        return this.errorResponse(
+          requestId,
+          'DB_CONSTRAINT_VIOLATION',
+          'Email nay dang gan voi mot tai khoan khac. Vui long dang nhap bang tai khoan da ton tai.'
+        )
+      }
+
+      let user = userByGoogleId || userByEmail
 
       if (!user) {
         const username = await this.generateUniqueUsername(
@@ -853,6 +863,7 @@ export class IdentityService {
           $setOnInsert: {
             userId,
             gamesPlayed: 0,
+            totalGames: 0,
             wins: 0,
             losses: 0,
             draws: 0,
@@ -868,6 +879,9 @@ export class IdentityService {
         {
           $setOnInsert: {
             _id: userId,
+            rating: 1200,
+            currentRating: 1200,
+            peakRating: 1200,
             rankedElo: 1200,
             createdAt: now,
             updatedAt: now,
@@ -888,6 +902,32 @@ export class IdentityService {
     }
 
     return (error as { code?: unknown }).code === 11000
+  }
+
+  private getRegisterConflictMessage(
+    existingUser: UserProfileDocument,
+    identifiers: { username: string; email: string }
+  ): string {
+    const sameEmail =
+      typeof existingUser.email === 'string' &&
+      this.normalizeEmail(existingUser.email) === identifiers.email
+    const sameUsername =
+      typeof existingUser.username === 'string' &&
+      this.normalizeUsername(existingUser.username) === identifiers.username
+
+    if (sameEmail && existingUser.googleId && !existingUser.passwordHash) {
+      return 'Email nay da duoc tao tai khoan bang Google. Hay dang nhap bang Google.'
+    }
+
+    if (sameEmail) {
+      return 'Email nay da duoc tao tai khoan roi.'
+    }
+
+    if (sameUsername) {
+      return 'Ten dang nhap nay da duoc su dung.'
+    }
+
+    return 'Username hoac email da duoc su dung'
   }
 
   private errorResponse<T>(

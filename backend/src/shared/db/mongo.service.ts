@@ -1,11 +1,13 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common'
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { Db, MongoClient } from 'mongodb'
 import { env } from '../config/env'
 
 @Injectable()
 export class MongoService implements OnModuleDestroy {
+  private readonly logger = new Logger(MongoService.name)
   private client: MongoClient | null = null
   private db: Db | null = null
+  private indexesEnsured = false
 
   async connect(): Promise<Db> {
     if (this.db) return this.db
@@ -18,6 +20,7 @@ export class MongoService implements OnModuleDestroy {
 
     await this.client.connect()
     this.db = this.client.db(env.mongodbDbName)
+    await this.ensureCoreIndexes()
     return this.db
   }
 
@@ -34,5 +37,45 @@ export class MongoService implements OnModuleDestroy {
       this.client = null
       this.db = null
     }
+  }
+
+  private async ensureCoreIndexes(): Promise<void> {
+    if (!this.db || this.indexesEnsured) return
+
+    const attempts: Array<Promise<unknown>> = [
+      this.db
+        .collection('user_profiles')
+        .createIndex({ username: 1 }, { unique: true, name: 'uq_user_profiles_username' }),
+      this.db.collection('user_profiles').createIndex(
+        { email: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { email: { $type: 'string' } },
+          name: 'uq_user_profiles_email',
+        }
+      ),
+      this.db.collection('user_profiles').createIndex(
+        { googleId: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { googleId: { $type: 'string' } },
+          name: 'uq_user_profiles_googleId',
+        }
+      ),
+      this.db
+        .collection('game_moves')
+        .createIndex({ gameId: 1, ply: 1 }, { unique: true, name: 'uq_game_moves_game_ply' }),
+    ]
+
+    const results = await Promise.allSettled(attempts)
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        this.logger.warn(
+          `[db] Failed to ensure index #${index + 1}: ${(result.reason as Error)?.message || String(result.reason)}`
+        )
+      }
+    })
+
+    this.indexesEnsured = true
   }
 }

@@ -2,6 +2,22 @@ const DB_NAME = process?.env?.MONGODB_DB_NAME || 'chessweb_dev'
 const appDb = db.getSiblingDB(DB_NAME)
 
 appDb.user_profiles.createIndex({ username: 1 }, { unique: true, name: 'uq_user_profiles_username' })
+appDb.user_profiles.createIndex(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { email: { $type: 'string' } },
+    name: 'uq_user_profiles_email'
+  }
+)
+appDb.user_profiles.createIndex(
+  { googleId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { googleId: { $type: 'string' } },
+    name: 'uq_user_profiles_googleId'
+  }
+)
 
 appDb.refresh_tokens.createIndex({ tokenHash: 1 }, { unique: true, name: 'uq_refresh_tokens_tokenHash' })
 appDb.refresh_tokens.createIndex({ userId: 1, expiresAt: 1 }, { name: 'idx_refresh_tokens_user_expires' })
