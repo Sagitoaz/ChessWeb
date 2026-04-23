@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react'
 import PropTypes from 'prop-types'
 
 /**
@@ -160,7 +160,7 @@ export const NotificationProvider = ({ children, position = 'top-right' }) => {
     'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
   }
 
-  const showNotification = ({ 
+  const showNotification = useCallback(({ 
     type = 'info', 
     title, 
     message, 
@@ -168,14 +168,16 @@ export const NotificationProvider = ({ children, position = 'top-right' }) => {
   }) => {
     const id = Date.now().toString() + Math.random().toString(36)
     setNotifications((prev) => [...prev, { id, type, title, message, duration }])
-  }
+  }, [])
 
-  const removeNotification = (id) => {
+  const removeNotification = useCallback((id) => {
     setNotifications((prev) => prev.filter((notif) => notif.id !== id))
-  }
+  }, [])
+
+  const contextValue = useMemo(() => ({ showNotification }), [showNotification])
 
   return (
-    <NotificationContext.Provider value={{ showNotification }}>
+    <NotificationContext.Provider value={contextValue}>
       {children}
       
       {/* Toast Container */}

@@ -91,6 +91,9 @@ export default function TournamentDetailPage() {
   const [participantStatus, setParticipantStatus] = useState(null)
   const [checkInMinutes, setCheckInMinutes] = useState(3)
   const participantStatusRef = useRef(null)
+  const hasTournamentSnapshotRef = useRef(false)
+  const isRefreshingRef = useRef(false)
+  const refreshTimerRef = useRef(null)
   const {
     isConnected: isTournamentSocketConnected,
     onPlayerRegistered,
@@ -122,11 +125,12 @@ export default function TournamentDetailPage() {
         : [],
     [tournament]
   )
-  const hasTournamentSnapshot = Boolean(tournament)
 
   const loadTournament = useCallback(async ({ background = false } = {}) => {
     if (!tournamentId) return
-    if (!background || !hasTournamentSnapshot) {
+    if (isRefreshingRef.current) return
+    isRefreshingRef.current = true
+    if (!background || !hasTournamentSnapshotRef.current) {
       setLoading(true)
     }
     try {
@@ -134,6 +138,7 @@ export default function TournamentDetailPage() {
       const payload = response?.data ?? response
       const normalized = normalizeTournament(payload, tournamentId)
       setTournament(normalized)
+      hasTournamentSnapshotRef.current = true
 
       const participantRows = Array.isArray(normalized.participants) ? normalized.participants : []
       const currentParticipant =
@@ -172,12 +177,14 @@ export default function TournamentDetailPage() {
       setIsOrganizer(Boolean(currentUserId && ownerCandidates.includes(String(currentUserId))))
     } catch (_error) {
       setTournament(null)
+      hasTournamentSnapshotRef.current = false
     } finally {
-      if (!background || !hasTournamentSnapshot) {
+      if (!background || !hasTournamentSnapshotRef.current) {
         setLoading(false)
       }
+      isRefreshingRef.current = false
     }
-  }, [currentUserId, hasTournamentSnapshot, tournamentId, showNotification])
+  }, [currentUserId, tournamentId, showNotification])
 
   useEffect(() => {
     void loadTournament()
@@ -205,7 +212,12 @@ export default function TournamentDetailPage() {
           message: message || 'Giải đấu vừa được cập nhật.',
         })
       }
-      void loadTournament({ background: true })
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+      }
+      refreshTimerRef.current = setTimeout(() => {
+        void loadTournament({ background: true })
+      }, 250)
     }
 
     const handlePlayerRegistered = (payload) => {
@@ -235,6 +247,10 @@ export default function TournamentDetailPage() {
     onTournamentCompleted(handleTournamentCompleted)
 
     return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
       off('tournament:playerRegistered', handlePlayerRegistered)
       off('tournament:playerWithdrawn', handlePlayerWithdrawn)
       off('tournament:started', handleTournamentStarted)

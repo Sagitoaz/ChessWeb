@@ -82,6 +82,7 @@ export default function TournamentMatchPlayPage() {
   const [submittingLeave, setSubmittingLeave] = useState(false)
 
   const chessRef = useRef(new Chess(INITIAL_FEN))
+  const isLoadingGameRef = useRef(false)
 
   const currentUserId = normalizeId(
     authUser?.id || authUser?.userId || authUser?._id || authUser?.sub || null
@@ -117,6 +118,8 @@ export default function TournamentMatchPlayPage() {
 
   const loadGame = useCallback(async () => {
     if (!gameId) return
+    if (isLoadingGameRef.current) return
+    isLoadingGameRef.current = true
     setLoading(true)
     setError('')
 
@@ -210,6 +213,7 @@ export default function TournamentMatchPlayPage() {
         message: loadError?.message || 'Không thể tải trận đấu tournament.',
       })
     } finally {
+      isLoadingGameRef.current = false
       setLoading(false)
     }
   }, [authRoles, currentUserId, gameId, tournamentId, showNotification])
