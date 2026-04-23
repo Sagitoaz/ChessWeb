@@ -22,6 +22,41 @@ import {
   Target,
 } from 'lucide-react'
 
+const resolveDisplayName = (value, fallback = 'Unknown') => {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  return fallback
+}
+
+const mergeTournamentStandings = (participants = [], standings = []) => {
+  const standingMap = new Map(
+    standings
+      .filter((row) => row && typeof row === 'object' && row.userId)
+      .map((row) => [String(row.userId), row])
+  )
+
+  const merged = participants.map((participant, idx) => {
+    const row = standingMap.get(String(participant.userId || participant.id || '')) || {}
+    return {
+      ...row,
+      userId: participant.userId || participant.id || `participant-${idx + 1}`,
+      name: resolveDisplayName(row.name, participant.username || `Người chơi ${idx + 1}`),
+      seed: Number(row.seed ?? participant.seed ?? idx + 1),
+      points: Number(row.points ?? 0),
+      wins: Number(row.wins ?? 0),
+      losses: Number(row.losses ?? 0),
+      played: Number(row.played ?? 0),
+      buchholz: Number(row.buchholz ?? 0),
+    }
+  })
+
+  return merged.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points
+    if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz
+    if (b.wins !== a.wins) return b.wins - a.wins
+    return a.seed - b.seed
+  })
+}
+
 const normalizeTournament = (tournament, tournamentId) => ({
   id: tournament?.id || tournament?._id || tournamentId,
   name: tournament?.name || 'Giải đấu',
@@ -34,8 +69,8 @@ const normalizeTournament = (tournament, tournamentId) => ({
       : tournament?.organizer && typeof tournament.organizer === 'object'
         ? {
             username:
-              tournament.organizer.username ||
               tournament.organizer.displayName ||
+              tournament.organizer.username ||
               tournament.organizer.name ||
               'Unknown',
             userId:
@@ -73,7 +108,14 @@ const normalizeTournament = (tournament, tournamentId) => ({
   description: tournament?.description || '',
   currentRound: tournament?.currentRound || null,
   rounds: Array.isArray(tournament?.rounds) ? tournament.rounds : [],
-  standings: Array.isArray(tournament?.standings) ? tournament.standings : [],
+  standings: mergeTournamentStandings(
+    Array.isArray(tournament?.participants)
+      ? tournament.participants
+      : Array.isArray(tournament?.players)
+        ? tournament.players
+        : [],
+    Array.isArray(tournament?.standings) ? tournament.standings : []
+  ),
   winner: tournament?.winner || null,
   completedAt: tournament?.completedAt || null,
 })
@@ -230,7 +272,7 @@ export default function TournamentDetailPage() {
       refreshIfRelevant(payload, 'Giải đấu đã bắt đầu.')
     }
     const handleRoundUpdate = (payload) => {
-      refreshIfRelevant(payload, 'Kết quả vòng đấu đã cập nhật, đang làm mới bảng điểm...')
+      refreshIfRelevant(payload, 'Lịch đấu vừa cập nhật, đang làm mới bảng điểm...')
     }
     const handleMatchReady = (payload) => {
       refreshIfRelevant(payload, 'Có bàn đấu mới sẵn sàng.')
@@ -739,7 +781,7 @@ export default function TournamentDetailPage() {
                   label: `Người chơi (${tournament.participants.length})`,
                   icon: Users,
                 },
-                { key: 'matches', label: 'Kết quả', icon: Target },
+                { key: 'matches', label: 'Theo dõi vòng đấu', icon: Target },
                 { key: 'standings', label: 'Bảng điểm', icon: Award },
                 { key: 'bracket', label: 'Bracket', icon: MapPin },
               ].map((tab) => {
@@ -873,7 +915,7 @@ export default function TournamentDetailPage() {
             {/* Matches Tab */}
             {activeTab === 'matches' && (
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Kết quả các trận</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Theo dõi các cặp đấu</h3>
                 {tournament.rounds.map((round, index) => (
                   <div key={index} className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-3">{round.name}</h4>

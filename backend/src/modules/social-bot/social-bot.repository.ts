@@ -35,6 +35,31 @@ export class SocialBotRepository {
     await this.replaceGameMoves(gameId, moves, now);
   }
 
+  private normalizeRoundsFromUpdate(
+    update: Record<string, unknown>,
+  ): Array<Record<string, unknown>> | null {
+    if (!Object.prototype.hasOwnProperty.call(update, "rounds")) {
+      return null;
+    }
+
+    return Array.isArray(update.rounds)
+      ? (update.rounds as Array<Record<string, unknown>>)
+      : [];
+  }
+
+  private async syncTournamentMatchesFromUpdate(
+    tournamentId: string,
+    update: Record<string, unknown>,
+    now: Date,
+  ): Promise<void> {
+    const rounds = this.normalizeRoundsFromUpdate(update);
+    if (rounds === null) {
+      return;
+    }
+
+    await this.replaceTournamentMatches(tournamentId, rounds, now);
+  }
+
   async createRoom(doc: Record<string, unknown>) {
     const result = await this.db.collection("rooms").insertOne(doc);
     return { ...doc, _id: result.insertedId };
@@ -126,13 +151,19 @@ export class SocialBotRepository {
       return null;
     }
     const objectId = new ObjectId(id);
-    return this.db
+    const now =
+      update.updatedAt instanceof Date ? update.updatedAt : new Date();
+    const result = await this.db
       .collection("tournaments")
       .findOneAndUpdate(
         { _id: objectId },
         { $set: update },
         { returnDocument: "after" },
       );
+
+    await this.syncTournamentMatchesFromUpdate(id, update, now);
+
+    return result;
   }
 
   async findTournamentsByStatus(statuses: string[]) {
@@ -378,6 +409,97 @@ export class SocialBotRepository {
     });
 
     const result = await collection.bulkWrite(operations, { ordered: true });
+    return { insertedCount: Number(result.insertedCount || 0) };
+  }
+
+  async replaceTournamentMatches(
+    tournamentId: string,
+    rounds: Array<Record<string, unknown>>,
+    now: Date,
+  ) {
+    const collection = this.db.collection<Record<string, unknown>>(
+      "tournament_matches",
+    );
+    await collection.deleteMany({ tournamentId });
+
+    if (!Array.isArray(rounds) || rounds.length === 0) {
+      return { insertedCount: 0 };
+    }
+
+    const documents = rounds.flatMap((round, roundIndex) => {
+      const matches = Array.isArray(round?.matches)
+        ? (round.matches as Array<Record<string, unknown>>)
+        : [];
+
+      return matches.map((match, matchIndex) => {
+        const matchId =
+          typeof match?.id === "string" && match.id.trim().length > 0
+            ? match.id.trim()
+            : `r${roundIndex + 1}-m${matchIndex + 1}`;
+        const player1 =
+          match?.player1 && typeof match.player1 === "object"
+            ? (match.player1 as Record<string, unknown>)
+            : {};
+        const player2 =
+          match?.player2 && typeof match.player2 === "object"
+            ? (match.player2 as Record<string, unknown>)
+            : {};
+
+        return {
+          _id: new ObjectId(),
+          matchKey: `${tournamentId}:${matchId}`,
+          tournamentId,
+          matchId,
+          roundIndex,
+          roundNumber: roundIndex + 1,
+          roundName:
+            typeof round?.name === "string" && round.name.trim().length > 0
+              ? round.name.trim()
+              : `Round ${roundIndex + 1}`,
+          status:
+            typeof match?.status === "string" ? String(match.status) : "pending",
+          result: typeof match?.result === "string" ? match.result : null,
+          winner: typeof match?.winner === "string" ? match.winner : null,
+          gameId:
+            typeof match?.gameId === "string" && match.gameId.trim().length > 0
+              ? match.gameId.trim()
+              : null,
+          nextMatchId:
+            typeof match?.nextMatchId === "string" ? match.nextMatchId : null,
+          nextSlot:
+            typeof match?.nextSlot === "string" ? match.nextSlot : null,
+          player1: {
+            userId:
+              typeof player1.userId === "string" ? player1.userId : null,
+            name: typeof player1.name === "string" ? player1.name : null,
+            seed: player1.seed ?? null,
+            score: player1.score ?? null,
+          },
+          player2: {
+            userId:
+              typeof player2.userId === "string" ? player2.userId : null,
+            name: typeof player2.name === "string" ? player2.name : null,
+            seed: player2.seed ?? null,
+            score: player2.score ?? null,
+          },
+          checkIn:
+            match?.checkIn && typeof match.checkIn === "object"
+              ? match.checkIn
+              : null,
+          startedAt: match?.startedAt ?? null,
+          completedAt: match?.completedAt ?? null,
+          createdAt: now,
+          updatedAt: now,
+          rawMatch: match,
+        };
+      });
+    });
+
+    if (documents.length === 0) {
+      return { insertedCount: 0 };
+    }
+
+    const result = await collection.insertMany(documents, { ordered: true });
     return { insertedCount: Number(result.insertedCount || 0) };
   }
 

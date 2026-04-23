@@ -815,6 +815,75 @@ export class SocialBotService {
     });
   }
 
+  private resolveTournamentParticipantName(
+    participant: Record<string, unknown>,
+    profile:
+      | {
+          displayName?: string;
+          username?: string;
+        }
+      | null
+      | undefined,
+    fallbackLabel: string,
+  ): string {
+    const preferred =
+      (typeof profile?.displayName === "string" &&
+      profile.displayName.trim().length > 0
+        ? profile.displayName
+        : typeof profile?.username === "string" &&
+            profile.username.trim().length > 0
+          ? profile.username
+          : typeof participant?.username === "string" &&
+              participant.username.trim().length > 0
+            ? participant.username
+            : null) || null;
+
+    return preferred || fallbackLabel;
+  }
+
+  private buildTournamentParticipantSnapshots(
+    participantsRaw: Array<Record<string, unknown>>,
+    latestProfileMap: Map<string, any>,
+    options?: {
+      includeStatuses?: string[];
+      excludeStatuses?: string[];
+    },
+  ) {
+    const includeStatuses = Array.isArray(options?.includeStatuses)
+      ? new Set(options?.includeStatuses)
+      : null;
+    const excludeStatuses = new Set(options?.excludeStatuses || []);
+
+    return participantsRaw
+      .filter((participant: any) => {
+        const status = String(participant?.status || "");
+        if (includeStatuses && !includeStatuses.has(status)) {
+          return false;
+        }
+        if (excludeStatuses.has(status)) {
+          return false;
+        }
+        return true;
+      })
+      .map((participant: any, idx: number) => {
+        const userId = String(participant.userId || "");
+        const profile = latestProfileMap.get(userId);
+        return {
+          userId,
+          name: this.resolveTournamentParticipantName(
+            participant,
+            profile,
+            `Player ${idx + 1}`,
+          ),
+          rating: Number(profile?.rating || participant.rating || 1200),
+          seed: Number(participant.seed || idx + 1),
+          status: String(participant.status || "active"),
+        };
+      })
+      .filter((participant) => participant.userId.length > 0)
+      .sort((a, b) => a.seed - b.seed);
+  }
+
   private async attachTournamentGamesForRound(
     tournamentId: string,
     rounds: Array<Record<string, unknown>>,
@@ -1961,24 +2030,11 @@ export class SocialBotService {
       ]),
     );
 
-    const activeParticipants = participantsRaw
-      .filter((participant: any) => participant.status !== "withdrawn")
-      .filter((participant: any) => participant.status === "active")
-      .map((participant: any, idx: number) => ({
-        userId: String(participant.userId),
-        name:
-          typeof participant.username === "string" &&
-          participant.username.length > 0
-            ? participant.username
-            : `Player ${idx + 1}`,
-        rating: Number(
-          latestProfileMap.get(String(participant.userId))?.rating ||
-            participant.rating ||
-            1200,
-        ),
-        seed: Number(participant.seed || idx + 1),
-      }))
-      .sort((a, b) => a.seed - b.seed);
+    const activeParticipants = this.buildTournamentParticipantSnapshots(
+      participantsRaw,
+      latestProfileMap,
+      { includeStatuses: ["active"] },
+    );
 
     const pendingParticipants = participantsRaw.filter(
       (participant: any) => participant.status === "pending",
@@ -2033,7 +2089,15 @@ export class SocialBotService {
       checkInMinutes: 5,
     });
 
-    const standings = this.buildTournamentStandings(activeParticipants, rounds);
+    const standingsParticipants = this.buildTournamentParticipantSnapshots(
+      participantsRaw,
+      latestProfileMap,
+      { excludeStatuses: ["withdrawn", "pending", "rejected"] },
+    );
+    const standings = this.buildTournamentStandings(
+      standingsParticipants,
+      rounds,
+    );
 
     const updated = await this.repo.updateTournamentById(tournamentId, {
       status: "ongoing",
@@ -2308,20 +2372,27 @@ export class SocialBotService {
       : tournamentId;
     const participantsRaw =
       await this.repo.findTournamentParticipants(normalizedId);
-    const activeParticipants = participantsRaw
-      .filter((participant: any) => participant.status === "active")
-      .map((participant: any, idx: number) => ({
-        userId: String(participant.userId),
-        name:
-          typeof participant.username === "string" &&
-          participant.username.length > 0
-            ? participant.username
-            : `Player ${idx + 1}`,
-        rating: Number(participant.rating || 1200),
-        seed: Number(participant.seed || idx + 1),
-      }));
+    const participantIds = participantsRaw
+      .map((participant: any) => String(participant.userId || ""))
+      .filter((value: string) => value.length > 0);
+    const latestProfiles =
+      await this.repo.findUserProfilesByIds(participantIds);
+    const latestProfileMap = new Map(
+      latestProfiles.map((profile: any) => [
+        String(profile._id || profile.userId || ""),
+        profile,
+      ]),
+    );
+    const standingsParticipants = this.buildTournamentParticipantSnapshots(
+      participantsRaw,
+      latestProfileMap,
+      { excludeStatuses: ["withdrawn", "pending", "rejected"] },
+    );
 
-    const standings = this.buildTournamentStandings(activeParticipants, rounds);
+    const standings = this.buildTournamentStandings(
+      standingsParticipants,
+      rounds,
+    );
     const updated = await this.repo.updateTournamentById(tournamentId, {
       rounds,
       standings,
@@ -2728,6 +2799,8 @@ export class SocialBotService {
           winnerSlot === TournamentWinnerSlot.PLAYER1
             ? "white_win"
             : "black_win",
+        rawResult:
+          winnerSlot === TournamentWinnerSlot.PLAYER1 ? "1-0" : "0-1",
         endReason: "tournament_result_recorded",
         finishedAt: new Date(),
         updatedAt: new Date(),
@@ -2746,8 +2819,7 @@ export class SocialBotService {
     const participantsRaw =
       await this.repo.findTournamentParticipants(normalizedId);
     const participantIds = participantsRaw
-      .filter((participant: any) => participant.status === "active")
-      .map((participant: any) => String(participant.userId))
+      .map((participant: any) => String(participant.userId || ""))
       .filter((value: string) => value.length > 0);
     const latestProfiles =
       await this.repo.findUserProfilesByIds(participantIds);
@@ -2757,23 +2829,15 @@ export class SocialBotService {
         profile,
       ]),
     );
-    const activeParticipants = participantsRaw
-      .filter((participant: any) => participant.status === "active")
-      .map((participant: any, idx: number) => ({
-        userId: String(participant.userId),
-        name:
-          typeof participant.username === "string" &&
-          participant.username.length > 0
-            ? participant.username
-            : `Player ${idx + 1}`,
-        rating: Number(
-          latestProfileMap.get(String(participant.userId))?.rating ||
-            participant.rating ||
-            1200,
-        ),
-        seed: Number(participant.seed || idx + 1),
-      }));
-    const standings = this.buildTournamentStandings(activeParticipants, rounds);
+    const standingsParticipants = this.buildTournamentParticipantSnapshots(
+      participantsRaw,
+      latestProfileMap,
+      { excludeStatuses: ["withdrawn", "pending", "rejected"] },
+    );
+    const standings = this.buildTournamentStandings(
+      standingsParticipants,
+      rounds,
+    );
     const eliminatedUserId = String(loserPlayer?.userId || "") || null;
 
     const finalRound = rounds[rounds.length - 1];

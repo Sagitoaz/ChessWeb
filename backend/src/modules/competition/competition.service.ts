@@ -112,9 +112,60 @@ export class CompetitionService {
   private profilesCollection() {
     return this.mongoService.getDb().collection<{
       _id: string;
+      username?: string;
+      displayName?: string;
+      avatarUrl?: string;
       rating?: number;
       updatedAt?: Date;
     }>("user_profiles");
+  }
+
+  private normalizeReferenceId(value: unknown): string | null {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const match = trimmed.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
+      return match?.[1] || trimmed;
+    }
+
+    if (
+      value &&
+      typeof value === "object" &&
+      "toString" in value &&
+      typeof (value as { toString?: unknown }).toString === "function"
+    ) {
+      const asString = (value as { toString: () => string }).toString().trim();
+      if (!asString) return null;
+      const match = asString.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
+      return match?.[1] || asString;
+    }
+
+    return null;
+  }
+
+  private resolveDisplayName(
+    profile:
+      | {
+          displayName?: string | null;
+          username?: string | null;
+        }
+      | null
+      | undefined,
+    fallback?: unknown,
+  ): string {
+    const preferred =
+      (typeof profile?.displayName === "string" &&
+      profile.displayName.trim().length > 0
+        ? profile.displayName
+        : typeof profile?.username === "string" &&
+            profile.username.trim().length > 0
+          ? profile.username
+          : null) ||
+      (typeof fallback === "string" && fallback.trim().length > 0
+        ? fallback
+        : null);
+
+    return preferred || "Unknown";
   }
 
   private async getActiveRankedMatchForUser(
@@ -2351,6 +2402,7 @@ export class CompetitionService {
     const db = this.mongoService.getDb();
     const tournaments = db.collection("tournaments");
     const tournamentParticipants = db.collection("tournament_participants");
+    const userProfiles = this.profilesCollection();
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 10;
@@ -2400,6 +2452,37 @@ export class CompetitionService {
       participantsByTournamentId.set(row._id.toHexString(), Number(row.count));
     }
 
+    const organizerIds = Array.from(
+      new Set(
+        items
+          .map((item) =>
+            this.normalizeReferenceId(
+              item.createdBy ||
+                item.organizerId ||
+                item.ownerUserId ||
+                (item.organizer as Record<string, unknown> | undefined)?.userId ||
+                (item.organizer as Record<string, unknown> | undefined)?._id ||
+                (item.organizer as Record<string, unknown> | undefined)?.id,
+            ),
+          )
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+
+    const organizerProfiles =
+      organizerIds.length > 0
+        ? await userProfiles
+            .find(
+              { _id: { $in: organizerIds } },
+              { projection: { _id: 1, username: 1, displayName: 1 } },
+            )
+            .toArray()
+        : [];
+
+    const organizerProfileMap = new Map(
+      organizerProfiles.map((profile) => [profile._id, profile]),
+    );
+
     return {
       items: items.map((item) => ({
         ...item,
@@ -2408,6 +2491,40 @@ export class CompetitionService {
         format: item.formatLabel || item.format,
         startDate: item.startAt,
         registrationDeadline: item.registrationDeadline || item.startAt,
+        organizerId:
+          this.normalizeReferenceId(
+            item.createdBy ||
+              item.organizerId ||
+              item.ownerUserId ||
+              (item.organizer as Record<string, unknown> | undefined)?.userId ||
+              (item.organizer as Record<string, unknown> | undefined)?._id ||
+              (item.organizer as Record<string, unknown> | undefined)?.id,
+          ) || null,
+        organizer: (() => {
+          const organizerId =
+            this.normalizeReferenceId(
+              item.createdBy ||
+                item.organizerId ||
+                item.ownerUserId ||
+                (item.organizer as Record<string, unknown> | undefined)?.userId ||
+                (item.organizer as Record<string, unknown> | undefined)?._id ||
+                (item.organizer as Record<string, unknown> | undefined)?.id,
+            ) || null;
+          const organizerProfile = organizerId
+            ? organizerProfileMap.get(organizerId) || null
+            : null;
+          return {
+            userId: organizerId,
+            username: this.resolveDisplayName(
+              organizerProfile,
+              (item.organizer as Record<string, unknown> | undefined)?.username ||
+                (item.organizer as Record<string, unknown> | undefined)?.displayName ||
+                item.organizerName ||
+                item.createdByUsername ||
+                item.createdBy,
+            ),
+          };
+        })(),
         status:
           item.status === "draft" || item.status === "open"
             ? "registration"
@@ -2450,6 +2567,11 @@ export class CompetitionService {
 
     const db = this.mongoService.getDb();
     const tournaments = db.collection("tournaments");
+    const organizerProfile = await this.profilesCollection().findOne(
+      { _id: user.userId },
+      { projection: { _id: 1, username: 1, displayName: 1 } },
+    );
+    const organizerName = this.resolveDisplayName(organizerProfile, user.userId);
 
     const now = new Date();
     const document = {
@@ -2464,6 +2586,12 @@ export class CompetitionService {
       registrationDeadline,
       maxParticipants: payload.maxParticipants,
       createdBy: user.userId,
+      organizerId: user.userId,
+      organizerName,
+      organizer: {
+        userId: user.userId,
+        username: organizerName,
+      },
       status: "registration",
       participants: 0,
       rounds: [],
@@ -2543,11 +2671,11 @@ export class CompetitionService {
       return {
         id: userId || `participant-${index + 1}`,
         userId,
-        username:
+        username: this.resolveDisplayName(
+          profile,
           (typeof participant.username === "string" && participant.username) ||
-          profile?.displayName ||
-          profile?.username ||
-          `Player ${index + 1}`,
+            `Player ${index + 1}`,
+        ),
         rating: Number(participant.rating ?? profile?.rating ?? 1200),
         seed: Number(participant.seed ?? index + 1),
         status: participant.status || "active",
@@ -2555,34 +2683,16 @@ export class CompetitionService {
       };
     });
 
-    const organizerIdRaw =
-      tournament.createdBy ||
-      tournament.organizerId ||
-      tournament.ownerUserId ||
-      (tournament.organizer as Record<string, unknown> | undefined)?.userId ||
-      (tournament.organizer as Record<string, unknown> | undefined)?._id ||
-      (tournament.organizer as Record<string, unknown> | undefined)?.id ||
-      "";
-    const organizerId = (() => {
-      if (typeof organizerIdRaw === "string") {
-        const match = organizerIdRaw.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
-        return match?.[1] || organizerIdRaw;
-      }
-      if (
-        organizerIdRaw &&
-        typeof organizerIdRaw === "object" &&
-        "toString" in organizerIdRaw &&
-        typeof (organizerIdRaw as { toString?: unknown }).toString ===
-          "function"
-      ) {
-        const asString = (
-          organizerIdRaw as { toString: () => string }
-        ).toString();
-        const match = asString.match(/ObjectId\("([a-fA-F0-9]{24})"\)/);
-        return match?.[1] || asString;
-      }
-      return "";
-    })();
+    const organizerId =
+      this.normalizeReferenceId(
+        tournament.createdBy ||
+          tournament.organizerId ||
+          tournament.ownerUserId ||
+          (tournament.organizer as Record<string, unknown> | undefined)
+            ?.userId ||
+          (tournament.organizer as Record<string, unknown> | undefined)?._id ||
+          (tournament.organizer as Record<string, unknown> | undefined)?.id,
+      ) || "";
     const organizerProfile = organizerId
       ? profileMap.get(organizerId) ||
         (await userProfiles.findOne(
@@ -2591,6 +2701,94 @@ export class CompetitionService {
         )) ||
         null
       : null;
+
+    const participantNameMap = new Map(
+      participants.map((participant) => [participant.userId, participant.username]),
+    );
+
+    const rounds = Array.isArray(tournament.rounds)
+      ? tournament.rounds.map((round: any, roundIndex: number) => ({
+          ...round,
+          roundIndex,
+          matches: Array.isArray(round?.matches)
+            ? round.matches.map((match: any, matchIndex: number) => {
+                const player1UserId = this.normalizeReferenceId(match?.player1?.userId);
+                const player2UserId = this.normalizeReferenceId(match?.player2?.userId);
+                const player1Name = this.resolveDisplayName(
+                  player1UserId ? profileMap.get(player1UserId) || null : null,
+                  participantNameMap.get(player1UserId || "") ||
+                    match?.player1?.name ||
+                    `Người chơi ${matchIndex * 2 + 1}`,
+                );
+                const player2Name = this.resolveDisplayName(
+                  player2UserId ? profileMap.get(player2UserId) || null : null,
+                  participantNameMap.get(player2UserId || "") ||
+                    match?.player2?.name ||
+                    `Người chơi ${matchIndex * 2 + 2}`,
+                );
+
+                let winner = match?.winner ?? null;
+                if (winner && String(winner) === String(match?.player1?.name || "")) {
+                  winner = player1Name;
+                } else if (
+                  winner &&
+                  String(winner) === String(match?.player2?.name || "")
+                ) {
+                  winner = player2Name;
+                }
+
+                return {
+                  ...match,
+                  winner,
+                  player1: {
+                    ...(match?.player1 || {}),
+                    userId: player1UserId,
+                    name: player1Name,
+                  },
+                  player2: {
+                    ...(match?.player2 || {}),
+                    userId: player2UserId,
+                    name: player2Name,
+                  },
+                };
+              })
+            : [],
+        }))
+      : [];
+
+    const standingsRows = Array.isArray(tournament.standings)
+      ? tournament.standings
+      : [];
+    const standingsMap = new Map(
+      standingsRows
+        .map((row: any) => [this.normalizeReferenceId(row?.userId), row] as const)
+        .filter((entry): entry is [string, any] => Boolean(entry[0])),
+    );
+    const enrichedStandings = participants
+      .map((participant) => {
+        const row = standingsMap.get(participant.userId) || {};
+        return {
+          ...row,
+          userId: participant.userId,
+          name: this.resolveDisplayName(
+            profileMap.get(participant.userId) || null,
+            row?.name || participant.username,
+          ),
+          seed: Number(row?.seed ?? participant.seed ?? 9999),
+          rating: Number(row?.rating ?? participant.rating ?? 1200),
+          points: Number(row?.points ?? 0),
+          wins: Number(row?.wins ?? 0),
+          losses: Number(row?.losses ?? 0),
+          played: Number(row?.played ?? 0),
+          buchholz: Number(row?.buchholz ?? 0),
+        };
+      })
+      .sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        return a.seed - b.seed;
+      });
 
     return {
       ...tournament,
@@ -2603,21 +2801,23 @@ export class CompetitionService {
       organizerId: organizerId || null,
       organizer: {
         userId: organizerId || null,
-        username:
-          organizerProfile?.displayName ||
-          organizerProfile?.username ||
+        username: this.resolveDisplayName(
+          organizerProfile,
           (typeof tournament.organizer === "string"
             ? tournament.organizer
             : null) ||
-          (typeof tournament.organizerName === "string"
-            ? tournament.organizerName
-            : null) ||
-          (typeof tournament.createdBy === "string"
-            ? tournament.createdBy
-            : null) ||
-          "Unknown",
+            (typeof tournament.organizerName === "string"
+              ? tournament.organizerName
+              : null) ||
+            (typeof tournament.createdByUsername === "string"
+              ? tournament.createdByUsername
+              : null) ||
+            (typeof tournament.createdBy === "string" ? tournament.createdBy : null),
+        ),
       },
       participants,
+      rounds,
+      standings: enrichedStandings,
       status:
         tournament.status === "draft" || tournament.status === "open"
           ? "registration"

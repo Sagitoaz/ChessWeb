@@ -23,7 +23,11 @@ const normalizeTournament = (tournament = {}) => ({
   organizer:
     typeof tournament.organizer === 'string'
       ? tournament.organizer
-      : tournament.organizer?.username || 'Unknown',
+      : tournament.organizer?.displayName ||
+        tournament.organizer?.username ||
+        tournament.organizerName ||
+        tournament.createdByUsername ||
+        'Unknown',
   startDate: tournament.startDate || tournament.start_date || new Date().toISOString(),
   registrationDeadline: tournament.registrationDeadline || tournament.registration_deadline || null,
   participants: Array.isArray(tournament.participants)

@@ -39,6 +39,37 @@ interface UsernameDoc {
 export class ProfileRepository implements ProfileRepositoryPort {
   constructor(private readonly mongoService: MongoService) {}
 
+  private normalizeGameOutcomeForUser(
+    game: Pick<GameDoc, "whitePlayerId" | "blackPlayerId" | "result" | "rawResult">,
+    userId: string,
+  ): "win" | "lose" | "draw" | null {
+    const rawResult =
+      typeof game.rawResult === "string" ? game.rawResult.toLowerCase() : "";
+    const result = typeof game.result === "string" ? game.result.toLowerCase() : "";
+    const isWhite = game.whitePlayerId === userId;
+    const isBlack = game.blackPlayerId === userId;
+
+    if (["draw", "1/2-1/2"].includes(rawResult) || ["draw", "1/2-1/2"].includes(result)) {
+      return "draw";
+    }
+
+    if (result === "win") return "win";
+    if (["lose", "loss"].includes(result)) return "lose";
+
+    const whiteWinValues = ["white_win", "whitewin", "1-0", "white"];
+    const blackWinValues = ["black_win", "blackwin", "0-1", "black"];
+
+    const effectiveResult = rawResult || result;
+    if (whiteWinValues.includes(effectiveResult)) {
+      return isWhite ? "win" : isBlack ? "lose" : null;
+    }
+    if (blackWinValues.includes(effectiveResult)) {
+      return isBlack ? "win" : isWhite ? "lose" : null;
+    }
+
+    return null;
+  }
+
   private userProfiles(): Collection<UserProfileDoc> {
     return this.mongoService
       .getDb()
@@ -250,16 +281,12 @@ export class ProfileRepository implements ProfileRepositoryPort {
     const match: Record<string, unknown> = {
       $or: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
       finishedAt: { $exists: true, $ne: null },
+      endReason: { $ne: "double_no_show" },
+      status: { $nin: ["cancelled", "canceled"] },
     };
 
     if (mode) {
       match.mode = mode;
-    }
-
-    if (result) {
-      match.result = result;
-    } else {
-      match.result = { $in: ["win", "lose", "draw"] };
     }
 
     if (fromDate || toDate) {
@@ -269,28 +296,33 @@ export class ProfileRepository implements ProfileRepositoryPort {
       match.createdAt = createdAtFilter;
     }
 
-    const [items, total] = await Promise.all([
-      this.games()
-        .find(match, {
-          projection: {
-            _id: 1,
-            mode: 1,
-            whitePlayerId: 1,
-            blackPlayerId: 1,
-            result: 1,
-            rawResult: 1,
-            moves: 1,
-            metadata: 1,
-            createdAt: 1,
-            finishedAt: 1,
-          },
-        })
-        .sort({ createdAt: -1, _id: -1 })
-        .skip(skip)
-        .limit(pageSize)
-        .toArray(),
-      this.games().countDocuments(match),
-    ]);
+    const allItems = await this.games()
+      .find(match, {
+        projection: {
+          _id: 1,
+          mode: 1,
+          whitePlayerId: 1,
+          blackPlayerId: 1,
+          result: 1,
+          rawResult: 1,
+          moves: 1,
+          metadata: 1,
+          createdAt: 1,
+          finishedAt: 1,
+        },
+      })
+      .sort({ createdAt: -1, _id: -1 })
+      .toArray();
+
+    const filteredItems = allItems.filter((game) => {
+      const normalizedResult = this.normalizeGameOutcomeForUser(game, userId);
+      if (!normalizedResult) return false;
+      if (!result) return true;
+      return normalizedResult === result;
+    });
+
+    const total = filteredItems.length;
+    const items = filteredItems.slice(skip, skip + pageSize);
 
     const playerIds = Array.from(
       new Set(
@@ -381,7 +413,6 @@ export class ProfileRepository implements ProfileRepositoryPort {
   }> {
     const match: Record<string, unknown> = {
       $or: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
-      result: { $in: ["win", "lose", "draw"] },
       finishedAt: { $exists: true, $ne: null },
       endReason: { $ne: "double_no_show" },
       status: { $nin: ["cancelled", "canceled"] },
@@ -391,12 +422,30 @@ export class ProfileRepository implements ProfileRepositoryPort {
       match.mode = mode;
     }
 
-    const [totalGames, wins, losses, draws] = await Promise.all([
-      this.games().countDocuments(match),
-      this.games().countDocuments({ ...match, result: "win" }),
-      this.games().countDocuments({ ...match, result: "lose" }),
-      this.games().countDocuments({ ...match, result: "draw" }),
-    ]);
+    const items = await this.games()
+      .find(match, {
+        projection: {
+          whitePlayerId: 1,
+          blackPlayerId: 1,
+          result: 1,
+          rawResult: 1,
+        },
+      })
+      .toArray();
+
+    let totalGames = 0;
+    let wins = 0;
+    let losses = 0;
+    let draws = 0;
+
+    for (const game of items) {
+      const outcome = this.normalizeGameOutcomeForUser(game, userId);
+      if (!outcome) continue;
+      totalGames += 1;
+      if (outcome === "win") wins += 1;
+      else if (outcome === "lose") losses += 1;
+      else if (outcome === "draw") draws += 1;
+    }
 
     return {
       totalGames,

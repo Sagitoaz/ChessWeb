@@ -41,6 +41,17 @@ appDb.tournament_participants.createIndex(
   { tournamentId: 1, userId: 1 },
   { unique: true, name: 'uq_tournament_participants_tour_user' }
 )
+appDb.tournament_matches.createIndex(
+  { tournamentId: 1, roundIndex: 1, matchId: 1 },
+  { unique: true, name: 'uq_tournament_matches_round_match' }
+)
+appDb.tournament_matches.createIndex(
+  { tournamentId: 1, gameId: 1 },
+  {
+    partialFilterExpression: { gameId: { $type: 'string' } },
+    name: 'idx_tournament_matches_game'
+  }
+)
 
 appDb.games.createIndex({ mode: 1, createdAt: -1 }, { name: 'idx_games_mode_createdAt' })
 appDb.games.createIndex({ whitePlayerId: 1, blackPlayerId: 1, createdAt: -1 }, { name: 'idx_games_players_createdAt' })
