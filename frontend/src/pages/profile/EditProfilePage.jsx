@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '@/store'
-import { Button, Input, useNotification } from '@/components/common'
+import { Avatar, Button, Input, useNotification } from '@/components/common'
 import authService from '@/services/authService'
 
 const profileSchema = z.object({
@@ -51,7 +51,7 @@ const EditProfilePage = () => {
     },
     mode: 'onTouched',
   })
-  const avatarPreview = watch('avatarUrl') || user?.avatarUrl || 'https://i.pravatar.cc/150?img=1'
+  const avatarPreview = watch('avatarUrl') || user?.avatarUrl || ''
 
   // Password form
   const {
@@ -136,10 +136,12 @@ const EditProfilePage = () => {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-4">
           <h2 className="text-base font-bold text-gray-900 mb-4">Ảnh đại diện</h2>
           <div className="flex items-center gap-5">
-            <img
+            <Avatar
               src={avatarPreview}
-              alt="avatar"
-              className="w-20 h-20 rounded-2xl object-cover border-2 border-gray-200"
+              name={watch('displayName') || user?.displayName || user?.username || 'Người chơi'}
+              size="2xl"
+              shape="rounded"
+              className="border-2 border-gray-200"
             />
             <p className="text-sm text-gray-600">
               Dán `Avatar URL` bên dưới rồi bấm <strong>Lưu thay đổi</strong> để cập nhật ảnh.
