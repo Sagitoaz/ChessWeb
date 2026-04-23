@@ -630,7 +630,7 @@ export class SocialBotService {
         const player1Name = String(match?.player1?.name || "");
         const player2Name = String(match?.player2?.name || "");
         if (
-          match.status !== "completed" &&
+          this.normalizeMatchStatus(match?.status) === "pending" &&
           player1Name !== "TBD" &&
           player2Name !== "TBD"
         ) {
@@ -988,6 +988,9 @@ export class SocialBotService {
 
       const rounds = this.cloneTournamentRounds(tournament.rounds);
       let roundsUpdated = false;
+      let firstUpdatedRoundIndex: number | null = null;
+      let earliestNextRoundToAttach: number | null = null;
+      const eliminatedUserIds = new Set<string>();
 
       for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
         const round = rounds[roundIndex] as any;
@@ -1042,6 +1045,14 @@ export class SocialBotService {
             if (match.player1) match.player1.score = 0;
             if (match.player2) match.player2.score = 0;
             roundsUpdated = true;
+            firstUpdatedRoundIndex =
+              firstUpdatedRoundIndex === null
+                ? roundIndex
+                : Math.min(firstUpdatedRoundIndex, roundIndex);
+            const p1UserId = String(match?.player1?.userId || "");
+            const p2UserId = String(match?.player2?.userId || "");
+            if (p1UserId) eliminatedUserIds.add(p1UserId);
+            if (p2UserId) eliminatedUserIds.add(p2UserId);
             continue;
           }
 
@@ -1093,6 +1104,22 @@ export class SocialBotService {
               String(winnerPlayer?.userId || "") || null,
             );
             roundsUpdated = true;
+            firstUpdatedRoundIndex =
+              firstUpdatedRoundIndex === null
+                ? roundIndex
+                : Math.min(firstUpdatedRoundIndex, roundIndex);
+            earliestNextRoundToAttach =
+              earliestNextRoundToAttach === null
+                ? roundIndex + 1
+                : Math.min(earliestNextRoundToAttach, roundIndex + 1);
+            const loserPlayer: any =
+              winnerSlot === TournamentWinnerSlot.PLAYER1
+                ? match.player2
+                : match.player1;
+            const loserUserId = String(loserPlayer?.userId || "");
+            if (loserUserId) {
+              eliminatedUserIds.add(loserUserId);
+            }
           }
         }
       }
@@ -1100,6 +1127,42 @@ export class SocialBotService {
       if (roundsUpdated) {
         this.refreshBracketRoundStatuses(rounds);
         this.propagateBracketAutoAdvancement(rounds);
+        if (
+          earliestNextRoundToAttach !== null &&
+          earliestNextRoundToAttach < rounds.length
+        ) {
+          await this.attachTournamentGamesForRounds(
+            tournamentId,
+            rounds,
+            earliestNextRoundToAttach,
+          );
+        }
+
+        const normalizedId = ObjectId.isValid(tournamentId)
+          ? new ObjectId(tournamentId)
+          : tournamentId;
+        const participantsRaw =
+          await this.repo.findTournamentParticipants(normalizedId);
+        const participantIds = participantsRaw
+          .map((participant: any) => String(participant.userId || ""))
+          .filter((value: string) => value.length > 0);
+        const latestProfiles =
+          await this.repo.findUserProfilesByIds(participantIds);
+        const latestProfileMap = new Map(
+          latestProfiles.map((profile: any) => [
+            String(profile._id || profile.userId || ""),
+            profile,
+          ]),
+        );
+        const standingsParticipants = this.buildTournamentParticipantSnapshots(
+          participantsRaw,
+          latestProfileMap,
+          { excludeStatuses: ["withdrawn", "pending", "rejected"] },
+        );
+        const standings = this.buildTournamentStandings(
+          standingsParticipants,
+          rounds,
+        );
 
         const allCompleted = rounds.every((round: any) => {
           const matches = Array.isArray(round?.matches) ? round.matches : [];
@@ -1118,16 +1181,58 @@ export class SocialBotService {
         await this.repo.updateTournamentById(tournamentId, {
           rounds,
           status: allCompleted ? "completed" : "ongoing",
+          currentRound: allCompleted
+            ? rounds.length
+            : this.determineTournamentCurrentRound(rounds),
+          standings,
           winner: winnerName,
           completedAt: allCompleted ? new Date() : null,
           updatedAt: new Date(),
         });
 
+        for (const userId of eliminatedUserIds) {
+          const participant = participantsRaw.find(
+            (entry: any) => String(entry?.userId || "") === userId,
+          );
+          if (participant && String(participant?.status || "") === "active") {
+            await this.repo.updateTournamentParticipantStatus(
+              normalizedId,
+              userId,
+              "eliminated",
+            );
+          }
+        }
+
         this.rankedGateway.emitTournamentRoundUpdate({
           tournamentId,
+          roundIndex:
+            firstUpdatedRoundIndex === null ? undefined : firstUpdatedRoundIndex,
           status: allCompleted ? "completed" : "ongoing",
           rounds,
         });
+
+        if (
+          earliestNextRoundToAttach !== null &&
+          earliestNextRoundToAttach < rounds.length
+        ) {
+          for (
+            let roundIndex = earliestNextRoundToAttach;
+            roundIndex < rounds.length;
+            roundIndex += 1
+          ) {
+            const round = rounds[roundIndex] as any;
+            const matches = Array.isArray(round?.matches) ? round.matches : [];
+            for (const match of matches) {
+              if (String(match?.gameId || "").length === 0) continue;
+              this.rankedGateway.emitTournamentMatchReady({
+                tournamentId,
+                matchId: String(match?.id || ""),
+                gameId: String(match?.gameId || ""),
+                roundIndex,
+              });
+            }
+          }
+        }
 
         if (allCompleted) {
           this.rankedGateway.emitTournamentCompleted({

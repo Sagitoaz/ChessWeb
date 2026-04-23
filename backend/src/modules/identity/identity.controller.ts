@@ -1,4 +1,20 @@
-import { Body, Controller, Get, Headers, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common'
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  ForbiddenException,
+  Get,
+  Headers,
+  HttpCode,
+  InternalServerErrorException,
+  NotFoundException,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common'
 import { JwtAuthGuard } from '../../shared/auth/jwt-auth.guard'
 import { ApiResponse } from '../../shared/http/response.util'
 import { env } from '../../shared/config/env'
@@ -18,6 +34,31 @@ import { IdentityService } from './identity.service'
 @Controller('auth')
 export class IdentityController {
   constructor(private readonly identityService: IdentityService) {}
+
+  private unwrapOrThrow<T>(response: ApiResponse<T>): ApiResponse<T> {
+    if (response.success) {
+      return response
+    }
+
+    const code = response.error?.code || 'INTERNAL_SERVER_ERROR'
+
+    switch (code) {
+      case 'VALIDATION_FAILED':
+        throw new BadRequestException(response)
+      case 'AUTH_INVALID_CREDENTIALS':
+      case 'AUTH_TOKEN_EXPIRED':
+        throw new UnauthorizedException(response)
+      case 'AUTH_FORBIDDEN':
+        throw new ForbiddenException(response)
+      case 'NOT_FOUND':
+        throw new NotFoundException(response)
+      case 'DB_CONSTRAINT_VIOLATION':
+        throw new ConflictException(response)
+      case 'INTERNAL_SERVER_ERROR':
+      default:
+        throw new InternalServerErrorException(response)
+    }
+  }
 
   private readCookie(request: { headers?: Record<string, unknown> }, cookieName: string): string | null {
     const rawCookie = request?.headers?.cookie
@@ -119,7 +160,7 @@ export class IdentityController {
     if (result.success && result.data?.refreshToken) {
       this.setRefreshCookie(response, result.data.refreshToken, dto.remember !== false)
     }
-    return this.stripRefreshToken(result)
+    return this.stripRefreshToken(this.unwrapOrThrow(result))
   }
 
   @HttpCode(200)
@@ -148,7 +189,7 @@ export class IdentityController {
     if (result.success && result.data?.refreshToken) {
       this.setRefreshCookie(response, result.data.refreshToken, true)
     }
-    return this.stripRefreshToken(result)
+    return this.stripRefreshToken(this.unwrapOrThrow(result))
   }
 
   @HttpCode(200)
@@ -177,19 +218,18 @@ export class IdentityController {
     if (result.success && result.data?.refreshToken) {
       this.setRefreshCookie(response, result.data.refreshToken, true)
     }
-    return this.stripRefreshToken(result)
+    return this.stripRefreshToken(this.unwrapOrThrow(result))
   }
 
   @HttpCode(200)
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
   async logout(
-    @Req() request: { user?: unknown },
+    @Req() request: { user?: unknown; headers?: Record<string, unknown> },
     @Res({ passthrough: true }) response: { clearCookie: Function },
     @Body() dto: LogoutDto,
     @Headers('x-request-id') requestId?: string
   ): Promise<ApiResponse<{ message: string }>> {
-    const tokenFromCookie = this.readCookie(request as { headers?: Record<string, unknown> }, env.authRefreshCookieName)
+    const tokenFromCookie = this.readCookie(request, env.authRefreshCookieName)
     const result = await this.identityService.logout(
       {
         ...dto,
@@ -199,7 +239,7 @@ export class IdentityController {
       requestId || null
     )
     this.clearRefreshCookie(response)
-    return result
+    return this.unwrapOrThrow(result)
   }
 
   @HttpCode(200)
@@ -232,7 +272,7 @@ export class IdentityController {
     } else {
       this.clearRefreshCookie(response)
     }
-    return this.stripRefreshToken(result)
+    return this.stripRefreshToken(this.unwrapOrThrow(result))
   }
 
   @HttpCode(200)

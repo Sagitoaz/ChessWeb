@@ -352,22 +352,21 @@ export class IdentityService {
     requestId: string | null
   ): Promise<ApiResponse<LogoutResponseData>> {
     try {
-      const userId = this.extractUserId(authUser)
-      if (!userId) {
-        return this.errorResponse(requestId, 'AUTH_FORBIDDEN', 'Khong xac dinh duoc nguoi dung')
-      }
-
       const db = await this.getDb()
       const refreshTokens = this.refreshTokens(db)
       const now = new Date()
+      const refreshToken = dto?.refreshToken?.trim() || null
+      const userId =
+        this.extractUserId(authUser) ||
+        this.extractUserIdFromRefreshToken(refreshToken)
 
-      if (dto?.refreshToken) {
-        const tokenHash = this.hashToken(dto.refreshToken)
+      if (refreshToken && userId) {
+        const tokenHash = this.hashToken(refreshToken)
         await refreshTokens.updateOne(
           { userId, tokenHash, revokedAt: null },
           { $set: { revokedAt: now, updatedAt: now } }
         )
-      } else {
+      } else if (userId) {
         await refreshTokens.updateMany(
           { userId, revokedAt: null },
           { $set: { revokedAt: now, updatedAt: now } }
@@ -751,6 +750,27 @@ export class IdentityService {
     }
 
     return candidate
+  }
+
+  private extractUserIdFromRefreshToken(refreshToken: string | null): string | null {
+    if (!refreshToken) {
+      return null
+    }
+
+    try {
+      const payload = this.jwtService.verify<JwtRefreshPayload>(refreshToken, {
+        secret: env.jwtRefreshSecret,
+        ignoreExpiration: true,
+      })
+
+      if (payload?.type !== 'refresh' || typeof payload?.sub !== 'string' || !payload.sub) {
+        return null
+      }
+
+      return payload.sub
+    } catch {
+      return null
+    }
   }
 
   private toUserResponse(user: UserProfileDocument): UserResponseData {

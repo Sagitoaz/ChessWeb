@@ -2889,7 +2889,16 @@ export class CompetitionService {
         .map((row: any) => [this.normalizeReferenceId(row?.userId), row] as const)
         .filter((entry): entry is [string, any] => Boolean(entry[0])),
     );
-    const enrichedStandings = participants
+    const standingsParticipants = participants.filter((participant) => {
+      const status = String(participant?.status || "").toLowerCase();
+      return (
+        status !== "pending" &&
+        status !== "rejected" &&
+        status !== "withdrawn"
+      );
+    });
+
+    const enrichedStandings = standingsParticipants
       .map((participant) => {
         const row = standingsMap.get(participant.userId) || {};
         return {
