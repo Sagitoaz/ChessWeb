@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useNotification } from '@/components/common/Notification'
-import { Card, Button, Input, Loader } from '@/components/common'
+import { Card, Button, Input, Loader, Pagination } from '@/components/common'
 import gameService from '@/services/gameService'
 import { Users, Clock, Lock, RefreshCcw } from 'lucide-react'
+
+const PAGE_SIZE = 8
 
 // Helper function to generate avatar from username
 const getAvatarColor = (username) => {
@@ -74,6 +76,7 @@ export default function RoomListPage() {
   const [publicRooms, setPublicRooms] = useState([])
   const [joiningRoom, setJoiningRoom] = useState(null)
   const [loadError, setLoadError] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const loadRooms = useCallback(
     async ({ forceRefresh = false } = {}) => {
@@ -100,6 +103,7 @@ export default function RoomListPage() {
               return status !== 'finished' && status !== 'cancelled' && room.canJoin
             })
         )
+        setCurrentPage((prev) => prev)
         return true
       } catch (error) {
         const message = error?.response?.data?.message || error?.message || 'Không thể tải danh sách phòng.'
@@ -121,6 +125,13 @@ export default function RoomListPage() {
 
     return () => clearInterval(timer)
   }, [loadRooms])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(publicRooms.length / PAGE_SIZE))
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, publicRooms.length])
 
   const handleCreateRoom = () => {
     navigate('/rooms/create')
@@ -150,6 +161,9 @@ export default function RoomListPage() {
       })
     }
   }
+
+  const totalPages = Math.max(1, Math.ceil(publicRooms.length / PAGE_SIZE))
+  const visibleRooms = publicRooms.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -292,7 +306,7 @@ export default function RoomListPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {publicRooms.map((room) => (
+                    {visibleRooms.map((room) => (
                       <div
                         key={room.id}
                         className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-all"
@@ -338,6 +352,15 @@ export default function RoomListPage() {
                       </div>
                     ))}
                   </div>
+                )}
+
+                {publicRooms.length > PAGE_SIZE && (
+                  <>
+                    <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} className="mt-6" />
+                    <p className="text-center text-xs text-gray-500 mt-2">
+                      Trang {currentPage}/{totalPages} · {PAGE_SIZE} phòng mỗi trang
+                    </p>
+                  </>
                 )}
               </div>
             </Card>

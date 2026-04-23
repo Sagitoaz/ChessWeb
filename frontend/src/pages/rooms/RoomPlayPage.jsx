@@ -7,7 +7,7 @@ import { Avatar, Button, Card } from '@/components/common'
 import gameService from '@/services/gameService'
 import { useGameSocket, useWebSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
-import { ArrowLeft, Clock, Flag, Play, Trophy, Users } from 'lucide-react'
+import { ArrowLeft, Clock, Flag, Handshake, Play, Trophy, Users } from 'lucide-react'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 import { getUserDisplayName } from '@/utils/userDisplay'
 
@@ -86,6 +86,7 @@ export default function RoomPlayPage() {
   const [pendingLeavePath, setPendingLeavePath] = useState(null)
   const [gameResult, setGameResult] = useState(null)
   const [moveHistory, setMoveHistory] = useState([])
+  const [drawOffer, setDrawOffer] = useState(null)
   const [whiteTime, setWhiteTime] = useState(600)
   const [blackTime, setBlackTime] = useState(600)
 
@@ -132,8 +133,12 @@ export default function RoomPlayPage() {
     joinGame,
     sendMove,
     resign,
+    offerDraw,
+    acceptDraw,
+    declineDraw,
     onMoveUpdate,
     onGameEnd,
+    onDrawOffer,
     off,
   } = useGameSocket(activeGameId)
   const { on: onSocketEvent, off: offSocketEvent } = useWebSocket()
@@ -289,6 +294,7 @@ export default function RoomPlayPage() {
               : 'Trận đấu đã kết thúc.',
       })
       void persistRoomResult(result, reason)
+      setDrawOffer(null)
     },
     [persistRoomResult, showNotification]
   )
@@ -428,13 +434,66 @@ export default function RoomPlayPage() {
       endGame(localResult, payload?.reason || 'game_end')
     }
 
+    const handleDrawOfferEvent = (payload) => {
+      const eventType = String(payload?.type || '').toLowerCase()
+      const fromUserId = normalizeId(payload?.fromUserId)
+      const byUserId = normalizeId(payload?.byUserId)
+      const isFromMe = Boolean(fromUserId && fromUserId === currentUserId)
+      const isByMe = Boolean(byUserId && byUserId === currentUserId)
+
+      if (eventType === 'offer') {
+        if (isFromMe) return
+        setDrawOffer('received')
+        showNotification({
+          type: 'info',
+          title: 'Đề nghị hòa',
+          message: `${opponentName} vừa đề nghị hòa ván đấu.`,
+        })
+        return
+      }
+
+      if (eventType === 'accepted') {
+        setDrawOffer(null)
+        if (!endedRef.current) {
+          endGame('draw', 'draw_agreement')
+        }
+        return
+      }
+
+      if (eventType === 'declined') {
+        if (isByMe) return
+        if (drawOffer === 'sent') {
+          showNotification({
+            type: 'warning',
+            title: 'Đề nghị hòa bị từ chối',
+            message: 'Đối thủ không đồng ý hòa. Ván đấu tiếp tục.',
+          })
+        }
+        setDrawOffer(null)
+      }
+    }
+
     onMoveUpdate(handleMoveUpdate)
     onGameEnd(handleGameEnd)
+    onDrawOffer(handleDrawOfferEvent)
     return () => {
       off('game:moveUpdate', handleMoveUpdate)
       off('game:end', handleGameEnd)
+      off('game:drawOffer', handleDrawOfferEvent)
     }
-  }, [checkGameEnd, endGame, off, onGameEnd, onMoveUpdate, playerColor])
+  }, [
+    checkGameEnd,
+    currentUserId,
+    drawOffer,
+    endGame,
+    off,
+    onDrawOffer,
+    onGameEnd,
+    onMoveUpdate,
+    opponentName,
+    playerColor,
+    showNotification,
+  ])
 
   useEffect(() => {
     if (gamePhase !== 'playing' || endedRef.current) return
@@ -507,6 +566,29 @@ export default function RoomPlayPage() {
       title: 'Không thể đầu hàng lúc này',
       message: 'Mất kết nối realtime. Vui lòng thử lại khi kết nối ổn định.',
     })
+  }
+
+  const handleOfferDraw = () => {
+    if (gamePhase !== 'playing' || !activeGameId || drawOffer || !isSocketConnected) return
+    offerDraw()
+    setDrawOffer('sent')
+    showNotification({
+      type: 'info',
+      title: 'Đã gửi đề nghị hòa',
+      message: 'Đang chờ đối thủ phản hồi.',
+    })
+  }
+
+  const handleAcceptDraw = () => {
+    if (drawOffer !== 'received') return
+    acceptDraw()
+    setDrawOffer(null)
+  }
+
+  const handleDeclineDraw = () => {
+    if (drawOffer !== 'received') return
+    declineDraw()
+    setDrawOffer(null)
   }
 
   const persistLeaveForfeit = useCallback(async () => {
@@ -790,6 +872,26 @@ export default function RoomPlayPage() {
             className="bg-white shadow-sm border-none rounded-xl overflow-hidden"
           >
             <div className="p-4 flex items-center gap-2">
+              {drawOffer === 'received' && (
+                <div className="mb-3 w-full rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                  <p className="font-semibold mb-2">{opponentName} đang đề nghị hòa.</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={handleAcceptDraw}>
+                      Đồng ý hòa
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleDeclineDraw}>
+                      Từ chối
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {drawOffer === 'sent' && (
+                <div className="mb-3 w-full rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                  Đã gửi đề nghị hòa. Đang chờ đối thủ phản hồi...
+                </div>
+              )}
+            </div>
+            <div className="px-4 pb-4 flex items-center gap-2 flex-wrap">
               {isOwner && room.status !== 'playing' ? (
                 <Button
                   onClick={handleStartGame}
@@ -809,6 +911,14 @@ export default function RoomPlayPage() {
                   Đầu hàng
                 </Button>
               )}
+              <Button
+                variant="outline"
+                onClick={handleOfferDraw}
+                disabled={gamePhase !== 'playing' || Boolean(drawOffer) || !isSocketConnected}
+              >
+                <Handshake className="w-4 h-4" />
+                Cầu hòa
+              </Button>
               <Button variant="outline" onClick={() => requestLeaveRoom()}>
                 <ArrowLeft className="w-4 h-4" />
                 Về danh sách

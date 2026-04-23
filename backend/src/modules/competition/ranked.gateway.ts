@@ -736,6 +736,19 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.emitGameEnd(matchId, participants, payload);
       return;
     } catch {
+      const roomCompletion =
+        await this.competitionService.completeRoomGameByDrawAgreement(matchId);
+      if (roomCompletion) {
+        const payload: GameEndPayload = {
+          matchId,
+          reason: "draw_agreement",
+          result: roomCompletion.result,
+          at: roomCompletion.finishedAt,
+        };
+        this.emitGameEnd(matchId, participants, payload);
+        return;
+      }
+
       const payload: GameEndPayload = {
         matchId,
         reason: "draw_agreement",

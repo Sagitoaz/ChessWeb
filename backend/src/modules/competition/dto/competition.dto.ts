@@ -84,6 +84,12 @@ export class TournamentQueryDto extends RankedPaginationQueryDto {
   @IsOptional()
   @IsEnum(TournamentStatus)
   status?: TournamentStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  search?: string;
 }
 
 export enum TournamentFormat {

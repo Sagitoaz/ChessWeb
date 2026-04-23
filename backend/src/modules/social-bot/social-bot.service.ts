@@ -1511,7 +1511,12 @@ export class SocialBotService {
     }
 
     const maxPlayers = Number(room.maxPlayers || 2);
-    if (members.length >= maxPlayers) {
+    const currentPlayerCount = Math.max(
+      Number(room?.playerCount || 0),
+      members.length,
+      room?.ownerUserId ? 1 : 0,
+    );
+    if (currentPlayerCount >= maxPlayers) {
       throw new BadRequestException("Room is full");
     }
 
@@ -1527,8 +1532,20 @@ export class SocialBotService {
       | { username?: string | null }
       | undefined;
 
+    const refreshedMembers = await this.repo.findRoomMembers(room._id);
+    const refreshedPlayerCount = Math.max(
+      Number(room?.playerCount || 0),
+      refreshedMembers.length,
+      room?.ownerUserId ? 1 : 0,
+    );
+
+    if (refreshedPlayerCount > maxPlayers) {
+      await this.repo.removeRoomMember(room._id, userId);
+      throw new BadRequestException("Room is full");
+    }
+
     await this.repo.updateRoomByCode(code, {
-      playerCount: Math.min(Number(room.maxPlayers || 2), members.length + 1),
+      playerCount: refreshedPlayerCount,
       updatedAt: new Date(),
     });
 
@@ -1537,7 +1554,7 @@ export class SocialBotService {
       code: String(room.roomCode || room.code || code),
       userId,
       username: profile?.username || null,
-      playerCount: members.length + 1,
+      playerCount: refreshedPlayerCount,
       maxPlayers,
       status: String(room.status || "waiting"),
     });

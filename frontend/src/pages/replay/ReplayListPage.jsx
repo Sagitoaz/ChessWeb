@@ -10,9 +10,11 @@ import { replayAPI } from '@services/gameService'
 import { useNotification } from '@hooks'
 import { useAuthStore } from '@store'
 import { THEME } from '@/styles/theme'
-import { Loader, Button } from '@components/common'
+import { Loader, Button, Pagination } from '@components/common'
 import { PlayCircle } from 'lucide-react'
 import { getUserDisplayName } from '@/utils/userDisplay'
+
+const PAGE_SIZE = 12
 
 function ResultBadge({ result }) {
   const cfg = {
@@ -62,10 +64,17 @@ export default function ReplayListPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [modeFilter, setModeFilter] = useState('')
   const [resultFilter, setResultFilter] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalGames, setTotalGames] = useState(0)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [modeFilter, resultFilter])
 
   useEffect(() => {
     setIsLoading(true)
-    const filters = {}
+    const filters = { page: currentPage, pageSize: PAGE_SIZE }
     if (modeFilter) filters.mode = modeFilter
     if (resultFilter) filters.result = resultFilter
 
@@ -89,7 +98,7 @@ export default function ReplayListPage() {
       )
 
       if (Array.isArray(payload?.games)) {
-        return payload.games.map((game) => {
+        const items = payload.games.map((game) => {
           const gameId = String(game.id || game.gameId)
           const item = itemById.get(gameId)
 
@@ -118,10 +127,16 @@ export default function ReplayListPage() {
             opponent,
           }
         })
+        return {
+          items,
+          total: Number(payload?.total || payload?.pagination?.total || items.length || 0),
+          page: Number(payload?.page || payload?.pagination?.page || currentPage),
+          pageSize: Number(payload?.pageSize || payload?.pagination?.pageSize || PAGE_SIZE),
+        }
       }
 
       if (Array.isArray(payload?.items)) {
-        return payload.items.map((item) => ({
+        const items = payload.items.map((item) => ({
           id: item.gameId || item.id,
           mode: item.mode || 'room',
           result: normalizePerspectiveResult(item.result, item.playerSide) || null,
@@ -136,16 +151,29 @@ export default function ReplayListPage() {
           blackPlayer: { username: item.blackPlayerId || 'Black' },
           metadata: { totalMoves: null },
         }))
+        return {
+          items,
+          total: Number(payload?.total || payload?.pagination?.total || items.length || 0),
+          page: Number(payload?.page || payload?.pagination?.page || currentPage),
+          pageSize: Number(payload?.pageSize || payload?.pagination?.pageSize || PAGE_SIZE),
+        }
       }
-      return []
+      return { items: [], total: 0, page: currentPage, pageSize: PAGE_SIZE }
     }
 
     replayAPI
       .getGameHistory(filters)
-      .then((data) => setGames(normalizeGames(data)))
+      .then((data) => {
+        const normalized = normalizeGames(data)
+        setGames(Array.isArray(normalized?.items) ? normalized.items : [])
+        const total = Number(normalized?.total || 0)
+        const pageSize = Number(normalized?.pageSize || PAGE_SIZE)
+        setTotalGames(total)
+        setTotalPages(Math.max(1, Math.ceil(total / pageSize)))
+      })
       .catch(() => showError('Không thể tải lịch sử'))
       .finally(() => setIsLoading(false))
-  }, [authUser, modeFilter, resultFilter, showError])
+  }, [authUser, currentPage, modeFilter, resultFilter, showError])
 
   const handleSelect = (gameId) => navigate(`/replays/${gameId}`)
 
@@ -163,7 +191,7 @@ export default function ReplayListPage() {
                 Xem lại ván đã chơi theo chế độ, kết quả và thời gian
               </p>
             </div>
-            <span className="ui-chip">{games.length} ván</span>
+            <span className="ui-chip">{totalGames} ván</span>
           </div>
         </div>
 
@@ -218,44 +246,51 @@ export default function ReplayListPage() {
         )}
 
         {!isLoading && games.length > 0 && (
-          <div className="space-y-2.5">
-            {games.map((game) => (
-              <button
-                key={game.id}
-                onClick={() => handleSelect(game.id)}
-                className={`w-full ${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-4 text-left transition-all group hover:bg-gray-50 hover:border-gray-300 ${THEME.shadow.sm}`}
-              >
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-3 items-center">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <span className={`${THEME.text.primary} font-semibold text-sm`}>
-                      Đối thủ: {game.opponent || game.blackPlayer.username}
-                    </span>
-                    <ModeBadge mode={game.mode} />
-                    <ResultBadge result={game.result} />
-                  </div>
-                  <div className={`flex items-center justify-between lg:justify-end gap-3 flex-wrap text-xs sm:text-sm ${THEME.text.secondary}`}>
-                    <span className="font-medium">{game.metadata?.totalMoves ?? '?'} nước</span>
-                    {game.metadata?.opening && (
-                      <span className="hidden md:inline truncate max-w-[180px]">
-                        {game.metadata.opening}
+          <>
+            <div className="space-y-2.5">
+              {games.map((game) => (
+                <button
+                  key={game.id}
+                  onClick={() => handleSelect(game.id)}
+                  className={`w-full ${THEME.background.card} border ${THEME.border.DEFAULT} ${THEME.rounded.lg} p-4 text-left transition-all group hover:bg-gray-50 hover:border-gray-300 ${THEME.shadow.sm}`}
+                >
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-3 items-center">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className={`${THEME.text.primary} font-semibold text-sm`}>
+                        Đối thủ: {game.opponent || game.blackPlayer.username}
                       </span>
-                    )}
-                    <span>
-                      {new Date(game.createdAt).toLocaleDateString('vi-VN')}{' '}
-                      {new Date(game.createdAt).toLocaleTimeString('vi-VN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                    <span className={`${THEME.primary.text} group-hover:underline flex items-center gap-1 font-semibold`}>
-                      <PlayCircle className="w-4 h-4" />
-                      Replay
-                    </span>
+                      <ModeBadge mode={game.mode} />
+                      <ResultBadge result={game.result} />
+                    </div>
+                    <div className={`flex items-center justify-between lg:justify-end gap-3 flex-wrap text-xs sm:text-sm ${THEME.text.secondary}`}>
+                      <span className="font-medium">{game.metadata?.totalMoves ?? '?'} nước</span>
+                      {game.metadata?.opening && (
+                        <span className="hidden md:inline truncate max-w-[180px]">
+                          {game.metadata.opening}
+                        </span>
+                      )}
+                      <span>
+                        {new Date(game.createdAt).toLocaleDateString('vi-VN')}{' '}
+                        {new Date(game.createdAt).toLocaleTimeString('vi-VN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                      <span className={`${THEME.primary.text} group-hover:underline flex items-center gap-1 font-semibold`}>
+                        <PlayCircle className="w-4 h-4" />
+                        Replay
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+
+            <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} className="mt-6" />
+            <p className="text-center text-xs text-gray-500 mt-2">
+              Trang {currentPage}/{totalPages} · {PAGE_SIZE} ván mỗi trang
+            </p>
+          </>
         )}
       </div>
     </div>

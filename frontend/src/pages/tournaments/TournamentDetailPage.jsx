@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, Button, Loader } from '@/components/common'
+import { Card, Button, Loader, Pagination } from '@/components/common'
 import { useNotification } from '@/components/common/Notification'
 import gameService from '@/services/gameService'
 import { useAuthStore } from '@/store'
@@ -120,6 +120,8 @@ const normalizeTournament = (tournament, tournamentId) => ({
   completedAt: tournament?.completedAt || null,
 })
 
+const DETAIL_PAGE_SIZE = 10
+
 export default function TournamentDetailPage() {
   const { showNotification } = useNotification()
   const { tournamentId } = useParams()
@@ -131,6 +133,8 @@ export default function TournamentDetailPage() {
   const [isRegistered, setIsRegistered] = useState(false)
   const [isOrganizer, setIsOrganizer] = useState(false)
   const [participantStatus, setParticipantStatus] = useState(null)
+  const [participantsPage, setParticipantsPage] = useState(1)
+  const [standingsPage, setStandingsPage] = useState(1)
   const [checkInMinutes, setCheckInMinutes] = useState(3)
   const participantStatusRef = useRef(null)
   const hasTournamentSnapshotRef = useRef(false)
@@ -231,6 +235,25 @@ export default function TournamentDetailPage() {
   useEffect(() => {
     void loadTournament()
   }, [loadTournament])
+
+  useEffect(() => {
+    setParticipantsPage(1)
+    setStandingsPage(1)
+  }, [activeTab, tournamentId])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil((tournament?.participants?.length || 0) / DETAIL_PAGE_SIZE))
+    if (participantsPage > totalPages) {
+      setParticipantsPage(totalPages)
+    }
+  }, [participantsPage, tournament?.participants?.length])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil((tournament?.standings?.length || 0) / DETAIL_PAGE_SIZE))
+    if (standingsPage > totalPages) {
+      setStandingsPage(totalPages)
+    }
+  }, [standingsPage, tournament?.standings?.length])
 
   useEffect(() => {
     if (!isTournamentSocketConnected || !tournamentId) return undefined
@@ -607,6 +630,22 @@ export default function TournamentDetailPage() {
   const currentRoundHasRooms = Array.isArray(currentRoundData?.matches)
     ? currentRoundData.matches.some((match) => Boolean(match?.gameId))
     : false
+  const participantTotalPages = Math.max(
+    1,
+    Math.ceil((tournament.participants.length || 0) / DETAIL_PAGE_SIZE)
+  )
+  const standingsTotalPages = Math.max(
+    1,
+    Math.ceil((tournament.standings.length || 0) / DETAIL_PAGE_SIZE)
+  )
+  const visibleParticipants = tournament.participants.slice(
+    (participantsPage - 1) * DETAIL_PAGE_SIZE,
+    participantsPage * DETAIL_PAGE_SIZE
+  )
+  const visibleStandings = tournament.standings.slice(
+    (standingsPage - 1) * DETAIL_PAGE_SIZE,
+    standingsPage * DETAIL_PAGE_SIZE
+  )
 
   return (
     <div className="min-h-screen bg-[#e1edff] p-4">
@@ -856,7 +895,7 @@ export default function TournamentDetailPage() {
                   {tournament.maxParticipants})
                 </h3>
                 <div className="space-y-2">
-                  {tournament.participants.map((participant) => (
+                  {visibleParticipants.map((participant) => (
                     <div
                       key={participant.id}
                       className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
@@ -897,6 +936,21 @@ export default function TournamentDetailPage() {
                     </div>
                   ))}
                 </div>
+
+                {participantTotalPages > 1 && (
+                  <>
+                    <Pagination
+                      page={participantsPage}
+                      totalPages={participantTotalPages}
+                      onPageChange={setParticipantsPage}
+                      className="mt-6"
+                    />
+                    <p className="mt-2 text-center text-xs text-gray-500">
+                      Trang {participantsPage}/{participantTotalPages} · {DETAIL_PAGE_SIZE} người mỗi
+                      trang
+                    </p>
+                  </>
+                )}
 
                 {canManageTournament &&
                   isRegistrationPhase &&
@@ -1089,12 +1143,14 @@ export default function TournamentDetailPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {tournament.standings.map((row, idx) => (
+                        {visibleStandings.map((row, idx) => (
                           <tr
                             key={row.userId || `${row.name}-${idx}`}
                             className="border-t border-gray-100"
                           >
-                            <td className="px-3 py-2 font-semibold text-gray-900">{idx + 1}</td>
+                            <td className="px-3 py-2 font-semibold text-gray-900">
+                              {(standingsPage - 1) * DETAIL_PAGE_SIZE + idx + 1}
+                            </td>
                             <td className="px-3 py-2 text-gray-900">{row.name || 'Unknown'}</td>
                             <td className="px-3 py-2 text-right font-semibold text-blue-700">
                               {typeof row.points === 'number' ? row.points : 0}
@@ -1108,6 +1164,20 @@ export default function TournamentDetailPage() {
                       </tbody>
                     </table>
                   </div>
+                )}
+
+                {standingsTotalPages > 1 && (
+                  <>
+                    <Pagination
+                      page={standingsPage}
+                      totalPages={standingsTotalPages}
+                      onPageChange={setStandingsPage}
+                      className="mt-6"
+                    />
+                    <p className="mt-2 text-center text-xs text-gray-500">
+                      Trang {standingsPage}/{standingsTotalPages} · {DETAIL_PAGE_SIZE} dòng mỗi trang
+                    </p>
+                  </>
                 )}
               </div>
             )}

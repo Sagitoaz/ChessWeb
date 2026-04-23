@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Button, Input, Loader } from '@/components/common'
+import { Card, Button, Input, Loader, Pagination } from '@/components/common'
 import gameService from '@/services/gameService'
 import {
   Trophy,
@@ -14,7 +14,7 @@ import {
   Target,
 } from 'lucide-react'
 
-const EMPTY_TOURNAMENTS = { upcoming: [], ongoing: [], completed: [] }
+const PAGE_SIZE = 9
 
 const normalizeTournament = (tournament = {}) => ({
   ...tournament,
@@ -49,43 +49,70 @@ const normalizeTournament = (tournament = {}) => ({
       : tournament.status || 'registration',
 })
 
-const groupTournamentsByStatus = (items = []) =>
-  items.reduce(
-    (acc, item) => {
-      const t = normalizeTournament(item)
-      if (t.status === 'cancelled') return acc
-      if (t.status === 'ongoing') acc.ongoing.push(t)
-      else if (t.status === 'completed') acc.completed.push(t)
-      else acc.upcoming.push(t)
-      return acc
-    },
-    { upcoming: [], ongoing: [], completed: [] }
-  )
-
 export default function TournamentListPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('upcoming')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [tournaments, setTournaments] = useState(EMPTY_TOURNAMENTS)
+  const [tournaments, setTournaments] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [tabCounts, setTabCounts] = useState({ upcoming: 0, ongoing: 0, completed: 0 })
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim())
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const activeStatusFilter = useMemo(() => {
+    if (activeTab === 'upcoming') return 'registration'
+    if (activeTab === 'ongoing') return 'ongoing'
+    if (activeTab === 'completed') return 'completed'
+    return undefined
+  }, [activeTab])
 
   useEffect(() => {
     const loadTournaments = async () => {
       setLoading(true)
       try {
-        const response = await gameService.getTournaments()
+        const response = await gameService.getTournaments({
+          page: currentPage,
+          pageSize: PAGE_SIZE,
+          status: activeStatusFilter,
+          search: debouncedSearch || undefined,
+        })
         const payload = response?.data ?? response
         const items = payload?.items || payload?.tournaments || payload || []
-        setTournaments(groupTournamentsByStatus(Array.isArray(items) ? items : []))
+        setTournaments(Array.isArray(items) ? items.map((item) => normalizeTournament(item)) : [])
+        const total = Number(payload?.pagination?.total || items.length || 0)
+        setTotalItems(total)
+        setTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)))
+        setTabCounts({
+          upcoming: Number(payload?.counts?.upcoming || 0),
+          ongoing: Number(payload?.counts?.ongoing || 0),
+          completed: Number(payload?.counts?.completed || 0),
+        })
       } catch (_error) {
-        setTournaments(EMPTY_TOURNAMENTS)
+        setTournaments([])
+        setTotalItems(0)
+        setTotalPages(1)
+        setTabCounts({ upcoming: 0, ongoing: 0, completed: 0 })
       } finally {
         setLoading(false)
       }
     }
 
     loadTournaments()
-  }, [])
+  }, [activeStatusFilter, currentPage, debouncedSearch])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeTab, debouncedSearch])
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -255,13 +282,6 @@ export default function TournamentListPage() {
     </Card>
   )
 
-  const filteredTournaments =
-    tournaments[activeTab]?.filter(
-      (t) =>
-        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.organizer.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || []
-
   return (
     <div className="min-h-screen bg-[#e1edff] p-4">
       <div className="max-w-6xl mx-auto">
@@ -308,9 +328,9 @@ export default function TournamentListPage() {
             {/* Tabs */}
             <div className="flex border-b border-gray-200 mb-6">
               {[
-                { key: 'upcoming', label: 'Sắp diễn ra', count: tournaments.upcoming.length },
-                { key: 'ongoing', label: 'Đang diễn ra', count: tournaments.ongoing.length },
-                { key: 'completed', label: 'Đã kết thúc', count: tournaments.completed.length },
+                { key: 'upcoming', label: 'Sắp diễn ra', count: tabCounts.upcoming },
+                { key: 'ongoing', label: 'Đang diễn ra', count: tabCounts.ongoing },
+                { key: 'completed', label: 'Đã kết thúc', count: tabCounts.completed },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -331,20 +351,20 @@ export default function TournamentListPage() {
               <div className="flex justify-center py-12">
                 <Loader size="lg" text="Đang tải giải đấu..." />
               </div>
-            ) : filteredTournaments.length === 0 ? (
+            ) : tournaments.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                   <Trophy size={48} className="text-gray-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {searchQuery ? 'Không tìm thấy giải đấu' : 'Chưa có giải đấu nào'}
+                  {debouncedSearch ? 'Không tìm thấy giải đấu' : 'Chưa có giải đấu nào'}
                 </h3>
                 <p className="text-gray-600 mb-4">
-                  {searchQuery
+                  {debouncedSearch
                     ? 'Thử tìm kiếm với từ khóa khác'
                     : 'Hãy là người đầu tiên tạo giải đấu mới'}
                 </p>
-                {!searchQuery && (
+                {!debouncedSearch && (
                   <Button
                     variant="primary"
                     onClick={() => navigate('/tournaments/create')}
@@ -356,11 +376,28 @@ export default function TournamentListPage() {
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredTournaments.map((tournament) => (
-                  <TournamentCard key={tournament.id} tournament={tournament} />
-                ))}
-              </div>
+              <>
+                <div className="space-y-4">
+                  {tournaments.map((tournament) => (
+                    <TournamentCard key={tournament.id} tournament={tournament} />
+                  ))}
+                </div>
+
+                {totalPages > 1 && (
+                  <>
+                    <Pagination
+                      page={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      className="mt-8"
+                    />
+                    <p className="text-center text-xs text-gray-500 mt-2">
+                      Trang {currentPage}/{totalPages} · {PAGE_SIZE} giải mỗi trang · {totalItems}{' '}
+                      {debouncedSearch ? 'kết quả phù hợp' : 'giải tổng cộng'}
+                    </p>
+                  </>
+                )}
+              </>
             )}
           </div>
         </Card>

@@ -396,13 +396,15 @@ export default function ReplayViewerPage() {
             <h3 className="text-gray-400 text-sm font-medium mb-3 uppercase tracking-wider">
               Lịch Sử Nước Đi
             </h3>
-            {/* onMoveClick = ReplaySession.jumpTo(moveIndex) */}
-            <MoveHistory
-              moves={moves}
-              currentMoveIndex={cursor}
-              onMoveClick={(idx) => jumpTo(idx)}
-              highlightLastMove={true}
-            />
+            <div className="h-[420px] max-h-[65vh]">
+              {/* onMoveClick = ReplaySession.jumpTo(moveIndex) */}
+              <MoveHistory
+                moves={moves}
+                currentMoveIndex={cursor}
+                onMoveClick={(idx) => jumpTo(idx)}
+                highlightLastMove={true}
+              />
+            </div>
 
             {gameData?.result && gameData.result !== 'Ongoing' && (
               <div

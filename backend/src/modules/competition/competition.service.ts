@@ -1322,6 +1322,86 @@ export class CompetitionService {
     };
   }
 
+  async completeRoomGameByDrawAgreement(
+    matchId: string,
+  ): Promise<{ result: string; finishedAt: string } | null> {
+    const query = ObjectId.isValid(matchId)
+      ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
+      : { matchId };
+
+    const game = await this.gamesCollection().findOne(query, {
+      projection: {
+        _id: 1,
+        mode: 1,
+        roomCode: 1,
+        moves: 1,
+        result: 1,
+        finishedAt: 1,
+        status: 1,
+      },
+    });
+
+    if (!game || String(game.mode || "") !== "room") {
+      return null;
+    }
+
+    if (game.finishedAt || game.status === "completed" || game.result) {
+      return {
+        result: "Draw",
+        finishedAt: game.finishedAt
+          ? new Date(game.finishedAt).toISOString()
+          : new Date().toISOString(),
+      };
+    }
+
+    const now = new Date();
+    const moves = Array.isArray(game.moves)
+      ? (game.moves as Array<Record<string, unknown>>)
+      : [];
+
+    await this.gamesCollection().updateOne(
+      { _id: game._id },
+      {
+        $set: {
+          result: "draw",
+          rawResult: "draw",
+          status: "completed",
+          state: "Finished",
+          endReason: "draw_agreement",
+          moves,
+          updatedAt: now,
+          finishedAt: now,
+        },
+      },
+    );
+
+    await this.replaceGameMoves(String(game._id), moves, now);
+
+    const roomCode =
+      typeof game.roomCode === "string" ? game.roomCode.trim() : "";
+    if (roomCode) {
+      await this.mongoService
+        .getDb()
+        .collection("rooms")
+        .updateOne(
+          { $or: [{ roomCode }, { code: roomCode }] },
+          {
+            $set: {
+              status: "finished",
+              activeGameId: null,
+              updatedAt: now,
+              finishedAt: now,
+            },
+          },
+        );
+    }
+
+    return {
+      result: "Draw",
+      finishedAt: now.toISOString(),
+    };
+  }
+
   async completeRankedMatchByDisconnect(
     matchId: string,
     disconnectedUserId: string,
@@ -2406,14 +2486,42 @@ export class CompetitionService {
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 10;
-    const filter: Record<string, unknown> = {};
-    if (query.status) {
-      filter.status = query.status;
-    } else {
-      filter.status = { $ne: "cancelled" };
+    const search = String(query.search || "").trim();
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const baseFilter: Record<string, unknown> = {};
+    if (search) {
+      baseFilter.name = { $regex: escapedSearch, $options: "i" };
     }
 
-    const [items, total] = await Promise.all([
+    const statusFilter = (() => {
+      switch (query.status) {
+        case "registration":
+          return { status: { $in: ["draft", "open", "registration", "full"] } };
+        case "ongoing":
+          return { status: "ongoing" };
+        case "completed":
+          return { status: "completed" };
+        case "cancelled":
+          return { status: "cancelled" };
+        case "draft":
+        case "open":
+        case "full":
+          return { status: query.status };
+        default:
+          return { status: { $ne: "cancelled" } };
+      }
+    })();
+
+    const filter = {
+      ...baseFilter,
+      ...statusFilter,
+    };
+
+    const countsBaseFilter = { ...baseFilter };
+
+    const [items, total, registrationCount, ongoingCount, completedCount] =
+      await Promise.all([
       tournaments
         .find(filter)
         .sort({ startAt: 1, createdAt: -1 })
@@ -2421,6 +2529,18 @@ export class CompetitionService {
         .limit(pageSize)
         .toArray(),
       tournaments.countDocuments(filter),
+      tournaments.countDocuments({
+        ...countsBaseFilter,
+        status: { $in: ["draft", "open", "registration", "full"] },
+      }),
+      tournaments.countDocuments({
+        ...countsBaseFilter,
+        status: "ongoing",
+      }),
+      tournaments.countDocuments({
+        ...countsBaseFilter,
+        status: "completed",
+      }),
     ]);
 
     const tournamentIds = items
@@ -2538,6 +2658,11 @@ export class CompetitionService {
         page,
         pageSize,
         total,
+      },
+      counts: {
+        upcoming: registrationCount,
+        ongoing: ongoingCount,
+        completed: completedCount,
       },
     };
   }
