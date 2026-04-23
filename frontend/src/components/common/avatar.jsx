@@ -24,28 +24,10 @@ const Avatar = ({
 }) => {
   const [imageError, setImageError] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
-  const [resolvedSrc, setResolvedSrc] = useState(src || '')
-  const [retriedWithProxy, setRetriedWithProxy] = useState(false)
-
-  const buildProxyUrl = (rawUrl) => {
-    if (!rawUrl || typeof rawUrl !== 'string') return ''
-    const trimmed = rawUrl.trim()
-    if (!/^https?:\/\//i.test(trimmed)) return trimmed
-
-    try {
-      const parsed = new URL(trimmed)
-      const hostAndPath = `${parsed.host}${parsed.pathname}${parsed.search}`
-      return `https://images.weserv.nl/?url=${encodeURIComponent(hostAndPath)}`
-    } catch {
-      return trimmed
-    }
-  }
 
   useEffect(() => {
     setImageError(false)
     setImageLoading(Boolean(src))
-    setResolvedSrc(src || '')
-    setRetriedWithProxy(false)
   }, [src])
 
   // Size styles
@@ -108,7 +90,7 @@ const Avatar = ({
 
   const avatarStyles = `${sizes[size]} ${shapes[shape]} ${interactiveStyles} ${className} relative inline-flex items-center justify-center overflow-hidden`
 
-  const showFallback = !resolvedSrc || imageError
+  const showFallback = !src || imageError
 
   return (
     <div className={avatarStyles} onClick={onClick} {...props}>
@@ -119,20 +101,10 @@ const Avatar = ({
             <div className={`absolute inset-0 ${fallbackColors[fallbackColor]} animate-pulse`} />
           )}
           <img
-            src={resolvedSrc}
+            src={src}
             alt={alt}
             className="w-full h-full object-cover"
             onError={() => {
-              if (!retriedWithProxy) {
-                const proxyUrl = buildProxyUrl(src)
-                if (proxyUrl && proxyUrl !== resolvedSrc) {
-                  setRetriedWithProxy(true)
-                  setImageError(false)
-                  setImageLoading(true)
-                  setResolvedSrc(proxyUrl)
-                  return
-                }
-              }
               setImageError(true)
               setImageLoading(false)
             }}
