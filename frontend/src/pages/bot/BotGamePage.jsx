@@ -109,6 +109,8 @@ export default function BotGamePage() {
   const lastHintRequestedPlyRef = useRef(0)
   const hintRequestSeqRef = useRef(0)
   const saveRequestInFlightRef = useRef(false)
+  const botMoveRequestSeqRef = useRef(0)
+  const botMoveFenInFlightRef = useRef(null)
 
   const buildReplayMoves = useCallback(() => {
     try {
@@ -287,6 +289,14 @@ export default function BotGamePage() {
   // =============================================
   const executeBotMove = useCallback(
     async (chessInst) => {
+      const expectedFen = chessInst.fen()
+      if (botMoveFenInFlightRef.current === expectedFen) {
+        return
+      }
+
+      const requestId = botMoveRequestSeqRef.current + 1
+      botMoveRequestSeqRef.current = requestId
+      botMoveFenInFlightRef.current = expectedFen
       setIsBotThinking(true)
       try {
         if (!botSessionId) {
@@ -297,9 +307,15 @@ export default function BotGamePage() {
           Number(gameData?.config?.timeLimitMs || 0) + 7000,
           10000
         )
-        const botResponse = await botGameAPI.getBotMove(botSessionId, chessInst.fen(), {
+        const botResponse = await botGameAPI.getBotMove(botSessionId, expectedFen, {
           timeoutMs: requestTimeoutMs,
         })
+        if (requestId !== botMoveRequestSeqRef.current) {
+          return
+        }
+        if (chessInst.fen() !== expectedFen) {
+          return
+        }
         const uci = botResponse?.move?.bestMoveUci || botResponse?.bestMoveUci
         if (!uci || uci.length < 4) {
           throw new Error('Invalid bot move from server')
@@ -312,7 +328,7 @@ export default function BotGamePage() {
         })
 
         if (!result) {
-          throw new Error(`Illegal move from bot: ${uci}`)
+          return
         }
 
         if (result) {
@@ -337,9 +353,17 @@ export default function BotGamePage() {
           checkEndCondition(chessInst)
         }
       } catch (error) {
+        if (requestId !== botMoveRequestSeqRef.current) {
+          return
+        }
         showError((error && error.message) || 'Bot gặp lỗi') // S1: 503/504
       } finally {
-        setIsBotThinking(false)
+        if (botMoveFenInFlightRef.current === expectedFen) {
+          botMoveFenInFlightRef.current = null
+        }
+        if (requestId === botMoveRequestSeqRef.current) {
+          setIsBotThinking(false)
+        }
       }
     },
     [botSessionId, checkEndCondition, showError, forceUpdate, gameData]
@@ -347,10 +371,10 @@ export default function BotGamePage() {
 
   // Nếu player chọn Black, bot (White) đi trước — trigger ngay khi vào game
   useEffect(() => {
-    if (gameState === 'InGame' && chess.turn() !== playerColorCode) {
+    if (gameState === 'InGame' && !isBotThinking && chess.turn() !== playerColorCode) {
       executeBotMove(chess)
     }
-  }, [chess, executeBotMove, gameState, playerColorCode])
+  }, [chess, executeBotMove, gameState, playerColorCode, isBotThinking])
 
   // =============================================
   // USER MOVE — UC3: Make Move

@@ -2866,7 +2866,10 @@ export class SocialBotService {
         fen,
         "hard",
       );
-      stockfishBestMove = stockfishMove?.bestMoveUci || "N/A";
+      stockfishBestMove =
+        stockfishMove?.bestMoveUci ||
+        this.getFallbackLegalMove(fen, "hard")?.bestMoveUci ||
+        "N/A";
     }
 
     const playerColor =
@@ -2958,11 +2961,13 @@ export class SocialBotService {
       );
     }
 
-    const stockfishBestMove = stockfishMove?.bestMoveUci || "N/A";
+    const fallbackMove = this.getFallbackLegalMove(fen, "expert");
+    const stockfishBestMove =
+      stockfishMove?.bestMoveUci || fallbackMove?.bestMoveUci || "N/A";
     const score =
       Number.isFinite(parsedScore) && parsedScore !== 0
         ? parsedScore
-        : Number(stockfishMove?.evaluation ?? 0);
+        : Number(stockfishMove?.evaluation ?? fallbackMove?.evaluation ?? 0);
 
     const aiCommentary = await this.groqService.analyzeMoveWithAI(
       fen,

@@ -74,6 +74,9 @@ export class StockfishService {
 
       const childProcess = spawn(this.stockfishPath);
       let lineBuffer = "";
+      let uciReady = false;
+      let engineReady = false;
+      let searchStarted = false;
       const timeout = setTimeout(() => {
         childProcess.kill();
         reject(new Error(`Stockfish timeout after ${timeoutMs}ms`));
@@ -89,6 +92,38 @@ export class StockfishService {
 
         for (const line of lines) {
           this.logLine(line.trim());
+          const trimmed = line.trim();
+          if (trimmed === "uciok") {
+            uciReady = true;
+            childProcess.stdin!.write(
+              `setoption name Skill Level value ${profile.skillLevel}\n`,
+            );
+            childProcess.stdin!.write(
+              `setoption name UCI_LimitStrength value ${profile.limitStrength ? "true" : "false"}\n`,
+            );
+            if (profile.limitStrength && profile.targetElo) {
+              childProcess.stdin!.write(
+                `setoption name UCI_Elo value ${profile.targetElo}\n`,
+              );
+            }
+            childProcess.stdin!.write("isready\n");
+            continue;
+          }
+
+          if (trimmed === "readyok") {
+            engineReady = true;
+            if (!searchStarted) {
+              searchStarted = true;
+              childProcess.stdin!.write(`position fen ${fen}\n`);
+              if (profile.searchMode === "depth") {
+                childProcess.stdin!.write(`go depth ${profile.depth}\n`);
+              } else {
+                childProcess.stdin!.write(`go movetime ${profile.moveTimeMs}\n`);
+              }
+            }
+            continue;
+          }
+
           if (line.startsWith("bestmove")) {
             const match = line.match(/^bestmove\s+(\S+)/);
             if (match) {
@@ -137,27 +172,14 @@ export class StockfishService {
           clearTimeout(timeout);
           this.logger.warn(`Stockfish exited with code ${code}`);
         }
+        if (!bestMove && (!uciReady || !engineReady)) {
+          this.log(
+            `Stockfish exited before ready state uciReady=${uciReady} engineReady=${engineReady}`,
+          );
+        }
       });
 
       childProcess.stdin!.write("uci\n");
-      childProcess.stdin!.write(
-        `setoption name Skill Level value ${profile.skillLevel}\n`,
-      );
-      childProcess.stdin!.write(
-        `setoption name UCI_LimitStrength value ${profile.limitStrength ? "true" : "false"}\n`,
-      );
-      if (profile.limitStrength && profile.targetElo) {
-        childProcess.stdin!.write(
-          `setoption name UCI_Elo value ${profile.targetElo}\n`,
-        );
-      }
-      childProcess.stdin!.write("isready\n");
-      childProcess.stdin!.write(`position fen ${fen}\n`);
-      if (profile.searchMode === "depth") {
-        childProcess.stdin!.write(`go depth ${profile.depth}\n`);
-      } else {
-        childProcess.stdin!.write(`go movetime ${profile.moveTimeMs}\n`);
-      }
     });
   }
 
