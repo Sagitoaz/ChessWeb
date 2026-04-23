@@ -1,5 +1,39 @@
 # 🚀 ChessWeb Frontend - SETUP HOÀN TẤT!
 
+## Environment Modes
+
+### Mặc định hiện tại: Production API để test
+
+File [`.env.local`](/home/hiubeo/Documents/code/ChessWeb/frontend/.env.local) hiện đang trỏ vào backend Railway production:
+
+```bash
+VITE_API_URL=https://chessweb-production-ed2f.up.railway.app/api/v1
+VITE_SOCKET_URL=https://chessweb-production-ed2f.up.railway.app
+```
+
+Điều này phù hợp khi bạn muốn:
+- test nhanh đúng luồng production
+- test frontend local nhưng dùng backend Railway
+- kiểm tra bug giống user thật
+
+### Khi cần debug local backend / local DB
+
+Copy file mẫu local backend:
+
+```bash
+cp .env.local.local-backend.example .env.local
+```
+
+Khi cần quay lại production:
+
+```bash
+cp .env.local.production.example .env.local
+```
+
+Lưu ý:
+- Nếu `.env.local` trỏ production thì dữ liệu sẽ không đi vào backend local/DB local
+- Nếu bạn đang soi Mongo Atlas của môi trường local mà frontend vẫn gọi Railway, bạn sẽ thấy lệch dữ liệu
+
 ## ✅ BƯỚC 1 GIAI ĐOẠN 0 ĐÃ HOÀN THÀNH
 
 Thành viên 1 đã setup xong môi trường phát triển cho cả team! 🎉

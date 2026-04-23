@@ -1218,6 +1218,9 @@ export class CompetitionService {
     const persistedResult =
       resignedByUserId === whitePlayerId ? "black_win" : "white_win";
     const now = new Date();
+    const moves = Array.isArray(game.moves)
+      ? (game.moves as Array<Record<string, unknown>>)
+      : [];
 
     await this.gamesCollection().updateOne(
       { _id: game._id },
@@ -1227,11 +1230,14 @@ export class CompetitionService {
           status: "completed",
           state: "Finished",
           endReason: "resignation",
+          moves,
           updatedAt: now,
           finishedAt: now,
         },
       },
     );
+
+    await this.replaceGameMoves(String(game._id), moves, now);
 
     const roomCode =
       typeof game.roomCode === "string" ? game.roomCode.trim() : "";

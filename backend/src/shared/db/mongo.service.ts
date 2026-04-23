@@ -20,6 +20,7 @@ export class MongoService implements OnModuleDestroy {
 
     await this.client.connect()
     this.db = this.client.db(env.mongodbDbName)
+    this.logger.log(`[db] Connected to MongoDB database: ${env.mongodbDbName}`)
     await this.ensureCoreIndexes()
     return this.db
   }

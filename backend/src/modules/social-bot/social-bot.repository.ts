@@ -10,6 +10,31 @@ export class SocialBotRepository {
     return this.mongo.getDb();
   }
 
+  private normalizeMovesFromUpdate(
+    update: Record<string, unknown>,
+  ): Array<Record<string, unknown>> | null {
+    if (!Object.prototype.hasOwnProperty.call(update, "moves")) {
+      return null;
+    }
+
+    return Array.isArray(update.moves)
+      ? (update.moves as Array<Record<string, unknown>>)
+      : [];
+  }
+
+  private async syncGameMovesFromUpdate(
+    gameId: string,
+    update: Record<string, unknown>,
+    now: Date,
+  ): Promise<void> {
+    const moves = this.normalizeMovesFromUpdate(update);
+    if (moves === null) {
+      return;
+    }
+
+    await this.replaceGameMoves(gameId, moves, now);
+  }
+
   async createRoom(doc: Record<string, unknown>) {
     const result = await this.db.collection("rooms").insertOne(doc);
     return { ...doc, _id: result.insertedId };
@@ -245,6 +270,8 @@ export class SocialBotRepository {
     }
 
     const objectId = new ObjectId(id);
+    const now =
+      update.updatedAt instanceof Date ? update.updatedAt : new Date();
     const result = await this.db
       .collection("games")
       .findOneAndUpdate(
@@ -252,6 +279,8 @@ export class SocialBotRepository {
         { $set: update },
         { returnDocument: "after" },
       );
+
+    await this.syncGameMovesFromUpdate(id, update, now);
 
     return result;
   }
@@ -262,13 +291,21 @@ export class SocialBotRepository {
     }
 
     const objectId = new ObjectId(id);
-    return this.db
+    const now =
+      update.updatedAt instanceof Date ? update.updatedAt : new Date();
+    const result = await this.db
       .collection("games")
       .findOneAndUpdate(
         { _id: objectId, state: { $ne: "Saved" } },
         { $set: update },
         { returnDocument: "after" },
       );
+
+    if (result) {
+      await this.syncGameMovesFromUpdate(id, update, now);
+    }
+
+    return result;
   }
 
   async replaceGameMoves(

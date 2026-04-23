@@ -9,6 +9,19 @@
 
 ## 🚀 Quick Start
 
+## Environment Notes
+
+- Frontend local hiện được đặt mặc định để gọi `Railway production API` cho mục đích test nhanh.
+- File mặc định: [frontend/.env.local](/home/hiubeo/Documents/code/ChessWeb/frontend/.env.local)
+- Nếu cần debug đúng local backend/local Mongo, dùng file:
+  - [frontend/.env.local.local-backend.example](/home/hiubeo/Documents/code/ChessWeb/frontend/.env.local.local-backend.example)
+- Nếu cần quay lại production API:
+  - [frontend/.env.local.production.example](/home/hiubeo/Documents/code/ChessWeb/frontend/.env.local.production.example)
+
+Quy ước vận hành:
+- `Vercel + Railway`: dùng để test production flow
+- `frontend local + backend local`: dùng để debug DB, socket, game_moves, replay integrity
+
 ### Cho Thành Viên Mới:
 
 ```bash
