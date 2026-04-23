@@ -326,7 +326,15 @@ export class SocialBotService {
   private normalizeReplayPlayer(
     game: Record<string, unknown>,
     color: "white" | "black",
-    profilesById: Map<string, { username?: string; rating?: number; avatarUrl?: string }>,
+    profilesById: Map<
+      string,
+      {
+        username?: string;
+        displayName?: string;
+        rating?: number;
+        avatarUrl?: string;
+      }
+    >,
   ) {
     const playerKey = color === "white" ? "whitePlayer" : "blackPlayer";
     const playerIdKey = color === "white" ? "whitePlayerId" : "blackPlayerId";
@@ -343,7 +351,9 @@ export class SocialBotService {
 
     const username =
       String(
+        existingPlayer?.displayName ||
         existingPlayer?.username ||
+          profile?.displayName ||
           profile?.username ||
           (isBot ? "Bot" : color === "white" ? "Trắng" : "Đen"),
       ).trim() || (isBot ? "Bot" : color === "white" ? "Trắng" : "Đen");
@@ -365,6 +375,7 @@ export class SocialBotService {
     return {
       ...(existingPlayer || {}),
       username,
+      displayName: username,
       rating,
       avatarUrl,
       isBot,
@@ -388,6 +399,7 @@ export class SocialBotService {
         String(profile._id),
         {
           username: profile.username,
+          displayName: profile.displayName,
           rating: profile.rating,
           avatarUrl: profile.avatarUrl,
         },
@@ -3056,6 +3068,12 @@ export class SocialBotService {
       result: normalizedResult,
       rawResult: payload.result,
       state: "Saved",
+      endReason:
+        typeof payload.endReason === "string" && payload.endReason.trim().length > 0
+          ? payload.endReason.trim()
+          : payload.result === "Draw"
+            ? "draw"
+            : "completed",
       mode: normalizedMode,
       moves,
       initialFEN: payload.initialFEN || null,

@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store'
 import gameService from '@/services/gameService'
 import { useGameSocket } from '@/hooks/useWebSocket'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
+import { getUserDisplayName } from '@/utils/userDisplay'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -126,8 +127,8 @@ export default function TournamentMatchPlayPage() {
       } else if (blackPlayerId && blackPlayerId === currentUserId) {
         setPlayerColor('black')
       }
-      setWhiteName(game?.whitePlayer?.username || game?.whiteUsername || 'Người chơi Trắng')
-      setBlackName(game?.blackPlayer?.username || game?.blackUsername || 'Người chơi Đen')
+      setWhiteName(getUserDisplayName(game?.whitePlayer, game?.whiteUsername || 'Người chơi Trắng'))
+      setBlackName(getUserDisplayName(game?.blackPlayer, game?.blackUsername || 'Người chơi Đen'))
 
       chessRef.current = new Chess(String(game?.initialFEN || INITIAL_FEN))
       const moves = Array.isArray(game?.moves) ? game.moves : []

@@ -24,6 +24,7 @@ import { ChessGame } from '@utils/chessLogic'
 import { RANKS } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor } from '@utils/formatters'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
+import { getUserDisplayName } from '@/utils/userDisplay'
 import gameService from '@services/gameService'
 
 // ─────────────────────────────────────────────────────
@@ -529,7 +530,7 @@ const RankedGamePage = () => {
       storeUser
         ? {
             id: normalizeId(storeUser.id || storeUser.userId || storeUser._id || storeUser.sub),
-            username: storeUser.username,
+            username: getUserDisplayName(storeUser, DEFAULT_PLAYER.username),
             rating: Number(rankedStats?.currentRating ?? storeUser.rating ?? DEFAULT_PLAYER.rating),
             avatarUrl: storeUser.avatarUrl || DEFAULT_PLAYER.avatarUrl,
           }
@@ -540,7 +541,7 @@ const RankedGamePage = () => {
     locationMatchData?.opponent
       ? {
           id: locationMatchData.opponent.id || 'opp-1',
-          username: locationMatchData.opponent.username,
+          username: getUserDisplayName(locationMatchData.opponent, DEFAULT_OPPONENT.username),
           rating: locationMatchData.opponent.rating,
           avatarUrl: locationMatchData.opponent.avatarUrl,
         }
@@ -695,7 +696,7 @@ const RankedGamePage = () => {
       setOpponent((prev) => ({
         ...prev,
         id: locationMatchData.opponent.id || locationMatchData.opponent.userId || prev.id,
-        username: locationMatchData.opponent.username || prev.username,
+        username: getUserDisplayName(locationMatchData.opponent, prev.username),
         rating: locationMatchData.opponent.rating || prev.rating,
         avatarUrl: locationMatchData.opponent.avatarUrl || prev.avatarUrl,
       }))
@@ -729,7 +730,7 @@ const RankedGamePage = () => {
           setOpponent((prev) => ({
             ...prev,
             id: normalizeId(opp.id || opp.userId) || prev.id,
-            username: opp.username || prev.username,
+            username: getUserDisplayName(opp, prev.username),
             rating: Number(opp.rating ?? prev.rating),
             avatarUrl: opp.avatarUrl || prev.avatarUrl,
           }))

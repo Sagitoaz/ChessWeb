@@ -32,6 +32,7 @@ interface GameDoc {
 interface UsernameDoc {
   _id: string;
   username?: string | null;
+  displayName?: string | null;
 }
 
 @Injectable()
@@ -248,6 +249,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
 
     const match: Record<string, unknown> = {
       $or: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
+      finishedAt: { $exists: true, $ne: null },
     };
 
     if (mode) {
@@ -256,6 +258,8 @@ export class ProfileRepository implements ProfileRepositoryPort {
 
     if (result) {
       match.result = result;
+    } else {
+      match.result = { $in: ["win", "lose", "draw"] };
     }
 
     if (fromDate || toDate) {
@@ -303,15 +307,22 @@ export class ProfileRepository implements ProfileRepositoryPort {
         ? await this.userProfiles()
             .find(
               { _id: { $in: playerIds } },
-              { projection: { _id: 1, username: 1 } },
+              { projection: { _id: 1, username: 1, displayName: 1 } },
             )
             .toArray()
         : [];
 
     const usernameMap = new Map<string, string>();
     for (const profile of profiles as UsernameDoc[]) {
-      if (profile?._id && profile?.username) {
-        usernameMap.set(profile._id, profile.username);
+      const displayName =
+        (typeof profile?.displayName === "string" &&
+          profile.displayName.trim().length > 0
+          ? profile.displayName
+          : typeof profile?.username === "string" && profile.username.trim().length > 0
+            ? profile.username
+            : null) || null;
+      if (profile?._id && displayName) {
+        usernameMap.set(profile._id, displayName);
       }
     }
 

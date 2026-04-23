@@ -27,6 +27,7 @@ import { RANKS, INACTIVITY_TIMEOUT } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor, formatRelativeTime } from '@utils/formatters'
 import { THEME } from '@/styles/theme'
 import { useNotification } from '@/components/common/Notification'
+import { getUserDisplayName } from '@/utils/userDisplay'
 
 // ─────────────── Helper: get rank info by rating ───────────────
 const getRankInfo = (rating) => {
@@ -236,7 +237,7 @@ const RankedLobbyPage = () => {
       storeUser
         ? {
             id: storeUser.id,
-            username: storeUser.username || 'Người chơi',
+            username: getUserDisplayName(storeUser, 'Người chơi'),
             rating: Number(rankedStats?.currentRating ?? storeUser.rating ?? 1200),
             avatarUrl: storeUser.avatarUrl || null,
             gamesPlayed: Number(rankedStats?.gamesPlayed ?? storeUser.gamesPlayed ?? 0),

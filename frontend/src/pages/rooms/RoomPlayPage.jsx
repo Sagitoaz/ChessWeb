@@ -9,6 +9,7 @@ import { useGameSocket, useWebSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
 import { ArrowLeft, Clock, Flag, Play, Trophy, Users } from 'lucide-react'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
+import { getUserDisplayName } from '@/utils/userDisplay'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -223,8 +224,8 @@ export default function RoomPlayPage() {
       const opponent = members.find(
         (member) => member?.userId && normalizeId(member.userId) === expectedOpponentId
       ) || members.find((member) => member?.userId && normalizeId(member.userId) !== currentUserId)
-      const meName = user?.username || user?.displayName || 'Bạn'
-      const oppName = opponent?.username || 'Đối thủ'
+      const meName = getUserDisplayName(user, 'Bạn')
+      const oppName = getUserDisplayName(opponent, 'Đối thủ')
       const whiteName = playerColor === 'white' ? meName : oppName
       const blackName = playerColor === 'black' ? meName : oppName
       const absoluteResult =

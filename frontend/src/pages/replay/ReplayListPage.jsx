@@ -9,9 +9,10 @@ import { useNavigate } from 'react-router-dom'
 import { replayAPI } from '@services/gameService'
 import { useNotification } from '@hooks'
 import { useAuthStore } from '@store'
-import { THEME, STATUS_COLORS } from '@/styles/theme'
+import { THEME } from '@/styles/theme'
 import { Loader, Button } from '@components/common'
 import { PlayCircle } from 'lucide-react'
+import { getUserDisplayName } from '@/utils/userDisplay'
 
 function ResultBadge({ result }) {
   const cfg = {
@@ -25,9 +26,9 @@ function ResultBadge({ result }) {
     draw: { label: '🤝 Hòa', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
   }
   const { label, bg, text, border } = cfg[result] ?? {
-    label: 'Chưa có kết quả',
-    bg: STATUS_COLORS.draw.bg,
-    text: STATUS_COLORS.draw.text,
+    label: 'Đang cập nhật',
+    bg: 'bg-gray-50',
+    text: 'text-gray-600',
     border: 'border-gray-200',
   }
   return (
@@ -93,18 +94,19 @@ export default function ReplayListPage() {
           const item = itemById.get(gameId)
 
           let playerSide = item?.playerSide || null
-          if (!playerSide && authUser?.username) {
-            if (game?.whitePlayer?.username === authUser.username) playerSide = 'white'
-            if (game?.blackPlayer?.username === authUser.username) playerSide = 'black'
+          const authDisplayName = getUserDisplayName(authUser, '')
+          if (!playerSide && authDisplayName) {
+            if (getUserDisplayName(game?.whitePlayer, '') === authDisplayName) playerSide = 'white'
+            if (getUserDisplayName(game?.blackPlayer, '') === authDisplayName) playerSide = 'black'
           }
 
           const result =
             normalizePerspectiveResult(item?.result, playerSide) ||
             normalizePerspectiveResult(game?.result, playerSide) ||
-            'draw'
+            null
 
-          const whiteName = game?.whitePlayer?.username || 'White'
-          const blackName = game?.blackPlayer?.username || 'Black'
+          const whiteName = getUserDisplayName(game?.whitePlayer, 'White')
+          const blackName = getUserDisplayName(game?.blackPlayer, 'Black')
           const opponent =
             playerSide === 'white' ? blackName : playerSide === 'black' ? whiteName : blackName
 
@@ -122,7 +124,7 @@ export default function ReplayListPage() {
         return payload.items.map((item) => ({
           id: item.gameId || item.id,
           mode: item.mode || 'room',
-          result: normalizePerspectiveResult(item.result, item.playerSide) || 'draw',
+          result: normalizePerspectiveResult(item.result, item.playerSide) || null,
           createdAt: item.createdAt,
           opponent:
             item.playerSide === 'white'
@@ -143,7 +145,7 @@ export default function ReplayListPage() {
       .then((data) => setGames(normalizeGames(data)))
       .catch(() => showError('Không thể tải lịch sử'))
       .finally(() => setIsLoading(false))
-  }, [authUser?.username, modeFilter, resultFilter, showError])
+  }, [authUser, modeFilter, resultFilter, showError])
 
   const handleSelect = (gameId) => navigate(`/replays/${gameId}`)
 

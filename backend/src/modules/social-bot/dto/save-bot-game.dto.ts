@@ -14,6 +14,10 @@ export class SaveBotGameDto {
 
   @IsOptional()
   @IsString()
+  endReason?: string;
+
+  @IsOptional()
+  @IsString()
   initialFEN?: string;
 
   @IsOptional()

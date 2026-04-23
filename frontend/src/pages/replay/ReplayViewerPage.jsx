@@ -7,6 +7,7 @@ import { replayAPI } from '@services/gameService'
 import { Loader } from '@components/common'
 import { THEME } from '@/styles/theme'
 import { getMoveLabel } from '@/utils/moveNotation'
+import { getUserDisplayName } from '@/utils/userDisplay'
 
 const getReplayPlayer = (gameData, color) => {
   const player = color === 'white' ? gameData?.whitePlayer : gameData?.blackPlayer
@@ -16,7 +17,7 @@ const getReplayPlayer = (gameData, color) => {
 
   return {
     username:
-      (typeof player?.username === 'string' && player.username.trim()) ||
+      getUserDisplayName(player, '') ||
       (typeof playerId === 'string' && playerId.trim() && playerId !== 'bot' ? playerId : '') ||
       fallbackName,
     rating: typeof player?.rating === 'number' ? player.rating : null,

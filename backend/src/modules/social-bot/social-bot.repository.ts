@@ -175,6 +175,7 @@ export class SocialBotRepository {
       .collection<{
         _id: string;
         username?: string;
+        displayName?: string;
         rating?: number;
         avatarUrl?: string;
       }>(
@@ -182,7 +183,15 @@ export class SocialBotRepository {
       )
       .find(
         { _id: { $in: userIds } },
-        { projection: { _id: 1, username: 1, rating: 1, avatarUrl: 1 } },
+        {
+          projection: {
+            _id: 1,
+            username: 1,
+            displayName: 1,
+            rating: 1,
+            avatarUrl: 1,
+          },
+        },
       )
       .toArray();
   }

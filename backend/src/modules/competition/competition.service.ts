@@ -478,18 +478,25 @@ export class CompetitionService {
     userId: string,
   ): Promise<{ username: string; rating: number }> {
     const db = this.mongoService.getDb();
-    const userProfiles = db.collection<{ _id: string; username?: string }>(
+    const userProfiles = db.collection<{
+      _id: string;
+      username?: string;
+      displayName?: string;
+    }>(
       "user_profiles",
     );
     const profileDoc = await userProfiles.findOne(
       { _id: userId },
-      { projection: { username: 1 } },
+      { projection: { username: 1, displayName: 1 } },
     );
     const rating = await this.getUserRating(userId);
     return {
       username:
-        typeof profileDoc?.username === "string"
-          ? profileDoc.username
+        typeof profileDoc?.displayName === "string" &&
+        profileDoc.displayName.trim().length > 0
+          ? profileDoc.displayName
+          : typeof profileDoc?.username === "string"
+            ? profileDoc.username
           : `user-${userId.slice(0, 6)}`,
       rating,
     };
@@ -1832,6 +1839,7 @@ export class CompetitionService {
     const profiles = db.collection<{
       _id: string;
       username?: string | null;
+      displayName?: string | null;
       avatarUrl?: string | null;
     }>("user_profiles");
 
@@ -1867,7 +1875,7 @@ export class CompetitionService {
         ? await profiles
             .find(
               { _id: { $in: playerIds } },
-              { projection: { _id: 1, username: 1, avatarUrl: 1 } },
+              { projection: { _id: 1, username: 1, displayName: 1, avatarUrl: 1 } },
             )
             .toArray()
         : [];
@@ -1875,8 +1883,15 @@ export class CompetitionService {
     const usernameMap = new Map<string, string>();
     const avatarMap = new Map<string, string | null>();
     for (const profile of usernames) {
-      if (profile?._id && typeof profile.username === "string") {
-        usernameMap.set(profile._id, profile.username);
+      const displayName =
+        (typeof profile?.displayName === "string" &&
+          profile.displayName.trim().length > 0
+          ? profile.displayName
+          : typeof profile?.username === "string" && profile.username.trim().length > 0
+            ? profile.username
+            : null) || null;
+      if (profile?._id && displayName) {
+        usernameMap.set(profile._id, displayName);
       }
       if (profile?._id) {
         avatarMap.set(
@@ -2409,6 +2424,7 @@ export class CompetitionService {
     const userProfiles = db.collection<{
       _id: string;
       username?: string;
+      displayName?: string;
       rating?: number;
     }>("user_profiles");
 
@@ -2435,18 +2451,19 @@ export class CompetitionService {
         ? await userProfiles
             .find(
               { _id: { $in: participantUserIds } },
-              { projection: { _id: 1, username: 1, rating: 1 } },
+              { projection: { _id: 1, username: 1, displayName: 1, rating: 1 } },
             )
             .toArray()
         : [];
 
     const profileMap = new Map<
       string,
-      { username?: string; rating?: number }
+      { username?: string; displayName?: string; rating?: number }
     >();
     for (const profile of profiles) {
       profileMap.set(profile._id, {
         username: profile.username,
+        displayName: profile.displayName,
         rating: profile.rating,
       });
     }
@@ -2459,6 +2476,7 @@ export class CompetitionService {
         userId,
         username:
           (typeof participant.username === "string" && participant.username) ||
+          profile?.displayName ||
           profile?.username ||
           `Player ${index + 1}`,
         rating: Number(participant.rating ?? profile?.rating ?? 1200),
@@ -2500,7 +2518,7 @@ export class CompetitionService {
       ? profileMap.get(organizerId) ||
         (await userProfiles.findOne(
           { _id: organizerId },
-          { projection: { _id: 1, username: 1 } },
+          { projection: { _id: 1, username: 1, displayName: 1 } },
         )) ||
         null
       : null;
@@ -2517,6 +2535,7 @@ export class CompetitionService {
       organizer: {
         userId: organizerId || null,
         username:
+          organizerProfile?.displayName ||
           organizerProfile?.username ||
           (typeof tournament.organizer === "string"
             ? tournament.organizer

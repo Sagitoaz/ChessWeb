@@ -99,6 +99,7 @@ export default function BotGamePage() {
   const [gameResult, setGameResult] = useState(null) // GameResult enum
   const [isBotThinking, setIsBotThinking] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
+  const [isSavingResult, setIsSavingResult] = useState(false)
   const [tacticalHint, setTacticalHint] = useState(
     'Gia sư chiến thuật sẽ đưa gợi ý khi ván đấu có đủ dữ liệu.'
   )
@@ -107,6 +108,7 @@ export default function BotGamePage() {
   const abandonWithoutSaveRef = useRef(false)
   const lastHintRequestedPlyRef = useRef(0)
   const hintRequestSeqRef = useRef(0)
+  const saveRequestInFlightRef = useRef(false)
 
   const buildReplayMoves = useCallback(() => {
     try {
@@ -133,6 +135,55 @@ export default function BotGamePage() {
   const playerColor = gameData?.playerColor ?? 'White'
   const playerColorCode = playerColor === 'White' ? 'w' : 'b'
   const playerSideLabel = playerColor === 'White' ? 'Trắng' : 'Đen'
+
+  const persistFinishedGame = useCallback(
+    async (result, { endReason } = {}) => {
+      if (!gameId || !gameData || isSaved || abandonWithoutSaveRef.current) return false
+      if (saveRequestInFlightRef.current) return false
+
+      saveRequestInFlightRef.current = true
+      setIsSavingResult(true)
+
+      const derivedMoves = buildReplayMoves()
+      const finalMoves = derivedMoves.length >= moveHistory.length ? derivedMoves : moveHistory
+      const fallbackHuman = { username: 'You', isBot: false }
+      const fallbackBot = { username: 'Bot', isBot: true }
+
+      try {
+        await botGameAPI.saveBotGame(gameId, {
+          result,
+          state: 'Saved',
+          mode: 'bot',
+          endReason,
+          moves: finalMoves,
+          initialFEN:
+            gameData?.initialFEN || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+          whitePlayer:
+            playerColor === 'White'
+              ? gameData?.humanPlayer || fallbackHuman
+              : gameData?.botPlayer || fallbackBot,
+          blackPlayer:
+            playerColor === 'White'
+              ? gameData?.botPlayer || fallbackBot
+              : gameData?.humanPlayer || fallbackHuman,
+          metadata: {
+            totalMoves: finalMoves.length,
+          },
+        })
+        setGameState('Saved')
+        setIsSaved(true)
+        showSuccess('Ván đấu đã được lưu vào lịch sử')
+        return true
+      } catch {
+        showError('Không thể lưu ván đấu')
+        return false
+      } finally {
+        saveRequestInFlightRef.current = false
+        setIsSavingResult(false)
+      }
+    },
+    [buildReplayMoves, gameData, gameId, isSaved, moveHistory, playerColor, showError, showSuccess]
+  )
 
   const difficultyRaw = String(
     gameData?.config?.difficultyCode || gameData?.difficulty || gameData?.config?.difficulty || ''
@@ -187,10 +238,14 @@ export default function BotGamePage() {
     (chessInst) => {
       if (chessInst.isCheckmate()) {
         const winner = chessInst.turn() === 'w' ? 'Black' : 'White'
-        setGameResult(winner === 'White' ? 'WhiteWin' : 'BlackWin')
+        const result = winner === 'White' ? 'WhiteWin' : 'BlackWin'
+        setGameResult(result)
         setGameState('Finished') // SM: InGame → Finished
         showSuccess(winner === 'White' ? 'Bạn đã thắng bot.' : 'Bạn đã thua bot.', {
           duration: 3500,
+        })
+        queueMicrotask(() => {
+          void persistFinishedGame(result, { endReason: 'checkmate' })
         })
         return true
       }
@@ -198,11 +253,14 @@ export default function BotGamePage() {
         setGameResult('Draw')
         setGameState('Finished')
         showSuccess('Ván bot đã kết thúc với kết quả hòa.', { duration: 3500 })
+        queueMicrotask(() => {
+          void persistFinishedGame('Draw', { endReason: 'draw' })
+        })
         return true
       }
       return false
     },
-    [showSuccess]
+    [persistFinishedGame, showSuccess]
   )
 
   // =============================================
@@ -211,49 +269,13 @@ export default function BotGamePage() {
   // =============================================
   useEffect(() => {
     if (gameState === 'Finished' && gameResult && !isSaved && !abandonWithoutSaveRef.current) {
-      const derivedMoves = buildReplayMoves()
-      const finalMoves = derivedMoves.length >= moveHistory.length ? derivedMoves : moveHistory
-      const fallbackHuman = { username: 'You', isBot: false }
-      const fallbackBot = { username: 'Bot', isBot: true }
-
-      botGameAPI
-        .saveBotGame(gameId, {
-          result: gameResult,
-          state: 'Saved',
-          moves: finalMoves,
-          mode: 'bot',
-          initialFEN:
-            gameData?.initialFEN || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-          whitePlayer:
-            playerColor === 'White'
-              ? gameData?.humanPlayer || fallbackHuman
-              : gameData?.botPlayer || fallbackBot,
-          blackPlayer:
-            playerColor === 'White'
-              ? gameData?.botPlayer || fallbackBot
-              : gameData?.humanPlayer || fallbackHuman,
-          metadata: {
-            totalMoves: finalMoves.length,
-          },
-        })
-        .then(() => {
-          setGameState('Saved') // SM: Finished → Saved
-          setIsSaved(true)
-          showSuccess('Ván đấu đã được lưu vào lịch sử')
-        })
-        .catch(() => showError('Không thể lưu ván đấu'))
+      void persistFinishedGame(gameResult)
     }
   }, [
     gameState,
     gameResult,
     isSaved,
-    buildReplayMoves,
-    moveHistory,
-    gameId,
-    gameData,
-    playerColor,
-    showSuccess,
-    showError,
+    persistFinishedGame,
   ])
 
   // =============================================
@@ -373,8 +395,10 @@ export default function BotGamePage() {
 
   // Resign — SM: InGame → Finished
   const handleResign = () => {
-    setGameResult(playerColor === 'White' ? 'BlackWin' : 'WhiteWin')
+    const result = playerColor === 'White' ? 'BlackWin' : 'WhiteWin'
+    setGameResult(result)
     setGameState('Finished')
+    void persistFinishedGame(result, { endReason: 'resignation' })
   }
 
   const requestTacticalHint = useCallback(
@@ -643,7 +667,11 @@ export default function BotGamePage() {
             </div>
             <h2 className="text-2xl font-bold mb-2 text-gray-900">{resultText}</h2>
             <p className="text-gray-500 text-sm mb-6">
-              {gameState === 'Saved' ? 'Đã lưu vào lịch sử' : 'Đang lưu...'}
+              {gameState === 'Saved'
+                ? 'Đã lưu vào lịch sử'
+                : isSavingResult
+                  ? 'Đang lưu kết quả...'
+                  : 'Đang chốt kết quả...'}
             </p>
             <div className="flex gap-3 justify-center">
               <button
@@ -817,9 +845,9 @@ export default function BotGamePage() {
             <div className="px-3 py-2 border-t border-gray-200 flex gap-2">
               <button
                 onClick={handleResign}
-                disabled={isFinished || gameState === 'Paused'}
+                disabled={isFinished || gameState === 'Paused' || isSavingResult}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all ${
-                  isFinished || gameState === 'Paused'
+                  isFinished || gameState === 'Paused' || isSavingResult
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700'
                 }`}
