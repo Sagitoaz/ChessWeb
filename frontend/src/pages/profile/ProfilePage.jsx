@@ -224,9 +224,7 @@ export default function ProfilePage() {
 
     const load = async () => {
       setLoading(true)
-      const profileTask = authUser?.id
-        ? Promise.resolve({ user: authUser })
-        : authService.getCurrentUser()
+      const profileTask = authService.getCurrentUser()
 
       const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
         profileTask,
@@ -236,22 +234,24 @@ export default function ProfilePage() {
 
       if (!mounted) return
 
-      const gamesHistory = gamesResult.status === 'fulfilled' ? gamesResult.value : { items: [] }
-      setMatches(normalizeHistoryPayload(gamesHistory, authUser?.username))
+      const profileData =
+        profileResult.status === 'fulfilled'
+          ? (profileResult.value?.data ?? profileResult.value)
+          : null
+      const nextUser = profileData?.user ?? profileData ?? authUser
 
-      if (profileResult.status === 'fulfilled') {
-        const profileData = profileResult.value?.data ?? profileResult.value
-        const nextUser = profileData?.user ?? profileData
-        if (nextUser && token) {
-          const stats = rankedStatsResult.status === 'fulfilled' ? rankedStatsResult.value : null
-          setAuthLogin(
-            {
-              ...nextUser,
-              rating: Number(stats?.currentRating ?? nextUser.rating ?? 1200),
-            },
-            token
-          )
-        }
+      const gamesHistory = gamesResult.status === 'fulfilled' ? gamesResult.value : { items: [] }
+      setMatches(normalizeHistoryPayload(gamesHistory, nextUser?.username || authUser?.username))
+
+      if (nextUser && token) {
+        const stats = rankedStatsResult.status === 'fulfilled' ? rankedStatsResult.value : null
+        setAuthLogin(
+          {
+            ...nextUser,
+            rating: Number(stats?.currentRating ?? nextUser.rating ?? 1200),
+          },
+          token
+        )
       }
 
       if (rankedStatsResult.status === 'fulfilled') {

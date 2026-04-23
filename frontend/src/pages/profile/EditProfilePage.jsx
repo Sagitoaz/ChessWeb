@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -42,6 +43,7 @@ const EditProfilePage = () => {
     register,
     watch,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(profileSchema),
@@ -52,6 +54,33 @@ const EditProfilePage = () => {
     mode: 'onTouched',
   })
   const avatarPreview = watch('avatarUrl') || user?.avatarUrl || ''
+
+  useEffect(() => {
+    let mounted = true
+
+    const syncProfile = async () => {
+      try {
+        const latestProfile = await authService.getCurrentUser()
+        const normalizedUser = latestProfile?.user ?? latestProfile
+        if (!mounted || !normalizedUser || !token) return
+
+        setAuthLogin(normalizedUser, token)
+
+        reset({
+          displayName: normalizedUser?.displayName ?? normalizedUser?.username ?? '',
+          avatarUrl: normalizedUser?.avatarUrl ?? '',
+        })
+      } catch {
+        // Keep local data if profile sync fails.
+      }
+    }
+
+    void syncProfile()
+
+    return () => {
+      mounted = false
+    }
+  }, [reset, setAuthLogin, token])
 
   // Password form
   const {
