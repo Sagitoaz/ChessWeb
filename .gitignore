@@ -17,6 +17,8 @@ node_modules/
 Thumbs.db
 *.pem
 .DS_Store
+.codex
+AGENTS.MD
 
 # ==================== Environment ====================
 .env

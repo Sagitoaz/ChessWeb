@@ -2676,6 +2676,9 @@ export class SocialBotService {
 
   async createBotGame(userId: string, dto: CreateBotGameDto) {
     const now = new Date();
+    const difficultyConfig = this.stockfishService.getDifficultyConfig(
+      dto.difficulty,
+    );
     const botSession = await this.repo.createBotSession({
       userId,
       status: "active",
@@ -2700,6 +2703,7 @@ export class SocialBotService {
       gameId: String(game._id),
       sessionId: String(botSession._id),
       difficulty: dto.difficulty,
+      config: difficultyConfig,
     };
   }
 

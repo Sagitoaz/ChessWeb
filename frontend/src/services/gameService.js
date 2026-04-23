@@ -11,6 +11,12 @@ const gameAPI = api
 const unwrapApiEnvelope = (payload) => payload?.data ?? payload
 const USER_GAMES_CACHE_TTL_MS = 20000
 const userGamesCache = new Map()
+const BOT_THINKING_PROFILES = {
+  easy: { timeLimitMs: 600, requestTimeoutMs: 8000, rating: 700, depth: 8 },
+  normal: { timeLimitMs: 1600, requestTimeoutMs: 10000, rating: 1250, depth: 14 },
+  hard: { timeLimitMs: 4200, requestTimeoutMs: 16000, rating: 1900, depth: 22 },
+  super_hard: { timeLimitMs: 18000, requestTimeoutMs: 30000, rating: 3200, depth: 40 },
+}
 const clearPublicRoomsCache = () => {
   // No-op: public rooms should always be fetched fresh to avoid stale room visibility.
 }
@@ -809,25 +815,30 @@ export const botGameAPI = {
     }
 
     const difficultyRatingMap = {
-      easy: 700,
-      normal: 1250,
-      hard: 1900,
-      super_hard: 3200,
-      beginner: 700,
-      intermediate: 1250,
-      advanced: 1900,
-      expert: 3200,
+      easy: BOT_THINKING_PROFILES.easy.rating,
+      normal: BOT_THINKING_PROFILES.normal.rating,
+      hard: BOT_THINKING_PROFILES.hard.rating,
+      super_hard: BOT_THINKING_PROFILES.super_hard.rating,
+      beginner: BOT_THINKING_PROFILES.easy.rating,
+      intermediate: BOT_THINKING_PROFILES.normal.rating,
+      advanced: BOT_THINKING_PROFILES.hard.rating,
+      expert: BOT_THINKING_PROFILES.super_hard.rating,
     }
 
     const requestedDifficulty = difficultyMap[level] || 'normal'
+    const requestedProfile =
+      BOT_THINKING_PROFILES[requestedDifficulty] || BOT_THINKING_PROFILES.normal
 
     const response = await gameAPI.post('/bot/games', {
       difficulty: requestedDifficulty,
       preferredColor: 'white',
+      maxThinkSeconds: Math.max(1, Math.ceil(requestedProfile.timeLimitMs / 1000)),
     })
 
     const data = response?.data ?? response
     const effectiveDifficulty = data?.difficulty || requestedDifficulty
+    const effectiveProfile =
+      BOT_THINKING_PROFILES[effectiveDifficulty] || requestedProfile || BOT_THINKING_PROFILES.normal
 
     return {
       ...data,
@@ -842,7 +853,10 @@ export const botGameAPI = {
         ...(data?.config || {}),
         difficulty: difficultyLabelMap[effectiveDifficulty] || 'Bình thường',
         difficultyCode: effectiveDifficulty,
-        timeLimitMs: data?.config?.timeLimitMs ?? 500,
+        depth: data?.config?.depth ?? effectiveProfile.depth,
+        timeLimitMs: data?.config?.timeLimitMs ?? effectiveProfile.timeLimitMs,
+        requestTimeoutMs:
+          data?.config?.requestTimeoutMs ?? effectiveProfile.requestTimeoutMs,
       },
       status: 'InGame',
     }
@@ -856,9 +870,19 @@ export const botGameAPI = {
    */
   submitPlayerMove: (gameId, move) => gameAPI.post(`/games/${gameId}/moves`, { move }),
 
-  getBotMove: async (sessionId, fen) => {
-    const response = await gameAPI.post('/bot/move', { sessionId, fen })
-    return response?.data ?? response
+  getBotMove: async (sessionId, fen, options = {}) => {
+    const timeoutMs = Math.max(Number(options?.timeoutMs || 0), 10000)
+    try {
+      const response = await gameAPI.post('/bot/move', { sessionId, fen }, { timeout: timeoutMs })
+      return response?.data ?? response
+    } catch (error) {
+      if (error?.code === 'ECONNABORTED' || String(error?.message || '').includes('timeout')) {
+        const timeoutError = new Error('Bot đang tính sâu hơn dự kiến, vui lòng thử lại.')
+        timeoutError.statusCode = 504
+        throw timeoutError
+      }
+      throw error
+    }
   },
 
   getTacticalHint: async (pgn, detailLevel = 'detailed', context = null) => {

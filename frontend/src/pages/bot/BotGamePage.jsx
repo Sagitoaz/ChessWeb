@@ -270,7 +270,14 @@ export default function BotGamePage() {
         if (!botSessionId) {
           throw new Error('Missing bot session id')
         }
-        const botResponse = await botGameAPI.getBotMove(botSessionId, chessInst.fen())
+        const requestTimeoutMs = Math.max(
+          Number(gameData?.config?.requestTimeoutMs || 0),
+          Number(gameData?.config?.timeLimitMs || 0) + 7000,
+          10000
+        )
+        const botResponse = await botGameAPI.getBotMove(botSessionId, chessInst.fen(), {
+          timeoutMs: requestTimeoutMs,
+        })
         const uci = botResponse?.move?.bestMoveUci || botResponse?.bestMoveUci
         if (!uci || uci.length < 4) {
           throw new Error('Invalid bot move from server')
@@ -313,7 +320,7 @@ export default function BotGamePage() {
         setIsBotThinking(false)
       }
     },
-    [botSessionId, checkEndCondition, showError, forceUpdate]
+    [botSessionId, checkEndCondition, showError, forceUpdate, gameData]
   )
 
   // Nếu player chọn Black, bot (White) đi trước — trigger ngay khi vào game

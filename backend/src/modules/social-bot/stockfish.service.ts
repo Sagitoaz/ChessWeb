@@ -42,6 +42,25 @@ export class StockfishService {
     }
   }
 
+  getDifficultyConfig(difficulty: string): {
+    difficulty: DifficultyProfile["normalizedDifficulty"];
+    skillLevel: number;
+    targetElo: number | null;
+    depth: number;
+    timeLimitMs: number;
+    requestTimeoutMs: number;
+  } {
+    const profile = this.getDifficultyProfile(difficulty);
+    return {
+      difficulty: profile.normalizedDifficulty,
+      skillLevel: profile.skillLevel,
+      targetElo: profile.targetElo,
+      depth: profile.depth,
+      timeLimitMs: profile.moveTimeMs,
+      requestTimeoutMs: profile.timeoutMs,
+    };
+  }
+
   private queryStockfish(
     fen: string,
     difficulty: string,
@@ -207,9 +226,9 @@ export class StockfishService {
         skillLevel: 1,
         limitStrength: true,
         targetElo: 650,
-        depth: 6,
-        moveTimeMs: 120,
-        timeoutMs: Math.max(baseTimeout, 2200),
+        depth: 8,
+        moveTimeMs: 600,
+        timeoutMs: Math.max(baseTimeout, 5000),
         searchMode: "movetime",
       };
     }
@@ -221,8 +240,8 @@ export class StockfishService {
         limitStrength: true,
         targetElo: 2000,
         depth: 22,
-        moveTimeMs: 2200,
-        timeoutMs: Math.max(baseTimeout, 8000),
+        moveTimeMs: 4200,
+        timeoutMs: Math.max(baseTimeout, 15000),
         searchMode: "movetime",
       };
     }
@@ -233,10 +252,10 @@ export class StockfishService {
         skillLevel: 20,
         limitStrength: false,
         targetElo: null,
-        depth: 99,
-        moveTimeMs: 30000,
-        timeoutMs: Math.max(baseTimeout, 70000),
-        searchMode: "depth",
+        depth: 40,
+        moveTimeMs: 18000,
+        timeoutMs: Math.max(baseTimeout, 35000),
+        searchMode: "movetime",
       };
     }
 
@@ -245,9 +264,9 @@ export class StockfishService {
       skillLevel: 9,
       limitStrength: true,
       targetElo: 1300,
-      depth: 12,
-      moveTimeMs: 500,
-      timeoutMs: Math.max(baseTimeout, 4200),
+      depth: 14,
+      moveTimeMs: 1600,
+      timeoutMs: Math.max(baseTimeout, 8000),
       searchMode: "movetime",
     };
   }
