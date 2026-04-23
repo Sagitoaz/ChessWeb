@@ -67,6 +67,10 @@ type GameEndPayload = {
   resignedByUserId?: string;
 };
 
+type TournamentRegisterPayload = {
+  tournamentId?: string;
+};
+
 @WebSocketGateway({
   cors: {
     origin: env.corsOrigins,
@@ -93,25 +97,35 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }, this.matchmakingTickMs);
   }
 
+  private tournamentRoom(tournamentId: string): string {
+    return `tournament:${tournamentId}`;
+  }
+
+  private emitTournamentEvent(
+    tournamentId: string,
+    event: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.server.to(this.tournamentRoom(tournamentId)).emit(event, {
+      ...payload,
+      tournamentId,
+      at: new Date().toISOString(),
+    });
+  }
+
   emitTournamentPlayerRegistered(payload: {
     tournamentId: string;
     userId: string;
     status?: string;
   }): void {
-    this.server.emit("tournament:playerRegistered", {
-      ...payload,
-      at: new Date().toISOString(),
-    });
+    this.emitTournamentEvent(payload.tournamentId, "tournament:playerRegistered", payload);
   }
 
   emitTournamentPlayerWithdrawn(payload: {
     tournamentId: string;
     userId: string;
   }): void {
-    this.server.emit("tournament:playerWithdrawn", {
-      ...payload,
-      at: new Date().toISOString(),
-    });
+    this.emitTournamentEvent(payload.tournamentId, "tournament:playerWithdrawn", payload);
   }
 
   emitTournamentStarted(payload: {
@@ -119,10 +133,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     status?: string;
     rounds?: unknown;
   }): void {
-    this.server.emit("tournament:started", {
-      ...payload,
-      at: new Date().toISOString(),
-    });
+    this.emitTournamentEvent(payload.tournamentId, "tournament:started", payload);
   }
 
   emitTournamentRoundUpdate(payload: {
@@ -131,10 +142,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     status?: string;
     rounds?: unknown;
   }): void {
-    this.server.emit("tournament:roundUpdate", {
-      ...payload,
-      at: new Date().toISOString(),
-    });
+    this.emitTournamentEvent(payload.tournamentId, "tournament:roundUpdate", payload);
   }
 
   emitTournamentMatchReady(payload: {
@@ -143,10 +151,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     gameId?: string | null;
     roundIndex?: number;
   }): void {
-    this.server.emit("tournament:matchReady", {
-      ...payload,
-      at: new Date().toISOString(),
-    });
+    this.emitTournamentEvent(payload.tournamentId, "tournament:matchReady", payload);
   }
 
   emitTournamentCompleted(payload: {
@@ -155,10 +160,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     status?: string;
     rounds?: unknown;
   }): void {
-    this.server.emit("tournament:completed", {
-      ...payload,
-      at: new Date().toISOString(),
-    });
+    this.emitTournamentEvent(payload.tournamentId, "tournament:completed", payload);
   }
 
   emitGameStatus(
@@ -459,6 +461,32 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.join(`match:${matchId}`);
     this.matchBySocketId.set(client.id, matchId);
+  }
+
+  @SubscribeMessage("tournament:register")
+  async onTournamentRegister(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: TournamentRegisterPayload | undefined,
+  ): Promise<void> {
+    this.getSocketUser(client);
+    const tournamentId = String(body?.tournamentId || "").trim();
+    if (!tournamentId) {
+      throw new UnauthorizedException("Missing tournamentId");
+    }
+    client.join(this.tournamentRoom(tournamentId));
+  }
+
+  @SubscribeMessage("tournament:withdraw")
+  async onTournamentWithdraw(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: TournamentRegisterPayload | undefined,
+  ): Promise<void> {
+    this.getSocketUser(client);
+    const tournamentId = String(body?.tournamentId || "").trim();
+    if (!tournamentId) {
+      throw new UnauthorizedException("Missing tournamentId");
+    }
+    client.leave(this.tournamentRoom(tournamentId));
   }
 
   @SubscribeMessage("game:move")

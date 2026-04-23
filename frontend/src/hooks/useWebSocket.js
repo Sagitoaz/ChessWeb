@@ -341,6 +341,15 @@ export function useRoomSocket(roomCode) {
 export function useTournamentSocket(tournamentId) {
   const { isConnected, on, off, emit } = useWebSocket()
 
+  useEffect(() => {
+    if (!isConnected || !tournamentId) return undefined
+    emit('tournament:register', { tournamentId })
+
+    return () => {
+      emit('tournament:withdraw', { tournamentId })
+    }
+  }, [emit, isConnected, tournamentId])
+
   // Register for tournament
   const register = useCallback(() => {
     if (!tournamentId) return
