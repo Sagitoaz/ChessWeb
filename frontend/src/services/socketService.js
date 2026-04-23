@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client'
 import { SOCKET_URL } from '../utils/constants'
+import { useAuthStore } from '../store'
 
 /**
  * WebSocket Service using Socket.io
@@ -15,7 +16,7 @@ class SocketService {
   }
 
   connect(token) {
-    const nextToken = token || localStorage.getItem('token')
+    const nextToken = token || useAuthStore.getState().token
 
     if (!nextToken) {
       console.warn('No auth token found for socket connection')

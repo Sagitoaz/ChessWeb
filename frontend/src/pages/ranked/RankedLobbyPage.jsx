@@ -372,7 +372,7 @@ const RankedLobbyPage = () => {
     setQueueStatus(QUEUE_STATUS.SEARCHING)
     setMatchData(null)
     if (!isConnected) {
-      connect(localStorage.getItem('token'))
+      connect()
     }
 
     // Emit WebSocket event

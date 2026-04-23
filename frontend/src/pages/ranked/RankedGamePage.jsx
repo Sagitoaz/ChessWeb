@@ -653,7 +653,7 @@ const RankedGamePage = () => {
         const player = data?.player
         if (!player) return
 
-        const token = authToken || localStorage.getItem('token')
+        const token = authToken
         if (!token) return
 
         const mergedUser = {

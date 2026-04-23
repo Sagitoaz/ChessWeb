@@ -32,22 +32,12 @@ const authService = {
    * @param {Object} credentials - Username/email và password
    * @param {string} credentials.username - Username hoặc email
    * @param {string} credentials.password - Password
-   * @returns {Promise<{user: Object, token: string, refreshToken: string}>}
+   * @returns {Promise<{user: Object, token: string}>}
    */
   async login(credentials) {
     try {
       const response = await apiCall('POST', API_ENDPOINTS.LOGIN, credentials)
-      const data = this.unwrapApiData(response)
-      
-      // Lưu tokens vào localStorage
-      if (data?.token) {
-        localStorage.setItem('token', data.token)
-      }
-      if (data?.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken)
-      }
-      
-      return data
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -60,22 +50,12 @@ const authService = {
    * @param {string} userData.email - Email
    * @param {string} userData.password - Password
    * @param {string} [userData.displayName] - Tên hiển thị (optional)
-   * @returns {Promise<{user: Object, token: string, refreshToken: string}>}
+   * @returns {Promise<{user: Object, token: string}>}
    */
   async register(userData) {
     try {
       const response = await apiCall('POST', API_ENDPOINTS.REGISTER, userData)
-      const data = this.unwrapApiData(response)
-      
-      // Lưu tokens vào localStorage (auto login sau khi đăng ký)
-      if (data?.token) {
-        localStorage.setItem('token', data.token)
-      }
-      if (data?.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken)
-      }
-      
-      return data
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -87,54 +67,24 @@ const authService = {
    */
   async logout() {
     try {
-      // Gọi API logout để invalidate token trên server
-      const refreshToken = localStorage.getItem('refreshToken')
-      await apiCall(
-        'POST',
-        API_ENDPOINTS.LOGOUT,
-        refreshToken ? { refreshToken } : undefined
-      )
+      await apiCall('POST', API_ENDPOINTS.LOGOUT, {})
     } catch (error) {
       // Vẫn logout ở client dù API lỗi
       console.error('Logout API error:', error)
-    } finally {
-      // Clear tokens từ localStorage
-      localStorage.removeItem('token')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
-      localStorage.removeItem('rememberMe')
-      sessionStorage.removeItem('authSession')
     }
   },
 
   /**
-   * Refresh token khi hết hạn
-   * @param {string} refreshToken - Refresh token
-   * @returns {Promise<{token: string, refreshToken: string}>}
+   * Khôi phục phiên từ refresh cookie httpOnly
+   * @returns {Promise<{token: string, user: Object}>}
    */
-  async refreshToken(refreshToken) {
+  async restoreSession() {
     try {
-      const response = await apiCall('POST', API_ENDPOINTS.REFRESH_TOKEN, {
-        refreshToken,
-      })
+      const response = await apiCall('POST', API_ENDPOINTS.REFRESH_TOKEN, {})
       const data = this.unwrapApiData(response)
-      
-      // Cập nhật token mới
-      if (data?.token) {
-        localStorage.setItem('token', data.token)
-      }
-      if (data?.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken)
-      }
-      
+
       return data
     } catch (error) {
-      // Token refresh failed - force logout
-      localStorage.removeItem('token')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
-      localStorage.removeItem('rememberMe')
-      sessionStorage.removeItem('authSession')
       throw this.handleError(error)
     }
   },
@@ -233,16 +183,7 @@ const authService = {
   async googleAuth(idToken) {
     try {
       const response = await apiCall('POST', '/auth/google', { idToken })
-      const data = this.unwrapApiData(response)
-
-      if (data?.token) {
-        localStorage.setItem('token', data.token)
-      }
-      if (data?.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken)
-      }
-
-      return data
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }

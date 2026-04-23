@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator'
+import { IsBoolean, IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator'
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/
@@ -25,6 +25,10 @@ export class LoginDto {
   @MinLength(6)
   @MaxLength(128)
   password!: string
+
+  @IsOptional()
+  @IsBoolean()
+  remember?: boolean
 }
 
 export class RegisterDto {
@@ -52,10 +56,11 @@ export class RegisterDto {
 }
 
 export class RefreshTokenDto {
+  @IsOptional()
   @IsString()
   @MinLength(20)
   @MaxLength(2048)
-  refreshToken!: string
+  refreshToken?: string
 }
 
 export class LogoutDto {

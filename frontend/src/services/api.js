@@ -7,16 +7,8 @@ const isValidToken = (token) =>
 
 const clearAuthSession = () => {
   try {
-    localStorage.removeItem('token')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('user')
-    localStorage.removeItem('rememberMe')
-    sessionStorage.removeItem('authSession')
     useAuthStore.getState().logout()
   } catch (_error) {
-    localStorage.removeItem('token')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('user')
     localStorage.removeItem('rememberMe')
     sessionStorage.removeItem('authSession')
   }
@@ -26,15 +18,22 @@ const clearAuthSession = () => {
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
+let refreshPromise = null
+const shouldSkipRefreshFor = (url = '') =>
+  ['/auth/login', '/auth/register', '/auth/google', '/auth/refresh'].some((path) =>
+    String(url || '').includes(path)
+  )
+
 // Request interceptor - Add token to headers
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = useAuthStore.getState().token
     const isAuthenticated = useAuthStore.getState().isAuthenticated
     const hasToken = typeof token === 'string' && token.length > 0
 
@@ -57,31 +56,38 @@ api.interceptors.response.use(
     const originalRequest = error.config
 
     // If 401 and not already retried, try to refresh token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest?._retry &&
+      !shouldSkipRefreshFor(originalRequest?.url)
+    ) {
       originalRequest._retry = true
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken')
-        if (
-          !refreshToken ||
-          refreshToken === 'undefined' ||
-          refreshToken === 'null' ||
-          refreshToken.startsWith('mock')
-        ) {
-          throw new Error('Missing or invalid refresh token')
+        if (!refreshPromise) {
+          refreshPromise = axios
+            .post(
+              `${API_URL}/auth/refresh`,
+              {},
+              {
+                withCredentials: true,
+                headers: { 'Content-Type': 'application/json' },
+              }
+            )
+            .then((response) => response.data?.data ?? response.data)
+            .finally(() => {
+              refreshPromise = null
+            })
         }
-        const response = await axios.post(`${API_URL}/auth/refresh`, {
-          refreshToken,
-        })
 
-        const payload = response.data?.data ?? response.data
+        const payload = await refreshPromise
         const token = payload?.token
         if (!isValidToken(token)) {
           throw new Error('Refresh response did not contain a valid token')
         }
-        localStorage.setItem('token', token)
-        if (payload?.refreshToken && payload.refreshToken !== refreshToken) {
-          localStorage.setItem('refreshToken', payload.refreshToken)
+        useAuthStore.getState().setToken(token)
+        if (payload?.user) {
+          useAuthStore.getState().setUser(payload.user)
         }
 
         originalRequest.headers.Authorization = `Bearer ${token}`

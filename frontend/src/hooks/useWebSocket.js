@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import socketService from '../services/socketService'
+import { useAuthStore } from '../store'
 
 /**
  * Custom React hook for WebSocket connection management
@@ -12,6 +13,7 @@ export function useWebSocket(autoConnect = true) {
   const [isConnected, setIsConnected] = useState(false)
   const [connectionError, setConnectionError] = useState(null)
   const listenersRef = useRef(new Map())
+  const authToken = useAuthStore((state) => state.token)
 
   // Connect to WebSocket
   const connect = useCallback((token) => {
@@ -64,9 +66,8 @@ export function useWebSocket(autoConnect = true) {
   // Auto-connect on mount if enabled
   useEffect(() => {
     if (autoConnect) {
-      const token = localStorage.getItem('token')
-      if (token) {
-        connect(token)
+      if (authToken) {
+        connect(authToken)
       }
     }
 
@@ -109,7 +110,7 @@ export function useWebSocket(autoConnect = true) {
       // Keep singleton socket alive across route transitions.
       // Disconnect should happen explicitly on logout/app teardown.
     }
-  }, [autoConnect, connect])
+  }, [autoConnect, authToken, connect])
 
   return {
     isConnected,

@@ -12,7 +12,7 @@ import socketService from '../services/socketService'
  * @returns {Object} Auth state và methods
  */
 export const useAuth = () => {
-  const { user, isAuthenticated, login: setLogin, logout: setLogout } = useAuthStore()
+  const { user, token: authToken, isAuthenticated, login: setLogin, logout: setLogout } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -61,7 +61,10 @@ export const useAuth = () => {
         setLoading(true)
         setError(null)
 
-        const response = await authService.login(credentials)
+        const response = await authService.login({
+          ...credentials,
+          remember: options?.remember !== false,
+        })
         const normalized = await normalizeAuthPayload(response)
         const remember = applyRememberPreference(options?.remember)
         setLogin(normalized.user, normalized.token, { remember })
@@ -226,11 +229,13 @@ export const useAuth = () => {
 
       const responseData = await authService.getCurrentUser()
       const userData = responseData?.user ?? responseData
-      const token = localStorage.getItem('token')
       if (!userData || typeof userData !== 'object' || !userData.username) {
         throw new Error('Không lấy được hồ sơ người dùng hiện tại.')
       }
-      setLogin(userData, token)
+      if (!authToken) {
+        throw new Error('Phiên truy cập hiện tại không còn access token.')
+      }
+      setLogin(userData, authToken)
 
       return userData
     } catch (err) {
@@ -239,7 +244,7 @@ export const useAuth = () => {
     } finally {
       setLoading(false)
     }
-  }, [setLogin])
+  }, [authToken, setLogin])
 
   /**
    * Kiểm tra username availability

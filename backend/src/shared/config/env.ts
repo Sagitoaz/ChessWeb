@@ -15,6 +15,14 @@ const parseCorsOrigins = (value: string | undefined): string[] => {
 const configuredCorsOrigins = parseCorsOrigins(
   process.env.CORS_ORIGINS || process.env.FRONTEND_URL,
 );
+const normalizeSameSite = (
+  value: string | undefined,
+): "lax" | "strict" | "none" => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "strict") return "strict";
+  if (normalized === "none") return "none";
+  return "lax";
+};
 
 for (const key of requiredVars) {
   if (!process.env[key]) {
@@ -40,6 +48,29 @@ export const env = {
   groqEnabled: (process.env.GROQ_API_KEY || "").trim().length > 0,
   googleClientId:
     (process.env.GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID).trim(),
+  authRefreshCookieName:
+    (process.env.AUTH_REFRESH_COOKIE_NAME || "chessweb_rt").trim() ||
+    "chessweb_rt",
+  authRefreshCookieDomain:
+    (process.env.AUTH_REFRESH_COOKIE_DOMAIN || "").trim() || null,
+  authRefreshCookiePath:
+    (process.env.AUTH_REFRESH_COOKIE_PATH || "/api/v1/auth").trim() ||
+    "/api/v1/auth",
+  authRefreshCookieSecure:
+    (process.env.AUTH_REFRESH_COOKIE_SECURE ||
+      (process.env.NODE_ENV === "production" ? "true" : "false")
+    ).toLowerCase() === "true",
+  authRefreshCookieSameSite: normalizeSameSite(
+    process.env.AUTH_REFRESH_COOKIE_SAMESITE ||
+      (process.env.NODE_ENV === "production" ? "none" : "lax"),
+  ),
+  authRefreshCookieMaxAgeMs: Math.max(
+    60_000,
+    Number(
+      process.env.AUTH_REFRESH_COOKIE_MAX_AGE_MS ||
+        30 * 24 * 60 * 60 * 1000,
+    ) || 30 * 24 * 60 * 60 * 1000,
+  ),
   port: Number(process.env.PORT || 8080),
   corsOrigins:
     configuredCorsOrigins.length > 0

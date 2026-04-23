@@ -97,6 +97,7 @@ interface LogoutResponseData {
 interface RefreshResponseData {
   token: string
   refreshToken: string
+  user: UserResponseData
 }
 
 interface ForgotPasswordResponseData {
@@ -381,6 +382,10 @@ export class IdentityService {
 
   async refresh(dto: RefreshTokenDto, requestId: string | null): Promise<ApiResponse<RefreshResponseData>> {
     try {
+      if (!dto?.refreshToken) {
+        return this.errorResponse(requestId, 'AUTH_TOKEN_EXPIRED', 'Refresh token da het han')
+      }
+
       let payload: JwtRefreshPayload
 
       try {
@@ -425,6 +430,7 @@ export class IdentityService {
         {
           token: newTokens.token,
           refreshToken: newTokens.refreshToken,
+          user: this.toUserResponse(user),
         },
         requestId
       )
