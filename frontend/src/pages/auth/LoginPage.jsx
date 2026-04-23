@@ -79,7 +79,7 @@ const LoginPage = () => {
     async ({ username, password, remember }) => {
       clearError?.()
       await login({ username, password }, { remember })
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     },
     [clearError, login, navigate]
   )
@@ -105,7 +105,7 @@ const LoginPage = () => {
         'Google đăng nhập thành công',
         `Chào mừng ${user?.displayName || user?.username || 'bạn'} quay lại!`
       )
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     } catch (err) {
       notifyError('Google đăng nhập thất bại', err?.message || 'Vui lòng thử lại.')
     }

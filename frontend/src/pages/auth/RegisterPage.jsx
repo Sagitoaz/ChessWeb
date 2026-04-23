@@ -83,7 +83,7 @@ const RegisterPage = () => {
           password: data.password,
         })
         notifySuccess('Đăng ký thành công!', `Chào mừng ${data.username} đến với WebChess!`)
-        navigate('/', { replace: true })
+        navigate('/dashboard', { replace: true })
       } catch (err) {
         notifyError('Đăng ký thất bại', err?.message || 'Vui lòng thử lại.')
       }
@@ -99,7 +99,7 @@ const RegisterPage = () => {
         'Google đăng ký thành công',
         `Chào mừng ${user?.displayName || user?.username || 'bạn'} đến với WebChess!`
       )
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     } catch (err) {
       notifyError('Google đăng ký thất bại', err?.message || 'Vui lòng thử lại.')
     }

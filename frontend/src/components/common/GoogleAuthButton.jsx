@@ -5,8 +5,21 @@ import { initializeGoogleIdentity, renderGoogleButton } from '@/utils/googleAuth
 
 const GoogleAuthButton = ({ onCredential, disabled = false, text = 'continue_with' }) => {
   const containerRef = useRef(null)
+  const lastWidthRef = useRef(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const drawButton = useCallback(async () => {
+    if (!containerRef.current) return
+
+    const nextWidth = Math.max(220, Math.round(containerRef.current.getBoundingClientRect().width || 320))
+    if (lastWidthRef.current === nextWidth) {
+      return
+    }
+
+    lastWidthRef.current = nextWidth
+    await renderGoogleButton(containerRef.current, { text })
+  }, [text])
 
   const mountButton = useCallback(async () => {
     if (!containerRef.current) return
@@ -24,36 +37,35 @@ const GoogleAuthButton = ({ onCredential, disabled = false, text = 'continue_wit
         void onCredential?.(response.credential)
       })
 
-      await renderGoogleButton(containerRef.current, { text })
-      setLoading(false)
+      await drawButton()
     } catch (err) {
-      setLoading(false)
       setError(err?.message || 'Không thể tải nút đăng nhập Google.')
+    } finally {
+      setLoading(false)
     }
-  }, [onCredential, text])
+  }, [drawButton, onCredential])
 
   useEffect(() => {
-    let resizeObserver = null
-    let cancelled = false
+    let active = true
 
     const bootstrap = async () => {
       await mountButton()
-      if (cancelled || !containerRef.current || typeof ResizeObserver === 'undefined') return
-
-      resizeObserver = new ResizeObserver(() => {
-        if (!containerRef.current) return
-        void renderGoogleButton(containerRef.current, { text }).catch(() => {})
-      })
-      resizeObserver.observe(containerRef.current)
     }
 
     void bootstrap()
 
-    return () => {
-      cancelled = true
-      resizeObserver?.disconnect()
+    const handleResize = () => {
+      if (!active || !containerRef.current) return
+      void drawButton().catch(() => {})
     }
-  }, [mountButton, text])
+
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      active = false
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [drawButton, mountButton])
 
   return (
     <div className="space-y-2">
@@ -70,7 +82,9 @@ const GoogleAuthButton = ({ onCredential, disabled = false, text = 'continue_wit
           </div>
         ) : null}
 
-        {disabled ? <div className="absolute inset-0 cursor-not-allowed rounded-lg bg-white/50" /> : null}
+        {disabled ? (
+          <div className="absolute inset-0 cursor-not-allowed rounded-lg bg-white/50" />
+        ) : null}
       </div>
 
       {error ? (
