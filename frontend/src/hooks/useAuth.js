@@ -16,6 +16,13 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  const applyRememberPreference = useCallback((remember) => {
+    const normalizedRemember = remember === false ? false : true
+    localStorage.setItem('rememberMe', normalizedRemember ? 'true' : 'false')
+    sessionStorage.setItem('authSession', '1')
+    return normalizedRemember
+  }, [])
+
   const normalizeAuthPayload = useCallback(async (response) => {
     const token = response?.token
     const effectiveToken =
@@ -49,14 +56,15 @@ export const useAuth = () => {
    * @returns {Promise<Object>} User data
    */
   const login = useCallback(
-    async (credentials) => {
+    async (credentials, options = {}) => {
       try {
         setLoading(true)
         setError(null)
 
         const response = await authService.login(credentials)
         const normalized = await normalizeAuthPayload(response)
-        setLogin(normalized.user, normalized.token)
+        const remember = applyRememberPreference(options?.remember)
+        setLogin(normalized.user, normalized.token, { remember })
         socketService.connect(normalized.token)
 
         return normalized.user
@@ -67,7 +75,7 @@ export const useAuth = () => {
         setLoading(false)
       }
     },
-    [setLogin, normalizeAuthPayload]
+    [applyRememberPreference, setLogin, normalizeAuthPayload]
   )
 
   /**
@@ -83,7 +91,8 @@ export const useAuth = () => {
 
         const response = await authService.register(userData)
         const normalized = await normalizeAuthPayload(response)
-        setLogin(normalized.user, normalized.token)
+        const remember = applyRememberPreference(true)
+        setLogin(normalized.user, normalized.token, { remember })
         socketService.connect(normalized.token)
 
         return normalized.user
@@ -94,7 +103,7 @@ export const useAuth = () => {
         setLoading(false)
       }
     },
-    [setLogin, normalizeAuthPayload]
+    [applyRememberPreference, setLogin, normalizeAuthPayload]
   )
 
   /**
@@ -109,7 +118,8 @@ export const useAuth = () => {
 
         const response = await authService.googleAuth(idToken)
         const normalized = await normalizeAuthPayload(response)
-        setLogin(normalized.user, normalized.token)
+        const remember = applyRememberPreference(true)
+        setLogin(normalized.user, normalized.token, { remember })
         socketService.connect(normalized.token)
 
         return normalized.user
@@ -120,7 +130,7 @@ export const useAuth = () => {
         setLoading(false)
       }
     },
-    [normalizeAuthPayload, setLogin]
+    [applyRememberPreference, normalizeAuthPayload, setLogin]
   )
 
   /**

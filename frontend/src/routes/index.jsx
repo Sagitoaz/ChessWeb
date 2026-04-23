@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import { Loader } from '@components/common'
 import { AppLayout } from '@components/layout'
 import PublicRoute from './PublicRoute'
+import PrivateRoute from './PrivateRoute'
 
 // =============================================================================
 // LAZY IMPORTS — Mỗi trang được tải khi người dùng truy cập (tối ưu tốc độ)
@@ -13,6 +14,7 @@ const LoginPage = lazy(() => import('@pages/auth/LoginPage'))
 const LogoutPage = lazy(() => import('@pages/auth/LogoutPage'))
 const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@pages/auth/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('@pages/auth/ResetPasswordPage'))
 
 // Home
 import DashboardPage from '@pages/home/DashboardPage'
@@ -128,22 +130,65 @@ function AppRoutes() {
             </PublicRoute>
           }
         />
+        <Route
+          path="/reset-password"
+          element={
+            <PublicRoute>
+              <ResetPasswordPage />
+            </PublicRoute>
+          }
+        />
         <Route path="/logout" element={<LogoutPage />} />
 
         {/* =========================================================
             RANKED — Trang này tự có MainLayout bên trong
             (Không bọc AppLayout để tránh double-wrap)
         ========================================================= */}
-        <Route path="/ranked" element={<RankedLobbyPage />} />
-        <Route path="/ranked/game/:matchId" element={<RankedGamePage />} />
-        <Route path="/ranked/history" element={<RankedHistoryPage />} />
-        <Route path="/ranked/stats" element={<RankedStatsPage />} />
+        <Route
+          path="/ranked"
+          element={
+            <PrivateRoute>
+              <RankedLobbyPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ranked/game/:matchId"
+          element={
+            <PrivateRoute>
+              <RankedGamePage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ranked/history"
+          element={
+            <PrivateRoute>
+              <RankedHistoryPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ranked/stats"
+          element={
+            <PrivateRoute>
+              <RankedStatsPage />
+            </PrivateRoute>
+          }
+        />
 
         {/* =========================================================
             BOT GAME — Tự có MainLayout bên trong
             (Không bọc AppLayout để tránh double-wrap)
         ========================================================= */}
-        <Route path="/bot/game/:gameId" element={<BotGamePage />} />
+        <Route
+          path="/bot/game/:gameId"
+          element={
+            <PrivateRoute>
+              <BotGamePage />
+            </PrivateRoute>
+          }
+        />
 
         {/* =========================================================
             APP LAYOUT — Tất cả trang có Sidebar + Header

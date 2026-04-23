@@ -21,7 +21,14 @@ function App() {
     useAuthStore.getState().loadUser()
 
     const handleStorageChange = (event) => {
-      if (event.key === 'token' || event.key === 'user' || event.key === 'refreshToken') {
+      if (
+        event.key === null ||
+        event.key === 'token' ||
+        event.key === 'user' ||
+        event.key === 'refreshToken' ||
+        event.key === 'rememberMe' ||
+        event.key === 'authSession'
+      ) {
         useAuthStore.getState().loadUser()
       }
     }

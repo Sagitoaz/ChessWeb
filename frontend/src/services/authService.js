@@ -88,7 +88,12 @@ const authService = {
   async logout() {
     try {
       // Gọi API logout để invalidate token trên server
-      await apiCall('POST', API_ENDPOINTS.LOGOUT)
+      const refreshToken = localStorage.getItem('refreshToken')
+      await apiCall(
+        'POST',
+        API_ENDPOINTS.LOGOUT,
+        refreshToken ? { refreshToken } : undefined
+      )
     } catch (error) {
       // Vẫn logout ở client dù API lỗi
       console.error('Logout API error:', error)
@@ -97,6 +102,8 @@ const authService = {
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
+      localStorage.removeItem('rememberMe')
+      sessionStorage.removeItem('authSession')
     }
   },
 
@@ -126,6 +133,8 @@ const authService = {
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
+      localStorage.removeItem('rememberMe')
+      sessionStorage.removeItem('authSession')
       throw this.handleError(error)
     }
   },
@@ -138,7 +147,7 @@ const authService = {
   async forgotPassword(email) {
     try {
       const response = await apiCall('POST', API_ENDPOINTS.FORGOT_PASSWORD, { email })
-      return response
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -156,7 +165,7 @@ const authService = {
         token,
         password: newPassword,
       })
-      return response
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -172,7 +181,7 @@ const authService = {
   async changePassword(passwords) {
     try {
       const response = await apiCall('PUT', API_ENDPOINTS.CHANGE_PASSWORD, passwords)
-      return response
+      return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
     }
@@ -285,9 +294,9 @@ const authService = {
    * Gửi lại email verification
    * @returns {Promise<{message: string}>}
    */
-  async resendVerificationEmail() {
+  async resendVerificationEmail(userId) {
     try {
-      const response = await apiCall('POST', '/auth/resend-verification')
+      const response = await apiCall('POST', '/auth/resend-verification', { userId })
       return this.unwrapApiData(response)
     } catch (error) {
       throw this.handleError(error)
@@ -303,7 +312,11 @@ const authService = {
   handleError(error) {
     if (error.response) {
       // Server responded với error status
-      const message = error.response.data?.message || error.response.data?.error || 'An error occurred'
+      const message =
+        error.response.data?.message ||
+        error.response.data?.error?.message ||
+        error.response.data?.error ||
+        'An error occurred'
       const statusCode = error.response.status
       
       // Tạo error object với thông tin chi tiết

@@ -10,11 +10,15 @@ const clearAuthSession = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
+    localStorage.removeItem('rememberMe')
+    sessionStorage.removeItem('authSession')
     useAuthStore.getState().logout()
   } catch (_error) {
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
+    localStorage.removeItem('rememberMe')
+    sessionStorage.removeItem('authSession')
   }
 }
 
@@ -31,11 +35,13 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
-    if (isValidToken(token)) {
+    const isAuthenticated = useAuthStore.getState().isAuthenticated
+    const hasToken = typeof token === 'string' && token.length > 0
+
+    if (isAuthenticated && isValidToken(token)) {
       config.headers.Authorization = `Bearer ${token}`
-    } else {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+    } else if ((isAuthenticated && !isValidToken(token)) || (hasToken && !isValidToken(token))) {
+      clearAuthSession()
     }
     return config
   },

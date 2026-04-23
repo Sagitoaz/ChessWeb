@@ -14,13 +14,14 @@ const registerSchema = z
     username: z
       .string()
       .min(3, 'Tên đăng nhập phải có ít nhất 3 ký tự')
-      .max(50, 'Tên đăng nhập không được vượt quá 50 ký tự')
+      .max(20, 'Tên đăng nhập không được vượt quá 20 ký tự')
       .regex(/^[a-zA-Z0-9_]+$/, 'Chỉ được dùng chữ cái, số và dấu gạch dưới'),
     email: z.string().email('Email không hợp lệ').max(100, 'Email không được vượt quá 100 ký tự'),
     password: z
       .string()
-      .min(6, 'Mật khẩu phải có ít nhất 6 ký tự')
-      .max(100, 'Mật khẩu không được vượt quá 100 ký tự'),
+      .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+      .max(128, 'Mật khẩu không được vượt quá 128 ký tự')
+      .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, 'Mật khẩu cần có chữ hoa, chữ thường và số'),
     confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -176,7 +177,7 @@ const RegisterPage = () => {
                   {...register('username')}
                   error={errors.username?.message}
                   disabled={busy}
-                  className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
+                  className="py-3 !border-gray-600 !text-black placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                 />
 
                 <Input
@@ -186,17 +187,17 @@ const RegisterPage = () => {
                   {...register('email')}
                   error={errors.email?.message}
                   disabled={busy}
-                  className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
+                  className="py-3  !border-gray-600 !text-black placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                 />
 
                 <Input
                   type="password"
-                  placeholder="Mật khẩu (ít nhất 6 ký tự)"
+                  placeholder="Mật khẩu (ít nhất 8 ký tự)"
                   fullWidth
                   {...register('password')}
                   error={errors.password?.message}
                   disabled={busy}
-                  className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
+                  className="py-3  !border-gray-600 !text-black placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                 />
 
                 <Input
@@ -206,7 +207,7 @@ const RegisterPage = () => {
                   {...register('confirmPassword')}
                   error={errors.confirmPassword?.message}
                   disabled={busy}
-                  className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
+                  className="py-3  !border-gray-600 !text-black placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                 />
 
                 <Button

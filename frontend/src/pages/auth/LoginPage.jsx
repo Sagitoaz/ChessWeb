@@ -18,7 +18,6 @@ const loginSchema = z.object({
   remember: z.boolean().optional(),
 })
 
-
 const Divider = () => (
   <div className="relative py-2">
     <div className="absolute inset-0 flex items-center">
@@ -113,9 +112,9 @@ const LoginPage = () => {
   )
 
   const handleLogin = useCallback(
-    async ({ username, password }) => {
+    async ({ username, password, remember }) => {
       clearError?.()
-      await login({ username, password })
+      await login({ username, password }, { remember })
       navigate('/', { replace: true })
     },
     [clearError, login, navigate]
@@ -126,6 +125,7 @@ const LoginPage = () => {
       await handleLogin({
         username: data.identifier,
         password: data.password,
+        remember: Boolean(data.remember),
       })
       notifySuccess('Đăng nhập thành công', 'Chào mừng bạn quay lại!')
     } catch (err) {
@@ -138,7 +138,10 @@ const LoginPage = () => {
       clearError?.()
       const credential = await requestGoogleCredential()
       const user = await googleAuth(credential)
-      notifySuccess('Google đăng nhập thành công', `Chào mừng ${user?.displayName || user?.username || 'bạn'} quay lại!`)
+      notifySuccess(
+        'Google đăng nhập thành công',
+        `Chào mừng ${user?.displayName || user?.username || 'bạn'} quay lại!`
+      )
       navigate('/', { replace: true })
     } catch (err) {
       notifyError('Google đăng nhập thất bại', err?.message || 'Vui lòng thử lại.')
@@ -186,7 +189,7 @@ const LoginPage = () => {
                     {...register('identifier')}
                     error={errors.identifier?.message}
                     disabled={busy}
-                    className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
+                    className="py-3 !border-gray-600 !text-black placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                   />
 
                   <Input
@@ -196,7 +199,7 @@ const LoginPage = () => {
                     {...register('password')}
                     error={errors.password?.message}
                     disabled={busy}
-                    className="py-3 !bg-gray-800 !border-gray-600 !text-white placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
+                    className="py-3  !border-gray-600 !text-black  placeholder:!text-gray-400 focus:!border-blue-400 focus:!ring-0 transition-none"
                   />
                 </div>
 

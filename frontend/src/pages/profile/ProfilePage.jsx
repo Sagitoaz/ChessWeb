@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store'
 import authService from '@/services/authService'
 import gameService from '@/services/gameService'
 import { THEME } from '@/styles/theme'
+import { useAuth } from '@/hooks/useAuth'
 import { Bot, Swords, Trophy, Users, Brain, BarChart3 } from 'lucide-react'
 
 const MODE_META = {
@@ -212,6 +213,7 @@ export default function ProfilePage() {
   const authUser = useAuthStore((state) => state.user)
   const token = useAuthStore((state) => state.token)
   const setAuthLogin = useAuthStore((state) => state.login)
+  const { logout: logoutUser, loading: authLoading } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [rankedStats, setRankedStats] = useState(null)
@@ -365,10 +367,11 @@ export default function ProfilePage() {
                 Chỉnh sửa
               </Link>
               <button
-                onClick={() => {
-                  useAuthStore.getState().logout()
-                  window.location.hash = '#/login'
+                onClick={async () => {
+                  await logoutUser()
+                  navigate('/login', { replace: true })
                 }}
+                disabled={authLoading}
                 className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold rounded-lg border border-red-200"
               >
                 Đăng xuất

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { useUIStore } from '@/store'
+import { useAuth } from '@/hooks/useAuth'
 
 const NAV_GROUPS = [
   {
@@ -55,7 +56,8 @@ const isPathActive = (pathname, path, match = 'exact') => {
 const Sidebar = ({ collapsed = false }) => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { logout, user } = useAuthStore()
+  const user = useAuthStore((state) => state.user)
+  const { logout, loading: isLoggingOut } = useAuth()
   const closeSidebar = useUIStore((s) => s.toggleSidebar)
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
 
@@ -160,14 +162,15 @@ const Sidebar = ({ collapsed = false }) => {
 
       <div className="border-t border-gray-200/90 px-2 py-3">
         <button
-          onClick={() => {
-            logout()
-            navigate('/login')
+          onClick={async () => {
+            await logout()
+            navigate('/login', { replace: true })
           }}
+          disabled={isLoggingOut}
           title={collapsed ? 'Đăng xuất' : undefined}
           className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 border border-transparent hover:bg-red-50 hover:border-red-100 transition-colors ${
             collapsed ? 'justify-center px-2' : ''
-          }`}
+          } ${isLoggingOut ? 'opacity-60 cursor-not-allowed' : ''}`}
         >
           <LogOut className="w-4 h-4" />
           {!collapsed && <span>Đăng xuất</span>}

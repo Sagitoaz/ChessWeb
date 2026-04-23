@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 
+const REMEMBER_ME_KEY = 'rememberMe'
+const SESSION_AUTH_KEY = 'authSession'
+
 /**
  * Auth Store - Quản lý state authentication
  */
@@ -12,7 +15,7 @@ export const useAuthStore = create((set) => ({
   setUser: (user) => set({ user, isAuthenticated: true, hasHydrated: true }),
   setToken: (token) => set({ token, hasHydrated: true }),
 
-  login: (user, token) => {
+  login: (user, token, options = {}) => {
     const hasValidToken =
       typeof token === 'string' &&
       token.length > 0 &&
@@ -25,8 +28,19 @@ export const useAuthStore = create((set) => ({
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
+      localStorage.removeItem(REMEMBER_ME_KEY)
+      sessionStorage.removeItem(SESSION_AUTH_KEY)
       set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
       return
+    }
+
+    const remember = options?.remember
+    if (remember === true) {
+      localStorage.setItem(REMEMBER_ME_KEY, 'true')
+      sessionStorage.setItem(SESSION_AUTH_KEY, '1')
+    } else if (remember === false) {
+      localStorage.setItem(REMEMBER_ME_KEY, 'false')
+      sessionStorage.setItem(SESSION_AUTH_KEY, '1')
     }
 
     localStorage.setItem('token', token)
@@ -36,7 +50,10 @@ export const useAuthStore = create((set) => ({
 
   logout: () => {
     localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
+    localStorage.removeItem(REMEMBER_ME_KEY)
+    sessionStorage.removeItem(SESSION_AUTH_KEY)
     set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
   },
 
@@ -44,6 +61,19 @@ export const useAuthStore = create((set) => ({
   loadUser: () => {
     const token = localStorage.getItem('token')
     const userStr = localStorage.getItem('user')
+    const rememberMe = localStorage.getItem(REMEMBER_ME_KEY)
+    const hasSession = sessionStorage.getItem(SESSION_AUTH_KEY) === '1'
+
+    // remember=false thì chỉ giữ phiên trong lifetime của tab/session hiện tại.
+    if (rememberMe === 'false' && !hasSession) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem(REMEMBER_ME_KEY)
+      sessionStorage.removeItem(SESSION_AUTH_KEY)
+      set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
+      return
+    }
 
     const hasValidToken =
       typeof token === 'string' &&
@@ -56,6 +86,8 @@ export const useAuthStore = create((set) => ({
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
+      localStorage.removeItem(REMEMBER_ME_KEY)
+      sessionStorage.removeItem(SESSION_AUTH_KEY)
       set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
       return
     }
@@ -65,11 +97,16 @@ export const useAuthStore = create((set) => ({
       if (!user || typeof user !== 'object' || !user.username) {
         throw new Error('Invalid stored user object')
       }
+      if (rememberMe === 'false') {
+        sessionStorage.setItem(SESSION_AUTH_KEY, '1')
+      }
       set({ user, token, isAuthenticated: true, hasHydrated: true })
     } catch {
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
+      localStorage.removeItem(REMEMBER_ME_KEY)
+      sessionStorage.removeItem(SESSION_AUTH_KEY)
       set({ user: null, token: null, isAuthenticated: false, hasHydrated: true })
     }
   },

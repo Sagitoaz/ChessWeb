@@ -114,14 +114,15 @@ const hashPassword = async (
 ): Promise<string> => {
   const salt = saltHex || randomBytes(16).toString("hex");
   const derived = (await scryptAsync(plainPassword, salt, 64)) as Buffer;
-  return `${salt}.${derived.toString("hex")}`;
+  return `${salt}:${derived.toString("hex")}`;
 };
 
 const verifyPassword = async (
   plainPassword: string,
   storedHash: string,
 ): Promise<boolean> => {
-  const [salt, hashHex] = storedHash.split(".");
+  const separator = storedHash.includes(":") ? ":" : ".";
+  const [salt, hashHex] = storedHash.split(separator);
   if (!salt || !hashHex) return false;
 
   const expected = Buffer.from(hashHex, "hex");
