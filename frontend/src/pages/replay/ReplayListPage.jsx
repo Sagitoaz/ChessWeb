@@ -82,10 +82,10 @@ export default function ReplayListPage() {
       const normalizePerspectiveResult = (rawResult, playerSide) => {
         const v = typeof rawResult === 'string' ? rawResult.toLowerCase() : ''
         if (v === 'win' || v === 'lose' || v === 'draw') return v
-        if (v === 'whitewin' || v === '1-0') {
+        if (v === 'whitewin' || v === 'white_win' || v === '1-0') {
           return playerSide === 'white' ? 'win' : playerSide === 'black' ? 'lose' : null
         }
-        if (v === 'blackwin' || v === '0-1') {
+        if (v === 'blackwin' || v === 'black_win' || v === '0-1') {
           return playerSide === 'black' ? 'win' : playerSide === 'white' ? 'lose' : null
         }
         return null
@@ -103,6 +103,12 @@ export default function ReplayListPage() {
           const item = itemById.get(gameId)
 
           let playerSide = item?.playerSide || null
+          const authUserId =
+            authUser?.id || authUser?.userId || authUser?._id || authUser?.sub || null
+          if (!playerSide && authUserId) {
+            if (String(item?.whitePlayerId || '') === String(authUserId)) playerSide = 'white'
+            if (String(item?.blackPlayerId || '') === String(authUserId)) playerSide = 'black'
+          }
           const authDisplayName = getUserDisplayName(authUser, '')
           if (!playerSide && authDisplayName) {
             if (getUserDisplayName(game?.whitePlayer, '') === authDisplayName) playerSide = 'white'
@@ -110,7 +116,9 @@ export default function ReplayListPage() {
           }
 
           const result =
+            normalizePerspectiveResult(item?.rawResult, playerSide) ||
             normalizePerspectiveResult(item?.result, playerSide) ||
+            normalizePerspectiveResult(game?.rawResult, playerSide) ||
             normalizePerspectiveResult(game?.result, playerSide) ||
             null
 
@@ -139,7 +147,10 @@ export default function ReplayListPage() {
         const items = payload.items.map((item) => ({
           id: item.gameId || item.id,
           mode: item.mode || 'room',
-          result: normalizePerspectiveResult(item.result, item.playerSide) || null,
+          result:
+            normalizePerspectiveResult(item.rawResult, item.playerSide) ||
+            normalizePerspectiveResult(item.result, item.playerSide) ||
+            null,
           createdAt: item.createdAt,
           opponent:
             item.playerSide === 'white'

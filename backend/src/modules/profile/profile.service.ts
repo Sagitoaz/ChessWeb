@@ -670,9 +670,17 @@ export class ProfileService {
 
       if (rawResult === "draw") {
         replayResult = "Draw";
-      } else if (rawResult === "whitewin" || rawResult === "1-0") {
+      } else if (
+        rawResult === "whitewin" ||
+        rawResult === "white_win" ||
+        rawResult === "1-0"
+      ) {
         replayResult = "WhiteWin";
-      } else if (rawResult === "blackwin" || rawResult === "0-1") {
+      } else if (
+        rawResult === "blackwin" ||
+        rawResult === "black_win" ||
+        rawResult === "0-1"
+      ) {
         replayResult = "BlackWin";
       } else if (game.result === "draw") {
         replayResult = "Draw";
