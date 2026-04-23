@@ -130,6 +130,8 @@ Ràng buộc chất lượng:
 - Nêu motif cụ thể khi có thể: ghim, xiên, đôi, quá tải, đòn đổi quân có lợi, lộ vua, ô yếu.
 - Nếu userMove gần tối ưu thì ghi rõ vì sao tốt, sau đó nêu cải thiện nhỏ.
 - Không phán bừa khi dữ liệu chưa đủ: dùng câu "chưa thấy đòn chiến thuật tức thời" nếu phù hợp.
+- Nếu có nước tốt nhất của Stockfish, dòng 5 bắt buộc phải nêu rõ đúng nước đó.
+- Nếu Stockfish không có dữ liệu và giá trị là "N/A", phải ghi rõ engine chưa trả về nước ứng viên, tuyệt đối không tự bịa.
 
 Dữ liệu:
 FEN: ${fen}

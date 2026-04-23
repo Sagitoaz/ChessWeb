@@ -8,6 +8,7 @@ import { Loader } from '@components/common'
 import { THEME } from '@/styles/theme'
 import { getMoveLabel } from '@/utils/moveNotation'
 import { getUserDisplayName } from '@/utils/userDisplay'
+import { useAuthStore } from '@/store'
 
 const getReplayPlayer = (gameData, color) => {
   const player = color === 'white' ? gameData?.whitePlayer : gameData?.blackPlayer
@@ -29,6 +30,7 @@ const getReplayPlayer = (gameData, color) => {
 export default function ReplayViewerPage() {
   const navigate = useNavigate()
   const { gameId } = useParams()
+  const authUser = useAuthStore((state) => state.user)
 
   const [gameData, setGameData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -114,6 +116,20 @@ export default function ReplayViewerPage() {
   }, [currentFEN])
   const whitePlayer = useMemo(() => getReplayPlayer(gameData, 'white'), [gameData])
   const blackPlayer = useMemo(() => getReplayPlayer(gameData, 'black'), [gameData])
+  const viewerColor = useMemo(() => {
+    const authUserId = String(
+      authUser?.id || authUser?._id || authUser?.userId || authUser?.sub || ''
+    ).trim()
+
+    if (authUserId) {
+      if (String(gameData?.whitePlayerId || '').trim() === authUserId) return 'white'
+      if (String(gameData?.blackPlayerId || '').trim() === authUserId) return 'black'
+    }
+
+    if (whitePlayer.isBot && !blackPlayer.isBot) return 'black'
+    if (blackPlayer.isBot && !whitePlayer.isBot) return 'white'
+    return 'white'
+  }, [authUser, gameData, whitePlayer.isBot, blackPlayer.isBot])
 
   // Keyboard navigation
   useEffect(() => {
@@ -141,8 +157,9 @@ export default function ReplayViewerPage() {
       return
     }
 
-    const currentMoveLabel = getMoveLabel(currentMove) || `${currentMove.from}-${currentMove.to}`
-    const cacheKey = `${gameId}::${currentFEN}::${currentMoveLabel}`
+    const currentMoveLabel =
+      currentMove?.san || currentMove?.uci || getMoveLabel(currentMove) || `${currentMove.from}-${currentMove.to}`
+    const cacheKey = `${gameId}::${viewerColor}::${currentFEN}::${currentMoveLabel}`
     const forceRefresh = forceAiRefreshRef.current
     forceAiRefreshRef.current = false
 
@@ -166,7 +183,7 @@ export default function ReplayViewerPage() {
           userMove: currentMoveLabel,
           score: 0,
           refreshAi: forceRefresh,
-          playerColor: currentMove.color === 'w' ? 'white' : 'black',
+          playerColor: viewerColor,
         })
         .then((data) => {
           if (!active) return
@@ -196,7 +213,7 @@ export default function ReplayViewerPage() {
       active = false
       clearTimeout(timer)
     }
-  }, [gameId, currentFEN, currentMove, aiRetryTick])
+  }, [gameId, currentFEN, currentMove, aiRetryTick, viewerColor])
 
   if (isLoading)
     return (
@@ -343,7 +360,10 @@ export default function ReplayViewerPage() {
                   Đại kiện tướng AI phân tích
                 </p>
                 <p className={`text-[11px] ${THEME.text.secondary} mb-1`}>
-                  Góc nhìn: {currentMove.color === 'w' ? 'Trắng' : 'Đen'}
+                  Góc nhìn: {viewerColor === 'white' ? 'Trắng' : 'Đen'}
+                </p>
+                <p className={`text-[11px] ${THEME.text.secondary} mb-2`}>
+                  Nước đang xét: {currentMove.color === 'w' ? 'Trắng' : 'Đen'} đi
                 </p>
                 <p className={`text-sm ${THEME.text.primary}`}>
                   {isAnalyzing ? 'Đang phân tích nước đi...' : aiCommentary || aiFallback}
@@ -351,6 +371,11 @@ export default function ReplayViewerPage() {
                 {aiAnalysis?.stockfishBestMove && aiAnalysis.stockfishBestMove !== 'N/A' && (
                   <p className={`mt-2 text-xs ${THEME.text.secondary}`}>
                     Stockfish gợi ý: <strong>{aiAnalysis.stockfishBestMove}</strong>
+                  </p>
+                )}
+                {aiAnalysis?.stockfishBestMove === 'N/A' && (
+                  <p className={`mt-2 text-xs ${THEME.text.secondary}`}>
+                    Stockfish hiện chưa trả về nước ứng viên cho vị trí này.
                   </p>
                 )}
                 {!isAnalyzing && (aiCommentary || aiFallback) === aiFallback && (
