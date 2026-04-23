@@ -161,6 +161,17 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  emitGameStatus(
+    matchId: string,
+    payload: Record<string, unknown> = {},
+  ): void {
+    this.server.to(`match:${matchId}`).emit("game:status", {
+      matchId,
+      ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
   emitRoomPlayerJoined(payload: {
     roomCode: string;
     code?: string;
@@ -435,13 +446,14 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw new UnauthorizedException("Missing matchId");
     }
 
-    const allowed = await this.competitionService.isUserInMatch(
+    const allowed = await this.competitionService.canUserJoinMatchRoom(
       matchId,
       user.userId,
+      user.roles || [],
     );
     if (!allowed) {
       throw new UnauthorizedException(
-        "User is not a participant of this match",
+        "User is not allowed to join this match room",
       );
     }
 

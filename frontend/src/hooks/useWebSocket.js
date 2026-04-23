@@ -191,6 +191,7 @@ export function useGameSocket(matchId) {
   const onMoveUpdate = useCallback((callback) => on('game:moveUpdate', callback), [on])
   const onTimeUpdate = useCallback((callback) => on('game:timeUpdate', callback), [on])
   const onGameEnd = useCallback((callback) => on('game:end', callback), [on])
+  const onGameStatus = useCallback((callback) => on('game:status', callback), [on])
   const onDrawOffer = useCallback((callback) => on('game:drawOffer', callback), [on])
   const onChatMessage = useCallback((callback) => on('game:chat', callback), [on])
   const onOpponentDisconnected = useCallback(
@@ -214,6 +215,7 @@ export function useGameSocket(matchId) {
     onMoveUpdate,
     onTimeUpdate,
     onGameEnd,
+    onGameStatus,
     onDrawOffer,
     onChatMessage,
     onOpponentDisconnected,
@@ -337,7 +339,7 @@ export function useRoomSocket(roomCode) {
  * @param {string} tournamentId - Current tournament ID
  */
 export function useTournamentSocket(tournamentId) {
-  const { isConnected, on, emit } = useWebSocket()
+  const { isConnected, on, off, emit } = useWebSocket()
 
   // Register for tournament
   const register = useCallback(() => {
@@ -380,6 +382,7 @@ export function useTournamentSocket(tournamentId) {
     onMatchReady,
     onTournamentCompleted,
     onTournamentUpdate,
+    off,
   }
 }
 

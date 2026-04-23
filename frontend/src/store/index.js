@@ -8,7 +8,13 @@ const clearSessionMarkers = () => {
 }
 
 const writeSessionMarkers = (remember) => {
-  localStorage.setItem(REMEMBER_ME_KEY, remember === false ? 'false' : 'true')
+  if (remember === false) {
+    localStorage.removeItem(REMEMBER_ME_KEY)
+    sessionStorage.removeItem(SESSION_AUTH_KEY)
+    return
+  }
+
+  localStorage.setItem(REMEMBER_ME_KEY, 'true')
   sessionStorage.setItem(SESSION_AUTH_KEY, '1')
 }
 

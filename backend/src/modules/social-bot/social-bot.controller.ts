@@ -181,6 +181,21 @@ export class SocialBotController {
     return successResponse(data, requestId || null);
   }
 
+  @Post("tournaments/:id/matches/:matchId/start")
+  async startTournamentMatch(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Param("matchId") matchId: string,
+    @Headers("x-request-id") requestId?: string,
+  ): Promise<ApiResponse<unknown>> {
+    const data = await this.service.startTournamentMatch(
+      this.getPrincipal(req),
+      id,
+      matchId,
+    );
+    return successResponse(data, requestId || null);
+  }
+
   @Post("tournaments/:id/matches/:matchId/resign")
   async resignTournamentMatch(
     @Req() req: AuthRequest,

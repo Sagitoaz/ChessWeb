@@ -1358,6 +1358,75 @@ export class CompetitionService {
     );
   }
 
+  async canUserJoinMatchRoom(
+    matchId: string,
+    userId: string,
+    roles: string[] = [],
+  ): Promise<boolean> {
+    if (await this.isUserInMatch(matchId, userId)) {
+      return true;
+    }
+
+    if (roles.includes("admin") || roles.includes("mod")) {
+      return true;
+    }
+
+    const query = ObjectId.isValid(matchId)
+      ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
+      : { matchId };
+
+    const game = await this.gamesCollection().findOne(query, {
+      projection: { mode: 1, tournamentId: 1 },
+    });
+    if (!game || game.mode !== "tournament" || !game.tournamentId) {
+      return false;
+    }
+
+    const tournamentQuery = ObjectId.isValid(String(game.tournamentId))
+      ? { _id: new ObjectId(String(game.tournamentId)) }
+      : { _id: game.tournamentId };
+
+    const tournament = await this
+      .mongoService
+      .getDb()
+      .collection("tournaments")
+      .findOne(tournamentQuery, {
+        projection: {
+          createdBy: 1,
+          organizerId: 1,
+          ownerUserId: 1,
+          organizer: 1,
+        },
+      });
+    if (!tournament) {
+      return false;
+    }
+
+    const ownerCandidates = [
+      tournament.createdBy,
+      tournament.organizerId,
+      tournament.ownerUserId,
+      (tournament.organizer as Record<string, unknown> | undefined)?.userId,
+      (tournament.organizer as Record<string, unknown> | undefined)?._id,
+      (tournament.organizer as Record<string, unknown> | undefined)?.id,
+    ]
+      .map((value) => {
+        if (typeof value === "string") return value;
+        if (
+          value &&
+          typeof value === "object" &&
+          "toString" in value &&
+          typeof (value as { toString?: unknown }).toString === "function"
+        ) {
+          return (value as { toString: () => string }).toString();
+        }
+        return "";
+      })
+      .filter((value) => value.length > 0);
+
+    return ownerCandidates.includes(userId);
+  }
+
   async tryMatchForUser(
     userId: string,
     timeControl?: RankedTimeControl,

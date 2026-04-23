@@ -316,7 +316,9 @@ export class SocialBotService {
 
   private normalizeTournamentStatus(status: unknown): string {
     const value = typeof status === "string" ? status.toLowerCase() : "";
-    if (value === "draft" || value === "open") return "registration";
+    if (value === "draft" || value === "open" || value === "full") {
+      return "registration";
+    }
     if (value === "ongoing") return "ongoing";
     if (value === "completed") return "completed";
     if (value === "cancelled") return "cancelled";
@@ -469,8 +471,27 @@ export class SocialBotService {
     const value = typeof status === "string" ? status.toLowerCase() : "";
     if (value === "completed") return "completed";
     if (value === "ongoing") return "ongoing";
+    if (value === "ready") return "ready";
     if (value === "scheduled") return "scheduled";
     return "pending";
+  }
+
+  private determineTournamentCurrentRound(
+    rounds: Array<Record<string, unknown>>,
+  ): number {
+    for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
+      const round = rounds[roundIndex] as any;
+      const matches = Array.isArray(round?.matches) ? round.matches : [];
+      const hasPendingMatch = matches.some(
+        (match: any) =>
+          this.normalizeMatchStatus(match?.status) !== "completed",
+      );
+      if (hasPendingMatch) {
+        return roundIndex + 1;
+      }
+    }
+
+    return Math.max(1, rounds.length);
   }
 
   private extractFenFromPgn(pgn: string): string | null {
@@ -906,7 +927,11 @@ export class SocialBotService {
         for (let matchIndex = 0; matchIndex < matches.length; matchIndex += 1) {
           const match = matches[matchIndex] as any;
           const matchStatus = this.normalizeMatchStatus(match?.status);
-          if (matchStatus !== "scheduled" && matchStatus !== "ongoing")
+          if (
+            matchStatus !== "scheduled" &&
+            matchStatus !== "ongoing" &&
+            matchStatus !== "ready"
+          )
             continue;
 
           const gameId = String(match?.gameId || "");
@@ -922,26 +947,6 @@ export class SocialBotService {
               : {};
           const p1Ready = Boolean((checkIn as any).player1Ready);
           const p2Ready = Boolean((checkIn as any).player2Ready);
-
-          if (p1Ready && p2Ready && String(game.status || "") !== "active") {
-            await this.repo.updateGameById(gameId, {
-              state: "InGame",
-              status: "active",
-              checkInClosedAt: new Date(),
-              noShowDeadlineAt: null,
-              updatedAt: new Date(),
-            });
-
-            match.status = "ongoing";
-            this.rankedGateway.emitTournamentMatchReady({
-              tournamentId,
-              matchId: String(match?.id || ""),
-              gameId,
-              roundIndex,
-            });
-            roundsUpdated = true;
-            continue;
-          }
 
           const deadlineRaw =
             (checkIn as any).deadlineAt ||
@@ -2023,6 +2028,11 @@ export class SocialBotService {
       }
     }
 
+    await this.attachTournamentGamesForRound(tournamentId, rounds, 0, {
+      activateImmediately: false,
+      checkInMinutes: 5,
+    });
+
     const standings = this.buildTournamentStandings(activeParticipants, rounds);
 
     const updated = await this.repo.updateTournamentById(tournamentId, {
@@ -2150,6 +2160,98 @@ export class SocialBotService {
     return {
       seeded: true,
       tournamentId,
+      rounds,
+    };
+  }
+
+  async startTournamentMatch(
+    principal: TournamentPrincipal,
+    tournamentId: string,
+    matchId: string,
+  ) {
+    const tournament = await this.repo.findTournamentById(tournamentId);
+    if (!tournament) {
+      throw new NotFoundException("Tournament not found");
+    }
+
+    if (!this.canManageTournament(principal, tournament)) {
+      throw new BadRequestException("Only organizer or admin can start match");
+    }
+
+    const rounds = this.cloneTournamentRounds(tournament.rounds);
+    const found = this.locateTournamentMatch(rounds, matchId);
+    if (!found) {
+      throw new NotFoundException("Match not found in tournament bracket");
+    }
+
+    const match = found.match as any;
+    if (this.normalizeMatchStatus(match?.status) === "completed") {
+      throw new BadRequestException("Match already completed");
+    }
+
+    const gameId = String(match?.gameId || "");
+    if (!gameId) {
+      throw new BadRequestException("Match room is not opened yet");
+    }
+
+    const checkIn =
+      match?.checkIn && typeof match.checkIn === "object" ? match.checkIn : {};
+    if (!checkIn.player1Ready || !checkIn.player2Ready) {
+      throw new BadRequestException(
+        "Both players must join the room before the organizer can start",
+      );
+    }
+
+    const now = new Date();
+    match.status = "ongoing";
+    match.startedAt = now;
+    match.checkIn = {
+      ...checkIn,
+      startedByOrganizerAt: now,
+    };
+
+    await this.repo.updateGameById(gameId, {
+      state: "InGame",
+      status: "active",
+      checkInClosedAt: now,
+      noShowDeadlineAt: null,
+      updatedAt: now,
+    });
+
+    await this.repo.updateTournamentById(tournamentId, {
+      rounds,
+      currentRound: this.determineTournamentCurrentRound(rounds),
+      status: "ongoing",
+      updatedAt: now,
+    });
+
+    this.rankedGateway.emitTournamentRoundUpdate({
+      tournamentId,
+      roundIndex: found.roundIndex,
+      status: "ongoing",
+      rounds,
+    });
+    this.rankedGateway.emitTournamentMatchReady({
+      tournamentId,
+      matchId,
+      gameId,
+      roundIndex: found.roundIndex,
+    });
+    this.rankedGateway.emitGameStatus(gameId, {
+      status: "ongoing",
+      gameStatus: "active",
+      tournamentId,
+      roundIndex: found.roundIndex,
+      checkIn: match.checkIn,
+    });
+
+    return {
+      started: true,
+      tournamentId,
+      matchId,
+      gameId,
+      roundIndex: found.roundIndex + 1,
+      status: "ongoing",
       rounds,
     };
   }
@@ -2298,22 +2400,7 @@ export class SocialBotService {
     match.checkIn = checkIn;
 
     if (bothReady) {
-      match.status = "ongoing";
-      match.startedAt = now;
-      await this.repo.updateGameById(gameId, {
-        state: "InGame",
-        status: "active",
-        checkInClosedAt: now,
-        noShowDeadlineAt: null,
-        updatedAt: now,
-      });
-
-      this.rankedGateway.emitTournamentMatchReady({
-        tournamentId,
-        matchId,
-        gameId,
-        roundIndex: found.roundIndex,
-      });
+      match.status = "ready";
     }
 
     await this.repo.updateTournamentById(tournamentId, {
@@ -2321,6 +2408,13 @@ export class SocialBotService {
       updatedAt: now,
     });
 
+    this.rankedGateway.emitGameStatus(gameId, {
+      status: bothReady ? "ready" : "scheduled",
+      gameStatus: "pending",
+      tournamentId,
+      roundIndex: found.roundIndex,
+      checkIn,
+    });
     this.rankedGateway.emitTournamentRoundUpdate({
       tournamentId,
       roundIndex: found.roundIndex,
@@ -2692,7 +2786,9 @@ export class SocialBotService {
 
     const updated = await this.repo.updateTournamentById(tournamentId, {
       rounds,
-      currentRound: tournamentCompleted ? rounds.length : found.roundIndex + 1,
+      currentRound: tournamentCompleted
+        ? rounds.length
+        : this.determineTournamentCurrentRound(rounds),
       status: tournamentCompleted ? "completed" : "ongoing",
       standings,
       winner: tournamentCompleted

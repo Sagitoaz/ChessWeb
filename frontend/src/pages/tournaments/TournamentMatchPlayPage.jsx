@@ -70,8 +70,13 @@ export default function TournamentMatchPlayPage() {
   const [moveHistory, setMoveHistory] = useState([])
   const [lastMove, setLastMove] = useState(null)
   const [matchIdInBracket, setMatchIdInBracket] = useState('')
+  const [matchStatus, setMatchStatus] = useState('pending')
+  const [gameStatus, setGameStatus] = useState('pending')
+  const [matchCheckIn, setMatchCheckIn] = useState(null)
+  const [isSpectator, setIsSpectator] = useState(false)
   const [participantStatus, setParticipantStatus] = useState(null)
   const [submittingResign, setSubmittingResign] = useState(false)
+  const [submittingReady, setSubmittingReady] = useState(false)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [pendingLeavePath, setPendingLeavePath] = useState(null)
   const [submittingLeave, setSubmittingLeave] = useState(false)
@@ -81,6 +86,15 @@ export default function TournamentMatchPlayPage() {
   const currentUserId = normalizeId(
     authUser?.id || authUser?.userId || authUser?._id || authUser?.sub || null
   )
+  const authRoles = useMemo(
+    () =>
+      Array.isArray(authUser?.roles)
+        ? authUser.roles.filter((role) => typeof role === 'string')
+        : authUser?.role && typeof authUser.role === 'string'
+          ? [authUser.role]
+          : [],
+    [authUser?.role, authUser?.roles]
+  )
 
   const {
     isConnected: isSocketConnected,
@@ -89,11 +103,17 @@ export default function TournamentMatchPlayPage() {
     resign,
     onMoveUpdate,
     onGameEnd,
+    onGameStatus,
     off,
   } = useGameSocket(gameId)
 
+  const isParticipant = currentUserId === whitePlayerId || currentUserId === blackPlayerId
   const myTurn = chessRef.current.turn() === (playerColor === 'white' ? 'w' : 'b')
   const isFinished = Boolean(resultText)
+  const bothPlayersReady = Boolean(matchCheckIn?.player1Ready) && Boolean(matchCheckIn?.player2Ready)
+  const amReady =
+    (playerColor === 'white' && Boolean(matchCheckIn?.player1Ready)) ||
+    (playerColor === 'black' && Boolean(matchCheckIn?.player2Ready))
 
   const loadGame = useCallback(async () => {
     if (!gameId) return
@@ -106,22 +126,13 @@ export default function TournamentMatchPlayPage() {
 
       const whitePlayerId = normalizeId(game?.whitePlayerId)
       const blackPlayerId = normalizeId(game?.blackPlayerId)
-
-      if (
-        currentUserId &&
-        whitePlayerId !== currentUserId &&
-        blackPlayerId !== currentUserId
-      ) {
-        showNotification({
-          type: 'error',
-          title: 'Không thể vào trận',
-          message: 'Bạn không phải người chơi của trận đấu này.',
-        })
-        return
-      }
+      const userIsParticipant =
+        Boolean(currentUserId) &&
+        (whitePlayerId === currentUserId || blackPlayerId === currentUserId)
 
       setWhitePlayerId(whitePlayerId)
       setBlackPlayerId(blackPlayerId)
+      setGameStatus(String(game?.status || game?.state || 'pending').toLowerCase())
       if (whitePlayerId && whitePlayerId === currentUserId) {
         setPlayerColor('white')
       } else if (blackPlayerId && blackPlayerId === currentUserId) {
@@ -155,6 +166,8 @@ export default function TournamentMatchPlayPage() {
         const tournament = tournamentPayload?.data ?? tournamentPayload
         const match = findMatchByGameId(tournament?.rounds, gameId)
         setMatchIdInBracket(String(match?.id || ''))
+        setMatchStatus(String(match?.status || game?.status || 'pending').toLowerCase())
+        setMatchCheckIn(match?.checkIn && typeof match.checkIn === 'object' ? match.checkIn : null)
 
         const participants = Array.isArray(tournament?.participants) ? tournament.participants : []
         const me = participants.find(
@@ -162,6 +175,23 @@ export default function TournamentMatchPlayPage() {
         )
         const status = me?.status || null
         setParticipantStatus(status)
+        const organizerCandidates = [
+          tournament?.createdBy,
+          tournament?.organizerId,
+          tournament?.ownerUserId,
+          tournament?.organizer?.userId,
+          tournament?.organizer?._id,
+          tournament?.organizer?.id,
+        ].map((value) => normalizeId(value))
+        const userCanSpectate =
+          authRoles.includes('admin') ||
+          authRoles.includes('mod') ||
+          organizerCandidates.includes(String(currentUserId || ''))
+        setIsSpectator(Boolean(!userIsParticipant && userCanSpectate))
+        if (!userIsParticipant && !userCanSpectate) {
+          setError('Bạn không có quyền vào phòng đấu này.')
+          return
+        }
         if (status === 'eliminated') {
           showNotification({
             type: 'error',
@@ -169,6 +199,9 @@ export default function TournamentMatchPlayPage() {
             message: 'Bạn đã bị loại khỏi giải đấu.',
           })
         }
+      } else if (!userIsParticipant) {
+        setError('Bạn không phải người chơi của trận đấu này.')
+        return
       }
     } catch (loadError) {
       showNotification({
@@ -179,7 +212,7 @@ export default function TournamentMatchPlayPage() {
     } finally {
       setLoading(false)
     }
-  }, [currentUserId, gameId, tournamentId, showNotification])
+  }, [authRoles, currentUserId, gameId, tournamentId, showNotification])
 
   useEffect(() => {
     void loadGame()
@@ -234,14 +267,29 @@ export default function TournamentMatchPlayPage() {
       void loadGame()
     }
 
+    const handleGameStatus = (payload) => {
+      if (String(payload?.matchId || '') !== String(gameId || '')) return
+      if (typeof payload?.status === 'string') {
+        setMatchStatus(String(payload.status).toLowerCase())
+      }
+      if (typeof payload?.gameStatus === 'string') {
+        setGameStatus(String(payload.gameStatus).toLowerCase())
+      }
+      if (payload?.checkIn && typeof payload.checkIn === 'object') {
+        setMatchCheckIn(payload.checkIn)
+      }
+    }
+
     onMoveUpdate(handleMoveUpdate)
     onGameEnd(handleGameEnd)
+    onGameStatus(handleGameStatus)
 
     return () => {
       off('game:moveUpdate', handleMoveUpdate)
       off('game:end', handleGameEnd)
+      off('game:status', handleGameStatus)
     }
-  }, [currentUserId, loadGame, off, onGameEnd, onMoveUpdate, showNotification])
+  }, [currentUserId, gameId, loadGame, off, onGameEnd, onGameStatus, onMoveUpdate, showNotification])
 
   const handleMove = useCallback(
     (move) => {
@@ -258,14 +306,56 @@ export default function TournamentMatchPlayPage() {
     [sendMove]
   )
 
-  const boardDisabled = Boolean(resultText) || !myTurn
+  const matchStarted = matchStatus === 'ongoing' && gameStatus === 'active'
+  const boardDisabled = Boolean(resultText) || !isParticipant || !matchStarted || !myTurn
 
   const turnLabel = normalizeTurnLabel(chessRef.current.turn())
   const myDisplayName = authUser?.displayName || authUser?.username || 'Bạn'
   const mySideLabel = playerColor === 'white' ? 'Trắng' : 'Đen'
   const myOpponentName = playerColor === 'white' ? blackName : whiteName
-  const canResign = !isFinished && !submittingResign
-  const isInLiveMatch = !isFinished && Boolean(gameId) && Boolean(whitePlayerId && blackPlayerId)
+  const canResign = !isFinished && !submittingResign && isParticipant
+  const isInLiveMatch =
+    !isFinished &&
+    isParticipant &&
+    matchStarted &&
+    Boolean(gameId) &&
+    Boolean(whitePlayerId && blackPlayerId)
+
+  const handleCheckIn = useCallback(async () => {
+    if (!tournamentId || !matchIdInBracket || !isParticipant || amReady || submittingReady) return
+
+    setSubmittingReady(true)
+    try {
+      await gameService.checkInTournamentMatch(tournamentId, matchIdInBracket)
+      showNotification({
+        type: 'success',
+        title: 'Đã vào phòng',
+        message:
+          'Bạn đã xác nhận có mặt trong phòng. Chờ đối thủ và BTC bắt đầu trận đấu.',
+      })
+      await loadGame()
+    } catch (submitError) {
+      const message =
+        submitError?.response?.data?.message ||
+        submitError?.message ||
+        'Không thể xác nhận có mặt trong phòng đấu.'
+      showNotification({
+        type: 'error',
+        title: 'Không thể vào phòng',
+        message: String(message),
+      })
+    } finally {
+      setSubmittingReady(false)
+    }
+  }, [
+    amReady,
+    isParticipant,
+    loadGame,
+    matchIdInBracket,
+    showNotification,
+    submittingReady,
+    tournamentId,
+  ])
 
   const handleLeaveRequest = useCallback(
     (destination = `/tournaments/${tournamentId}`) => {
@@ -558,7 +648,13 @@ export default function TournamentMatchPlayPage() {
               Lượt hiện tại: <span className="font-extrabold">{turnLabel}</span>
             </div>
             <div className="text-xs text-blue-700">
-              Bạn cầm quân <span className="font-bold">{mySideLabel}</span>
+              {isSpectator ? (
+                <span className="font-bold">Bạn đang theo dõi trận với vai trò BTC/giám sát</span>
+              ) : (
+                <>
+                  Bạn cầm quân <span className="font-bold">{mySideLabel}</span>
+                </>
+              )}
             </div>
           </div>
           <ChessBoard
@@ -584,7 +680,9 @@ export default function TournamentMatchPlayPage() {
                   <p className="font-semibold text-gray-900 leading-tight">{whiteName}</p>
                 </div>
               </div>
-              {playerColor === 'white' && <Crown className="w-4 h-4 text-amber-500" />}
+              {!isSpectator && playerColor === 'white' && (
+                <Crown className="w-4 h-4 text-amber-500" />
+              )}
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex items-center justify-between gap-3">
@@ -595,20 +693,46 @@ export default function TournamentMatchPlayPage() {
                   <p className="font-semibold text-gray-900 leading-tight">{blackName}</p>
                 </div>
               </div>
-              {playerColor === 'black' && <Crown className="w-4 h-4 text-amber-500" />}
+              {!isSpectator && playerColor === 'black' && (
+                <Crown className="w-4 h-4 text-amber-500" />
+              )}
             </div>
           </div>
 
           <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
-            <p>
-              Bạn: <span className="font-semibold">{myDisplayName}</span> ({mySideLabel})
-            </p>
-            <p>
-              Đối thủ: <span className="font-semibold">{myOpponentName}</span>
-            </p>
+            {isSpectator ? (
+              <>
+                <p>
+                  BTC/giám sát: <span className="font-semibold">{myDisplayName}</span>
+                </p>
+                <p>
+                  Đang theo dõi: <span className="font-semibold">{whiteName}</span> vs{' '}
+                  <span className="font-semibold">{blackName}</span>
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  Bạn: <span className="font-semibold">{myDisplayName}</span> ({mySideLabel})
+                </p>
+                <p>
+                  Đối thủ: <span className="font-semibold">{myOpponentName}</span>
+                </p>
+              </>
+            )}
           </div>
 
           <div className="mt-1 flex gap-2">
+            {isParticipant && !isFinished && !amReady && !matchStarted && (
+              <Button
+                variant="primary"
+                disabled={submittingReady}
+                onClick={handleCheckIn}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {submittingReady ? 'Đang xác nhận...' : 'Tôi đã vào phòng'}
+              </Button>
+            )}
             <Button variant="outline" disabled={!canResign} onClick={handleResign}>
               <Flag className="w-4 h-4" />
               {submittingResign ? 'Đang xử lý...' : 'Đầu hàng'}
@@ -621,6 +745,18 @@ export default function TournamentMatchPlayPage() {
               Xem replay
             </Button>
           </div>
+
+          {!matchStarted && !isFinished && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {isSpectator
+                ? bothPlayersReady
+                  ? 'Cả hai người chơi đã vào phòng. BTC có thể quay lại trang giải để bấm bắt đầu trận.'
+                  : 'BTC đang theo dõi phòng chờ. Trận sẽ chỉ bắt đầu khi cả hai người chơi xác nhận có mặt.'
+                : amReady
+                  ? 'Bạn đã vào phòng. Chờ đối thủ xác nhận và BTC bắt đầu trận.'
+                  : 'Hãy bấm "Tôi đã vào phòng" để BTC thấy bạn đã sẵn sàng thi đấu.'}
+            </div>
+          )}
 
           {!hasValidPlayers && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">

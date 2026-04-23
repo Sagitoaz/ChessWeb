@@ -18,8 +18,13 @@ export const useAuth = () => {
 
   const applyRememberPreference = useCallback((remember) => {
     const normalizedRemember = remember === false ? false : true
-    localStorage.setItem('rememberMe', normalizedRemember ? 'true' : 'false')
-    sessionStorage.setItem('authSession', '1')
+    if (normalizedRemember) {
+      localStorage.setItem('rememberMe', 'true')
+      sessionStorage.setItem('authSession', '1')
+    } else {
+      localStorage.removeItem('rememberMe')
+      sessionStorage.removeItem('authSession')
+    }
     return normalizedRemember
   }, [])
 

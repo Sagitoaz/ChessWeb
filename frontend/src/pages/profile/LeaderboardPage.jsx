@@ -20,7 +20,12 @@ const PodiumCard = ({ entry, size }) => {
       <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center text-lg font-bold text-gray-700 mb-1">
         {entry.username?.[0]?.toUpperCase() || '?'}
       </div>
-      <p className="text-sm font-bold text-gray-900">{entry.username || 'Unknown'}</p>
+      <p
+        className="max-w-full text-sm font-bold text-gray-900 truncate"
+        title={entry.displayName || entry.username || 'Unknown'}
+      >
+        {entry.displayName || entry.username || 'Unknown'}
+      </p>
       <p className="text-lg font-extrabold mt-0.5">{entry.rating}</p>
     </div>
   )
@@ -81,13 +86,13 @@ const LeaderboardPage = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="py-3 px-4 text-left w-12">#</th>
                 <th className="py-3 px-4 text-left">Người chơi</th>
-                <th className="py-3 px-4 text-right">Rating</th>
-                <th className="py-3 px-4 text-right hidden sm:table-cell">Peak</th>
+                <th className="py-3 px-4 text-right w-24">Rating</th>
+                <th className="py-3 px-4 text-right hidden sm:table-cell w-24">Peak</th>
               </tr>
             </thead>
             <tbody>
@@ -98,12 +103,15 @@ const LeaderboardPage = () => {
                     className="border-t border-gray-50 hover:bg-gray-50 transition"
                   >
                     <td className="py-3 px-4 text-gray-400 font-mono">{entry.rank}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2.5">
+                    <td className="py-3 px-4 min-w-0">
+                      <div className="flex min-w-0 items-center gap-2.5">
                         <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0">
                           {entry.username?.[0]?.toUpperCase() || '?'}
                         </div>
-                        <span className="text-gray-900">
+                        <span
+                          className="block min-w-0 truncate text-gray-900"
+                          title={entry.displayName || entry.username || 'Unknown'}
+                        >
                           {entry.displayName || entry.username || 'Unknown'}
                         </span>
                       </div>

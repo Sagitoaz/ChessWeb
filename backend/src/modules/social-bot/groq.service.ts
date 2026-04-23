@@ -7,6 +7,8 @@ export class GroqService {
   private readonly fallback = "AI đang bận, vui lòng phân tích lại sau";
   private readonly coachFallback =
     "Gia sư tạm thời bận, hãy ưu tiên kiểm soát trung tâm và giữ an toàn vua.";
+  private readonly unexpectedScriptPattern =
+    /[\u0E00-\u0E7F\u0400-\u04FF\u0600-\u06FF\u0590-\u05FF]/g;
   private readonly groq: Groq | null;
   private readonly modelCandidates: string[];
   private activeModelName: string | null = null;
@@ -68,6 +70,20 @@ export class GroqService {
     }
   }
 
+  private sanitizeAiText(text: string): string {
+    return String(text || "")
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(this.unexpectedScriptPattern, " ")
+      .replace(/[^\S\r\n]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  private containsUnexpectedScript(text: string): boolean {
+    this.unexpectedScriptPattern.lastIndex = 0;
+    return this.unexpectedScriptPattern.test(String(text || ""));
+  }
+
   private extractSideToMove(fen: string): "white" | "black" | null {
     const token = String(fen || "")
       .trim()
@@ -117,6 +133,7 @@ Nhiệm vụ:
 
 Định dạng bắt buộc:
 - Trả lời TIẾNG VIỆT có dấu.
+- Chỉ dùng tiếng Việt, ký tự Latin, số và dấu câu thông thường. Không dùng chữ Thái hay ký tự ngoài tiếng Việt.
 - ĐÚNG 5 dòng, không thêm dòng.
 - Mỗi dòng bắt đầu chính xác một nhãn sau:
 1) Tổng quan:
@@ -155,7 +172,15 @@ Nước đi tốt nhất Stockfish: ${stockfishBestMove}
       try {
         const text = await this.generateWithModel(model, prompt, 340, 0.25);
         this.activeModelName = model;
-        return text || this.fallback;
+        const hadUnexpectedScript = this.containsUnexpectedScript(text);
+        const sanitized = this.sanitizeAiText(text);
+        if (!sanitized) {
+          return this.fallback;
+        }
+        if (hadUnexpectedScript) {
+          this.logFailure(`model ${model} returned unexpected script in analysis`);
+        }
+        return sanitized;
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         lastErrorMessage = reason;
@@ -210,6 +235,7 @@ ${perspectiveLine}
 Đầu vào là PGN hiện tại của ván đấu.
 Yêu cầu trả lời:
 - Tiếng Việt có dấu, ngắn gọn, không lan man.
+- Chỉ dùng tiếng Việt, ký tự Latin, số và dấu câu thông thường. Không dùng chữ Thái hay ký tự ngoài tiếng Việt.
 - Độ dài ${hintLength}.
 - Không viết kiểu lý thuyết dài dòng.
 - Không liệt kê quá 1 nước đi tọa độ; thay vào đó nói ý tưởng và kế hoạch.
@@ -247,7 +273,15 @@ PGN: ${sanitizedPgn}`;
           0.25,
         );
         this.activeModelName = model;
-        return text || this.coachFallback;
+        const hadUnexpectedScript = this.containsUnexpectedScript(text);
+        const sanitized = this.sanitizeAiText(text);
+        if (!sanitized) {
+          return this.coachFallback;
+        }
+        if (hadUnexpectedScript) {
+          this.logFailure(`model ${model} returned unexpected script in coach hint`);
+        }
+        return sanitized;
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         lastErrorMessage = reason;

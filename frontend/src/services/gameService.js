@@ -762,6 +762,9 @@ const gameService = {
   recordTournamentMatchResult: (tournamentId, matchId, data) =>
     gameAPI.post(`/tournaments/${tournamentId}/matches/${matchId}/result`, data),
 
+  startTournamentMatch: (tournamentId, matchId) =>
+    gameAPI.post(`/tournaments/${tournamentId}/matches/${matchId}/start`),
+
   resignTournamentMatch: (tournamentId, matchId) =>
     gameAPI.post(`/tournaments/${tournamentId}/matches/${matchId}/resign`),
 
