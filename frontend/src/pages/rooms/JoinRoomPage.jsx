@@ -134,7 +134,7 @@ export default function JoinRoomPage() {
         const room = response?.data ?? response
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
-          console.debug('[room:join] validate from url', { code: normalizedCode, room })
+          console.debug('room-join validate from url', { code: normalizedCode, room })
         }
         setRoomInfo(normalizeRoomInfo(room, normalizedCode))
       } catch (err) {
@@ -186,7 +186,7 @@ export default function JoinRoomPage() {
       const room = response?.data ?? response
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.debug('[room:join] validate manual', { code: normalizedCode, room })
+          console.debug('room-join validate manual', { code: normalizedCode, room })
       }
       setRoomInfo(normalizeRoomInfo(room, normalizedCode))
       saveRecentRoomCode(normalizedCode)
@@ -221,7 +221,7 @@ export default function JoinRoomPage() {
 
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.debug('[room:join] join requested', {
+        console.debug('room-join join requested', {
           code: roomInfo.code,
           started: roomStarted,
           alreadyJoined,

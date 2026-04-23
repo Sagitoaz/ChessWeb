@@ -1061,6 +1061,8 @@ export class SocialBotService {
                 winnerSlot === TournamentWinnerSlot.PLAYER1
                   ? "white_win"
                   : "black_win",
+              rawResult:
+                winnerSlot === TournamentWinnerSlot.PLAYER1 ? "1-0" : "0-1",
               finishedAt: new Date(),
               updatedAt: new Date(),
               endReason: "no_show_forfeit",

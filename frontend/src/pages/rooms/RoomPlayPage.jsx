@@ -141,7 +141,7 @@ export default function RoomPlayPage() {
     onDrawOffer,
     off,
   } = useGameSocket(activeGameId)
-  const { on: onSocketEvent, off: offSocketEvent } = useWebSocket()
+  const { on: onSocketEvent, off: offSocketEvent, emit } = useWebSocket()
 
   const refreshRoom = useCallback(async () => {
     if (!roomId) return
@@ -151,7 +151,7 @@ export default function RoomPlayPage() {
       roomUnavailableRef.current = false
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.debug('[room:play] refresh room', {
+        console.debug('room-play refresh room', {
           roomId,
           status: data?.status,
           activeGameId: data?.activeGameId,
@@ -205,11 +205,13 @@ export default function RoomPlayPage() {
       navigate('/rooms', { replace: true })
     }
 
+    emit('room:register', { code: room?.code || roomId })
     onSocketEvent('room:cancelled', handleRoomCancelled)
     return () => {
       offSocketEvent('room:cancelled', handleRoomCancelled)
+      emit('room:withdraw', { code: room?.code || roomId })
     }
-  }, [navigate, offSocketEvent, onSocketEvent, room?.code, roomId, showNotification])
+  }, [emit, navigate, offSocketEvent, onSocketEvent, room?.code, roomId, showNotification])
 
   useEffect(() => {
     if (!activeGameId) return
@@ -346,7 +348,7 @@ export default function RoomPlayPage() {
 
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
-      console.debug('[room:play] room entered playing state', {
+      console.debug('room-play entered playing state', {
         roomId,
         activeGameId: room.activeGameId,
       })

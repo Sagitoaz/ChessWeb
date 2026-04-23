@@ -17,39 +17,39 @@ const ForgotPasswordPage = lazy(() => import('@pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@pages/auth/ResetPasswordPage'))
 
 // Home
-import DashboardPage from '@pages/home/DashboardPage'
+const DashboardPage = lazy(() => import('@pages/home/DashboardPage'))
 
 // Profile
-import ProfilePage from '@pages/profile/ProfilePage'
-import EditProfilePage from '@pages/profile/EditProfilePage'
-import LeaderboardPage from '@pages/profile/LeaderboardPage'
+const ProfilePage = lazy(() => import('@pages/profile/ProfilePage'))
+const EditProfilePage = lazy(() => import('@pages/profile/EditProfilePage'))
+const LeaderboardPage = lazy(() => import('@pages/profile/LeaderboardPage'))
 
 // Ranked — những trang này quản lý layout BÊN TRONG nên không cần AppLayout bọc ngoài
-import RankedLobbyPage from '@pages/ranked/RankedLobbyPage'
-import RankedGamePage from '@pages/ranked/RankedGamePage'
-import RankedHistoryPage from '@pages/ranked/RankedHistoryPage'
-import RankedStatsPage from '@pages/ranked/RankedStatsPage'
+const RankedLobbyPage = lazy(() => import('@pages/ranked/RankedLobbyPage'))
+const RankedGamePage = lazy(() => import('@pages/ranked/RankedGamePage'))
+const RankedHistoryPage = lazy(() => import('@pages/ranked/RankedHistoryPage'))
+const RankedStatsPage = lazy(() => import('@pages/ranked/RankedStatsPage'))
 
 // Rooms (phòng chơi)
-import RoomListPage from '@pages/rooms/RoomListPage'
-import CreateRoomPage from '@pages/rooms/CreateRoomPage'
-import JoinRoomPage from '@pages/rooms/JoinRoomPage'
-import RoomGamePage from '@pages/rooms/RoomPlayPage'
+const RoomListPage = lazy(() => import('@pages/rooms/RoomListPage'))
+const CreateRoomPage = lazy(() => import('@pages/rooms/CreateRoomPage'))
+const JoinRoomPage = lazy(() => import('@pages/rooms/JoinRoomPage'))
+const RoomGamePage = lazy(() => import('@pages/rooms/RoomPlayPage'))
 
 // Tournaments (giải đấu)
-import TournamentListPage from '@pages/tournaments/TournamentListPage'
-import CreateTournamentPage from '@pages/tournaments/CreateTournamentPage'
-import TournamentDetailPage from '@pages/tournaments/TournamentDetailPage'
-import TournamentBracketPage from '@pages/tournaments/TournamentBracketPage'
-import TournamentMatchPlayPage from '@pages/tournaments/TournamentMatchPlayPage'
+const TournamentListPage = lazy(() => import('@pages/tournaments/TournamentListPage'))
+const CreateTournamentPage = lazy(() => import('@pages/tournaments/CreateTournamentPage'))
+const TournamentDetailPage = lazy(() => import('@pages/tournaments/TournamentDetailPage'))
+const TournamentBracketPage = lazy(() => import('@pages/tournaments/TournamentBracketPage'))
+const TournamentMatchPlayPage = lazy(() => import('@pages/tournaments/TournamentMatchPlayPage'))
 
 // Bot
-import BotSelectPage from '@pages/bot/BotSelectPage'
-import BotGamePage from '@pages/bot/BotGamePage'
+const BotSelectPage = lazy(() => import('@pages/bot/BotSelectPage'))
+const BotGamePage = lazy(() => import('@pages/bot/BotGamePage'))
 
 // Replay (xem lại ván đấu)
-import ReplayListPage from '@pages/replay/ReplayListPage'
-import ReplayViewerPage from '@pages/replay/ReplayViewerPage'
+const ReplayListPage = lazy(() => import('@pages/replay/ReplayListPage'))
+const ReplayViewerPage = lazy(() => import('@pages/replay/ReplayViewerPage'))
 
 // =============================================================================
 // LOADING SPINNER — Hiển thị khi đang tải trang

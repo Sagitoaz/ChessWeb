@@ -71,6 +71,10 @@ type TournamentRegisterPayload = {
   tournamentId?: string;
 };
 
+type RoomJoinPayload = {
+  code?: string;
+};
+
 @WebSocketGateway({
   cors: {
     origin: env.corsOrigins,
@@ -99,6 +103,21 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private tournamentRoom(tournamentId: string): string {
     return `tournament:${tournamentId}`;
+  }
+
+  private roomChannel(roomCode: string): string {
+    return `room:${String(roomCode || "").trim().toUpperCase()}`;
+  }
+
+  private emitRoomEvent(
+    roomCode: string,
+    event: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.server.to(this.roomChannel(roomCode)).emit(event, {
+      ...payload,
+      at: new Date().toISOString(),
+    });
   }
 
   private emitTournamentEvent(
@@ -183,11 +202,10 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     maxPlayers?: number;
     status?: string;
   }): void {
-    this.server.emit("room:playerJoined", {
+    this.emitRoomEvent(payload.roomCode || payload.code || "", "room:playerJoined", {
       ...payload,
       code: payload.code || payload.roomCode,
       roomCode: payload.roomCode || payload.code,
-      at: new Date().toISOString(),
     });
   }
 
@@ -200,11 +218,10 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     maxPlayers?: number;
     status?: string;
   }): void {
-    this.server.emit("room:playerLeft", {
+    this.emitRoomEvent(payload.roomCode || payload.code || "", "room:playerLeft", {
       ...payload,
       code: payload.code || payload.roomCode,
       roomCode: payload.roomCode || payload.code,
-      at: new Date().toISOString(),
     });
   }
 
@@ -216,11 +233,10 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     blackPlayerId: string;
     status?: string;
   }): void {
-    this.server.emit("room:gameStarted", {
+    this.emitRoomEvent(payload.roomCode || payload.code || "", "room:gameStarted", {
       ...payload,
       code: payload.code || payload.roomCode,
       roomCode: payload.roomCode || payload.code,
-      at: new Date().toISOString(),
     });
   }
 
@@ -230,11 +246,10 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     cancelledByUserId?: string;
     reason?: string;
   }): void {
-    this.server.emit("room:cancelled", {
+    this.emitRoomEvent(payload.roomCode || payload.code || "", "room:cancelled", {
       ...payload,
       code: payload.code || payload.roomCode,
       roomCode: payload.roomCode || payload.code,
-      at: new Date().toISOString(),
     });
   }
 
@@ -487,6 +502,32 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw new UnauthorizedException("Missing tournamentId");
     }
     client.leave(this.tournamentRoom(tournamentId));
+  }
+
+  @SubscribeMessage("room:register")
+  async onRoomRegister(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: RoomJoinPayload | undefined,
+  ): Promise<void> {
+    this.getSocketUser(client);
+    const roomCode = String(body?.code || "").trim().toUpperCase();
+    if (!roomCode) {
+      throw new UnauthorizedException("Missing room code");
+    }
+    client.join(this.roomChannel(roomCode));
+  }
+
+  @SubscribeMessage("room:withdraw")
+  async onRoomWithdraw(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: RoomJoinPayload | undefined,
+  ): Promise<void> {
+    this.getSocketUser(client);
+    const roomCode = String(body?.code || "").trim().toUpperCase();
+    if (!roomCode) {
+      throw new UnauthorizedException("Missing room code");
+    }
+    client.leave(this.roomChannel(roomCode));
   }
 
   @SubscribeMessage("game:move")

@@ -61,7 +61,7 @@ export default function CreateRoomPage() {
   const token = useAuthStore((state) => state.token)
   const currentUserId = normalizeId(user?.id || user?.userId || user?._id || user?.sub)
   const { showNotification } = useNotification()
-  const { on, off } = useWebSocket()
+  const { on, off, emit } = useWebSocket()
 
   // Form state
   const [roomName, setRoomName] = useState('')
@@ -91,7 +91,7 @@ export default function CreateRoomPage() {
 
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
-          console.debug('[room:create] snapshot', { code, nextCount, members: members.length })
+          console.debug('room-create snapshot', { code, nextCount, members: members.length })
         }
 
         if (nextCount > memberCountRef.current) {
@@ -112,7 +112,7 @@ export default function CreateRoomPage() {
       } catch (error) {
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
-          console.debug('[room:create] snapshot failed', { code, error: error?.message })
+          console.debug('room-create snapshot failed', { code, error: error?.message })
         }
       }
     },
@@ -176,7 +176,7 @@ export default function CreateRoomPage() {
 
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.debug('[room:create] room created', { createdCode })
+        console.debug('room-create room created', { createdCode })
       }
     } catch (createError) {
       const message =
@@ -222,7 +222,7 @@ export default function CreateRoomPage() {
         const data = response?.data ?? response
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
-          console.debug('[room:create] start requested', { roomCode, gameId: data?.gameId })
+          console.debug('room-create start requested', { roomCode, gameId: data?.gameId })
         }
         navigate(`/rooms/${roomCode}`, { state: { activeGameId: data?.gameId || null } })
       })
@@ -245,6 +245,8 @@ export default function CreateRoomPage() {
   useEffect(() => {
     if (!roomCreated || !roomCode) return undefined
 
+    emit('room:register', { code: roomCode })
+
     let mounted = true
     const sync = async () => {
       if (!mounted) return
@@ -259,8 +261,9 @@ export default function CreateRoomPage() {
     return () => {
       mounted = false
       clearInterval(interval)
+      emit('room:withdraw', { code: roomCode })
     }
-  }, [refreshRoomSnapshot, roomCode, roomCreated])
+  }, [emit, refreshRoomSnapshot, roomCode, roomCreated])
 
   useEffect(() => {
     if (!roomCode) return undefined
@@ -278,7 +281,7 @@ export default function CreateRoomPage() {
 
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.debug('[room:create] player joined', payload)
+        console.debug('room-create player joined', payload)
       }
 
       showNotification({

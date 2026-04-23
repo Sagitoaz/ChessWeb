@@ -266,6 +266,15 @@ export function useRankedSocket() {
 export function useRoomSocket(roomCode) {
   const { isConnected, on, emit } = useWebSocket()
 
+  useEffect(() => {
+    if (!isConnected || !roomCode) return undefined
+    emit('room:register', { code: roomCode })
+
+    return () => {
+      emit('room:withdraw', { code: roomCode })
+    }
+  }, [emit, isConnected, roomCode])
+
   // Create room
   const createRoom = useCallback(
     (settings) => {

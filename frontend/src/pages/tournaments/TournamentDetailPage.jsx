@@ -135,6 +135,7 @@ export default function TournamentDetailPage() {
   const [participantStatus, setParticipantStatus] = useState(null)
   const [participantsPage, setParticipantsPage] = useState(1)
   const [standingsPage, setStandingsPage] = useState(1)
+  const [expandedRounds, setExpandedRounds] = useState([])
   const [checkInMinutes, setCheckInMinutes] = useState(3)
   const participantStatusRef = useRef(null)
   const hasTournamentSnapshotRef = useRef(false)
@@ -240,6 +241,21 @@ export default function TournamentDetailPage() {
     setParticipantsPage(1)
     setStandingsPage(1)
   }, [activeTab, tournamentId])
+
+  useEffect(() => {
+    const rounds = Array.isArray(tournament?.rounds) ? tournament.rounds : []
+    if (rounds.length === 0) {
+      setExpandedRounds([])
+      return
+    }
+
+    const preferredRoundIndex = Math.max(0, Number(tournament?.currentRound || 1) - 1)
+    setExpandedRounds((prev) => {
+      const existing = Array.isArray(prev) ? prev.filter((idx) => idx >= 0 && idx < rounds.length) : []
+      if (existing.length > 0) return existing
+      return [Math.min(preferredRoundIndex, rounds.length - 1)]
+    })
+  }, [tournament?.currentRound, tournament?.rounds])
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil((tournament?.participants?.length || 0) / DETAIL_PAGE_SIZE))
@@ -646,6 +662,11 @@ export default function TournamentDetailPage() {
     (standingsPage - 1) * DETAIL_PAGE_SIZE,
     standingsPage * DETAIL_PAGE_SIZE
   )
+  const toggleRoundExpanded = (roundIndex) => {
+    setExpandedRounds((prev) =>
+      prev.includes(roundIndex) ? prev.filter((idx) => idx !== roundIndex) : [...prev, roundIndex]
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#e1edff] p-4">
@@ -970,11 +991,41 @@ export default function TournamentDetailPage() {
             {activeTab === 'matches' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Theo dõi các cặp đấu</h3>
+                <p className="mb-4 text-sm text-gray-600">
+                  Mặc định đang mở vòng hiện tại. Bạn có thể mở thêm các vòng khác để xem hoặc điều
+                  phối trận đấu.
+                </p>
                 {tournament.rounds.map((round, index) => (
-                  <div key={index} className="mb-6">
-                    <h4 className="font-semibold text-gray-900 mb-3">{round.name}</h4>
-                    <div className="space-y-2">
-                      {round.matches.map((match) => {
+                  <div key={index} className="mb-4 rounded-xl border border-gray-200 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleRoundExpanded(index)}
+                      className="flex w-full items-center justify-between gap-3 bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 transition-colors"
+                    >
+                      <div>
+                        <h4 className="font-semibold text-gray-900">{round.name}</h4>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {Array.isArray(round.matches) ? round.matches.length : 0} cặp đấu
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {index === currentRoundIndex && (
+                          <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                            Vòng hiện tại
+                          </span>
+                        )}
+                        <ChevronRight
+                          size={18}
+                          className={`text-gray-500 transition-transform ${
+                            expandedRounds.includes(index) ? 'rotate-90' : ''
+                          }`}
+                        />
+                      </div>
+                    </button>
+
+                    {expandedRounds.includes(index) && (
+                      <div className="space-y-2 border-t border-gray-200 p-4">
+                        {round.matches.map((match) => {
                         const player1Name = match.player1?.name || match.player1?.username || 'TBD'
                         const player2Name = match.player2?.name || match.player2?.username || 'TBD'
                         const isCompleted = String(match.status || '').toLowerCase() === 'completed'
@@ -1114,7 +1165,8 @@ export default function TournamentDetailPage() {
                           </div>
                         )
                       })}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
