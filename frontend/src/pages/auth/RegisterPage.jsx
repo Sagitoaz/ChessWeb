@@ -5,8 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 
 import { useAuth } from '@/hooks/useAuth'
-import { useNotification, Card, Button, Input } from '@/components/common'
-import { requestGoogleCredential } from '@/utils/googleAuth'
+import { useNotification, Card, Button, Input, GoogleAuthButton } from '@/components/common'
 
 // ─── Schema ────────────────────────────────────────────────────────────────
 const registerSchema = z
@@ -39,36 +38,6 @@ const Divider = () => (
       <span className="bg-white px-3 text-xs text-gray-500">HOẶC</span>
     </div>
   </div>
-)
-
-// ─── Google Button ─────────────────────────────────────────────────────────
-const GoogleButton = ({ onClick, disabled }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-  >
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-      <path
-        fill="#FFC107"
-        d="M43.611 20.083H42V20H24v8h11.303C33.73 32.659 29.223 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.958 3.042l5.657-5.657C34.047 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"
-      />
-      <path
-        fill="#FF3D00"
-        d="M6.306 14.691l6.571 4.819C14.655 16.108 19.008 12 24 12c3.059 0 5.842 1.154 7.958 3.042l5.657-5.657C34.047 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
-      />
-      <path
-        fill="#4CAF50"
-        d="M24 44c5.166 0 9.86-1.977 13.409-5.197l-6.19-5.238C29.182 35.091 26.715 36 24 36c-5.202 0-9.694-3.317-11.259-7.946l-6.523 5.025C9.505 39.556 16.227 44 24 44z"
-      />
-      <path
-        fill="#1976D2"
-        d="M43.611 20.083H42V20H24v8h11.303c-.746 2.062-2.231 3.809-4.094 4.995l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.651-.389-3.917z"
-      />
-    </svg>
-    Đăng ký với Google
-  </button>
 )
 
 // ─── Page ──────────────────────────────────────────────────────────────────
@@ -122,10 +91,9 @@ const RegisterPage = () => {
     [clearError, registerUser, notifySuccess, notifyError, navigate]
   )
 
-  const onGoogleRegister = useCallback(async () => {
+  const onGoogleRegister = useCallback(async (credential) => {
     try {
       clearError?.()
-      const credential = await requestGoogleCredential()
       const user = await googleAuth(credential)
       notifySuccess(
         'Google đăng ký thành công',
@@ -223,7 +191,11 @@ const RegisterPage = () => {
 
                 <Divider />
 
-                <GoogleButton onClick={onGoogleRegister} disabled={busy} />
+                <GoogleAuthButton
+                  onCredential={onGoogleRegister}
+                  disabled={busy}
+                  text="signup_with"
+                />
 
                 <div className="pt-5 mt-3 border-t border-gray-100 text-center">
                   <p className="text-sm text-gray-600">
