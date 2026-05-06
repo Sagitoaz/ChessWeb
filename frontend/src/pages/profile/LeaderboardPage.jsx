@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { apiCall } from '@/services/api'
+import api from '@/services/api'
 
 const PodiumCard = ({ entry, size }) => {
   if (!entry) return null
@@ -37,25 +37,36 @@ const LeaderboardPage = () => {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const response = await apiCall('get', '/users/leaderboard', { page: 1, pageSize: 50 })
-        const payload = response?.data ?? response
-        setEntries(payload?.items || [])
-      } catch {
-        setEntries([])
-      } finally {
-        setIsLoading(false)
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      const fetchLeaderboard = async () => {
+        setIsLoading(true)
+        try {
+          const params = { page: 1, pageSize: 50 }
+          const normalizedSearch = search.trim()
+          if (normalizedSearch) params.search = normalizedSearch
+          const response = await api.get('/users/leaderboard', {
+            params,
+            signal: controller.signal,
+          })
+          const payload = response?.data ?? response
+          setEntries(payload?.items || [])
+        } catch (error) {
+          if (error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') return
+          setEntries([])
+        } finally {
+          setIsLoading(false)
+        }
       }
+
+      fetchLeaderboard()
+    }, 250)
+
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
     }
-
-    fetchLeaderboard()
-  }, [])
-
-  const filtered = useMemo(
-    () => entries.filter((u) => (u.username || '').toLowerCase().includes(search.toLowerCase())),
-    [entries, search]
-  )
+  }, [search])
 
   const top3 = entries.slice(0, 3)
 
@@ -97,7 +108,7 @@ const LeaderboardPage = () => {
             </thead>
             <tbody>
               {!isLoading &&
-                filtered.map((entry) => (
+                entries.map((entry) => (
                   <tr
                     key={entry.userId || entry.rank}
                     className="border-t border-gray-50 hover:bg-gray-50 transition"
@@ -126,8 +137,12 @@ const LeaderboardPage = () => {
                 ))}
             </tbody>
           </table>
-          {!isLoading && filtered.length === 0 && (
-            <div className="p-6 text-center text-sm text-gray-500">Chưa có dữ liệu xếp hạng.</div>
+          {!isLoading && entries.length === 0 && (
+            <div className="p-6 text-center text-sm text-gray-500">
+              {search.trim()
+                ? 'Không tìm thấy người chơi phù hợp.'
+                : 'Chưa có dữ liệu xếp hạng.'}
+            </div>
           )}
           {isLoading && (
             <div className="p-6 text-center text-sm text-gray-500">Đang tải dữ liệu...</div>

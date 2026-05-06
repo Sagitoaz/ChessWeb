@@ -675,11 +675,17 @@ export class CompetitionService {
   }
 
   async getWaitingQueueCount(timeControl?: RankedTimeControl): Promise<number> {
+    await this.cleanupDuplicateWaitingEntries();
+
     const match: Record<string, unknown> = { status: "waiting" };
     if (timeControl) {
       match.timeControl = timeControl;
     }
-    return this.queueCollection().countDocuments(match);
+
+    const userIds = await this.queueCollection().distinct("userId", match);
+    return userIds.filter(
+      (userId) => typeof userId === "string" && userId.length > 0,
+    ).length;
   }
 
   async getWaitingQueueUserIds(
@@ -695,12 +701,14 @@ export class CompetitionService {
       .sort({ joinedAt: 1, _id: 1 })
       .toArray()) as Array<{ userId?: string }>;
 
-    return entries
+    const userIds = entries
       .map((entry) => entry.userId)
       .filter(
         (userId): userId is string =>
           typeof userId === "string" && userId.length > 0,
       );
+
+    return Array.from(new Set(userIds));
   }
 
   private async getWaitingQueueEntries(
@@ -2462,7 +2470,9 @@ export class CompetitionService {
           id: item._id?.toString?.() || item._id,
           gameId: item._id?.toString?.() || item._id,
           result: outcome,
+          outcome,
           absoluteResult: persistedResult,
+          rawResult: item.rawResult || item.result || persistedResult,
           playerColor,
           whitePlayerId: item.whitePlayerId,
           blackPlayerId: item.blackPlayerId,

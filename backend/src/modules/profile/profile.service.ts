@@ -528,6 +528,7 @@ export class ProfileService {
       pageSize,
       mode: query.mode,
       sort,
+      search: query.search,
     });
 
     if (query.mode && !result.modeApplied) {

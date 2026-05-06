@@ -36,6 +36,7 @@ export interface LeaderboardQuery {
   pageSize: number;
   mode?: "ranked" | "room" | "bot" | "tournament";
   sort: "rating_desc" | "rating_asc" | "peak_desc" | "peak_asc";
+  search?: string;
 }
 
 export interface LeaderboardEntryDoc {

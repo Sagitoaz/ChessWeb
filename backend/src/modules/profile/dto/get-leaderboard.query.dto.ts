@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer'
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator'
+import { Transform, Type } from 'class-transformer'
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 
 export class GetLeaderboardQueryDto {
   @Type(() => Number)
@@ -22,4 +22,10 @@ export class GetLeaderboardQueryDto {
   @IsIn(['rating_desc', 'rating_asc', 'peak_desc', 'peak_asc'])
   @IsOptional()
   sort?: 'rating_desc' | 'rating_asc' | 'peak_desc' | 'peak_asc'
+
+  @IsString()
+  @MaxLength(80)
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  search?: string
 }

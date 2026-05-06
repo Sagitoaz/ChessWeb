@@ -187,6 +187,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
   ): Promise<LeaderboardQueryResult> {
     const { page, pageSize, mode, sort } = query;
     const skip = (page - 1) * pageSize;
+    const search = query.search?.trim();
 
     const modeFieldExists = mode
       ? (await this.userRatings().countDocuments(
@@ -197,6 +198,26 @@ export class ProfileRepository implements ProfileRepositoryPort {
     const canApplyMode = Boolean(mode && modeFieldExists);
 
     const modeMatchStage = canApplyMode ? [{ $match: { mode } }] : [];
+    const profileLookupStage = {
+      $lookup: {
+        from: "user_profiles",
+        localField: "_id",
+        foreignField: "_id",
+        as: "profile",
+      },
+    };
+    const searchMatchStage = search
+      ? [
+          {
+            $match: {
+              $or: [
+                { "profile.username": { $regex: search, $options: "i" } },
+                { "profile.displayName": { $regex: search, $options: "i" } },
+              ],
+            },
+          },
+        ]
+      : [];
 
     const sortStage =
       sort === "rating_asc"
@@ -217,20 +238,14 @@ export class ProfileRepository implements ProfileRepositoryPort {
           updatedAt: 1,
         },
       },
+      profileLookupStage,
+      ...searchMatchStage,
       { $sort: sortStage },
       {
         $facet: {
           items: [
             { $skip: skip },
             { $limit: pageSize },
-            {
-              $lookup: {
-                from: "user_profiles",
-                localField: "_id",
-                foreignField: "_id",
-                as: "profile",
-              },
-            },
             {
               $project: {
                 userId: { $toString: "$_id" },

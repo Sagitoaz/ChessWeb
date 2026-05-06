@@ -38,6 +38,35 @@ const normalizeRankedResult = (result, playerColor = null) => {
   return 'draw'
 }
 
+const normalizeRankedHistoryResult = (item, playerColor) => {
+  const directOutcome = item.outcome || item.playerOutcome || item.player?.outcome
+  if (directOutcome) {
+    return normalizeRankedResult(directOutcome, playerColor)
+  }
+
+  const absoluteResult = item.absoluteResult || item.rawResult
+  if (absoluteResult) {
+    return normalizeRankedResult(absoluteResult, playerColor)
+  }
+
+  const itemResult = item.result
+  if (itemResult !== undefined && itemResult !== null && itemResult !== '') {
+    return normalizeRankedResult(itemResult, playerColor)
+  }
+
+  const endReason = normalizeEndReason(item.endReason || item.finishReason || '', null)
+  if (endReason === 'resignation' || endReason === 'forfeit' || endReason === 'afk') {
+    if (item.resignedByUserId && item.playerId && item.resignedByUserId === item.playerId) {
+      return 'loss'
+    }
+    if (item.winnerId && item.playerId) {
+      return item.winnerId === item.playerId ? 'win' : 'loss'
+    }
+  }
+
+  return 'draw'
+}
+
 const normalizeEndReason = (reason, result) => {
   const value = typeof reason === 'string' ? reason.trim().toLowerCase() : ''
 
@@ -46,6 +75,7 @@ const normalizeEndReason = (reason, result) => {
     value === 'resignation' ||
     value === 'forfeit' ||
     value === 'timeout' ||
+    value === 'afk' ||
     value === 'stalemate' ||
     value === 'draw' ||
     value === 'aborted' ||
@@ -95,11 +125,7 @@ const normalizeRankedHistory = (payload) => {
 
   const matches = items.map((item) => {
     const playerColor = item.playerColor || item.color || 'white'
-    const rawResult =
-      item.result !== undefined && item.result !== null && item.result !== ''
-        ? item.result
-        : item.absoluteResult
-    const result = normalizeRankedResult(rawResult, playerColor)
+    const result = normalizeRankedHistoryResult(item, playerColor)
 
     return {
       id: item.id || item.gameId || item._id,
