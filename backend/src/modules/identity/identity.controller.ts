@@ -121,17 +121,21 @@ export class IdentityController {
     )
   }
 
-  private stripRefreshToken<T extends { refreshToken?: string }>(
+  private stripRefreshArtifacts<T extends { refreshToken?: string; refreshCookieRemember?: boolean }>(
     response: ApiResponse<T>,
-  ): ApiResponse<Omit<T, 'refreshToken'>> {
+  ): ApiResponse<Omit<T, 'refreshToken' | 'refreshCookieRemember'>> {
     if (!response?.success || !response.data) {
-      return response as unknown as ApiResponse<Omit<T, 'refreshToken'>>
+      return response as unknown as ApiResponse<Omit<T, 'refreshToken' | 'refreshCookieRemember'>>
     }
 
-    const { refreshToken: _refreshToken, ...safeData } = response.data
+    const {
+      refreshToken: _refreshToken,
+      refreshCookieRemember: _refreshCookieRemember,
+      ...safeData
+    } = response.data
     return {
       ...response,
-      data: safeData as Omit<T, 'refreshToken'>,
+      data: safeData as Omit<T, 'refreshToken' | 'refreshCookieRemember'>,
     }
   }
 
@@ -161,7 +165,7 @@ export class IdentityController {
     if (result.success && result.data?.refreshToken) {
       this.setRefreshCookie(response, result.data.refreshToken, dto.remember !== false)
     }
-    return this.stripRefreshToken(this.unwrapOrThrow(result))
+    return this.stripRefreshArtifacts(this.unwrapOrThrow(result))
   }
 
   @HttpCode(200)
@@ -190,7 +194,7 @@ export class IdentityController {
     if (result.success && result.data?.refreshToken) {
       this.setRefreshCookie(response, result.data.refreshToken, true)
     }
-    return this.stripRefreshToken(this.unwrapOrThrow(result))
+    return this.stripRefreshArtifacts(this.unwrapOrThrow(result))
   }
 
   @HttpCode(200)
@@ -219,7 +223,7 @@ export class IdentityController {
     if (result.success && result.data?.refreshToken) {
       this.setRefreshCookie(response, result.data.refreshToken, true)
     }
-    return this.stripRefreshToken(this.unwrapOrThrow(result))
+    return this.stripRefreshArtifacts(this.unwrapOrThrow(result))
   }
 
   @HttpCode(200)
@@ -275,11 +279,15 @@ export class IdentityController {
       requestId || null
     )
     if (result.success && result.data?.refreshToken) {
-      this.setRefreshCookie(response, result.data.refreshToken, true)
+      this.setRefreshCookie(
+        response,
+        result.data.refreshToken,
+        result.data.refreshCookieRemember !== false,
+      )
     } else {
       this.clearRefreshCookie(response)
     }
-    return this.stripRefreshToken(this.unwrapOrThrow(result))
+    return this.stripRefreshArtifacts(this.unwrapOrThrow(result))
   }
 
   @HttpCode(200)

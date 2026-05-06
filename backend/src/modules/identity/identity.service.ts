@@ -36,6 +36,7 @@ interface RefreshTokenDocument {
   tokenHash: string
   userId: string
   sessionId: string
+  remember?: boolean
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -55,6 +56,7 @@ interface PasswordResetTokenDocument {
 interface JwtRefreshPayload {
   sub: string
   sid: string
+  remember?: boolean
   type: 'refresh'
   iat: number
   exp: number
@@ -98,6 +100,7 @@ interface LogoutResponseData {
 interface RefreshResponseData {
   token: string
   refreshToken: string
+  refreshCookieRemember: boolean
   user: UserResponseData
 }
 
@@ -164,7 +167,7 @@ export class IdentityService {
         return this.errorResponse(requestId, 'AUTH_FORBIDDEN', 'Tai khoan da bi khoa')
       }
 
-      const tokens = await this.issueAuthTokens(db, user)
+      const tokens = await this.issueAuthTokens(db, user, { remember: dto.remember !== false })
 
       return successResponse(
         {
@@ -213,7 +216,7 @@ export class IdentityService {
       await users.insertOne(user)
       await this.seedUserDocuments(db, user._id, now)
 
-      const tokens = await this.issueAuthTokens(db, user)
+      const tokens = await this.issueAuthTokens(db, user, { remember: true })
 
       return successResponse(
         {
@@ -333,7 +336,7 @@ export class IdentityService {
         }
       }
 
-      const tokens = await this.issueAuthTokens(db, user)
+      const tokens = await this.issueAuthTokens(db, user, { remember: true })
       return successResponse(
         {
           user: this.toUserResponse(user),
@@ -417,20 +420,33 @@ export class IdentityService {
         return this.errorResponse(requestId, 'AUTH_TOKEN_EXPIRED', 'Token da het han')
       }
 
-      if (payload.type !== 'refresh' || !payload.sub) {
+      if (
+        payload.type !== 'refresh' ||
+        typeof payload.sub !== 'string' ||
+        !payload.sub ||
+        typeof payload.sid !== 'string' ||
+        !payload.sid
+      ) {
         return this.errorResponse(requestId, 'AUTH_TOKEN_EXPIRED', 'Refresh token khong hop le')
       }
 
       const db = await this.getDb()
       const refreshTokens = this.refreshTokens(db)
       const tokenHash = this.hashToken(dto.refreshToken)
-      const refreshTokenDoc = await refreshTokens.findOne({
+      const now = new Date()
+      const refreshTokenDoc = await refreshTokens.findOneAndUpdate({
         tokenHash,
         userId: payload.sub,
+        sessionId: payload.sid,
         revokedAt: null,
+        expiresAt: { $gt: now },
+      }, {
+        $set: { revokedAt: now, updatedAt: now },
+      }, {
+        returnDocument: 'before',
       })
 
-      if (!refreshTokenDoc || refreshTokenDoc.expiresAt.getTime() <= Date.now()) {
+      if (!refreshTokenDoc) {
         return this.errorResponse(requestId, 'AUTH_TOKEN_EXPIRED', 'Refresh token da het han')
       }
 
@@ -439,18 +455,14 @@ export class IdentityService {
         return this.errorResponse(requestId, 'AUTH_FORBIDDEN', 'Khong co quyen truy cap')
       }
 
-      const now = new Date()
-      await refreshTokens.updateOne(
-        { tokenHash, userId: payload.sub, revokedAt: null },
-        { $set: { revokedAt: now, updatedAt: now } }
-      )
-
-      const newTokens = await this.issueAuthTokens(db, user)
+      const remember = this.resolveRefreshCookieRemember(refreshTokenDoc, payload)
+      const newTokens = await this.issueAuthTokens(db, user, { remember })
 
       return successResponse(
         {
           token: newTokens.token,
           refreshToken: newTokens.refreshToken,
+          refreshCookieRemember: remember,
           user: this.toUserResponse(user),
         },
         requestId
@@ -526,11 +538,15 @@ export class IdentityService {
       const now = new Date()
       const db = await this.getDb()
       const resetTokens = this.passwordResetTokens(db)
-      const resetTokenDoc = await resetTokens.findOne({
+      const resetTokenDoc = await resetTokens.findOneAndUpdate({
         tokenHash,
         purpose: IdentityService.PASSWORD_RESET_PURPOSE,
         usedAt: null,
         expiresAt: { $gt: now },
+      }, {
+        $set: { usedAt: now, updatedAt: now },
+      }, {
+        returnDocument: 'before',
       })
 
       if (!resetTokenDoc) {
@@ -551,11 +567,6 @@ export class IdentityService {
             updatedAt: now,
           },
         }
-      )
-
-      await resetTokens.updateOne(
-        { tokenHash, userId: user._id, usedAt: null },
-        { $set: { usedAt: now, updatedAt: now } }
       )
 
       await this.refreshTokens(db).updateMany(
@@ -881,7 +892,24 @@ export class IdentityService {
     return Role.USER
   }
 
-  private async issueAuthTokens(db: Db, user: UserProfileDocument): Promise<{ token: string; refreshToken: string }> {
+  private resolveRefreshCookieRemember(
+    refreshTokenDoc: Pick<RefreshTokenDocument, 'remember'> | null,
+    payload: Pick<JwtRefreshPayload, 'remember'>,
+  ): boolean {
+    if (typeof refreshTokenDoc?.remember === 'boolean') {
+      return refreshTokenDoc.remember
+    }
+    if (typeof payload.remember === 'boolean') {
+      return payload.remember
+    }
+    return true
+  }
+
+  private async issueAuthTokens(
+    db: Db,
+    user: UserProfileDocument,
+    options: { remember: boolean },
+  ): Promise<{ token: string; refreshToken: string }> {
     const role = this.resolveRole(user.role)
     const sessionId = randomUUID()
     const token = this.jwtService.sign(
@@ -901,6 +929,7 @@ export class IdentityService {
       {
         sub: user._id,
         sid: sessionId,
+        remember: options.remember,
         type: 'refresh',
       },
       {
@@ -916,6 +945,7 @@ export class IdentityService {
       tokenHash: this.hashToken(refreshToken),
       userId: user._id,
       sessionId,
+      remember: options.remember,
       expiresAt: refreshTokenExpiresAt,
       createdAt: now,
       updatedAt: now,
