@@ -21,19 +21,20 @@ const clearPublicRoomsCache = () => {
   // No-op: public rooms should always be fetched fresh to avoid stale room visibility.
 }
 
-const normalizeRankedResult = (result) => {
+const normalizeRankedResult = (result, playerColor = null) => {
   const v = typeof result === 'string' ? result.toLowerCase() : ''
-  if (v === 'win' || v === 'white_win' || v === 'whitewin' || v === '1-0' || v === 'white')
+  if (v === 'win') return 'win'
+  if (v === 'lose' || v === 'loss') return 'loss'
+  if (v === 'white_win' || v === 'whitewin' || v === '1-0' || v === 'white') {
+    if (playerColor === 'white') return 'win'
+    if (playerColor === 'black') return 'loss'
     return 'win'
-  if (
-    v === 'lose' ||
-    v === 'loss' ||
-    v === 'black_win' ||
-    v === 'blackwin' ||
-    v === '0-1' ||
-    v === 'black'
-  )
+  }
+  if (v === 'black_win' || v === 'blackwin' || v === '0-1' || v === 'black') {
+    if (playerColor === 'black') return 'win'
+    if (playerColor === 'white') return 'loss'
     return 'loss'
+  }
   return 'draw'
 }
 
@@ -93,7 +94,12 @@ const normalizeRankedHistory = (payload) => {
       : []
 
   const matches = items.map((item) => {
-    const result = normalizeRankedResult(item.result)
+    const playerColor = item.playerColor || item.color || 'white'
+    const rawResult =
+      item.result !== undefined && item.result !== null && item.result !== ''
+        ? item.result
+        : item.absoluteResult
+    const result = normalizeRankedResult(rawResult, playerColor)
 
     return {
       id: item.id || item.gameId || item._id,
@@ -110,7 +116,7 @@ const normalizeRankedHistory = (payload) => {
       },
       result,
       ratingChange: Number(item.ratingChange || item.eloChange || 0),
-      playerColor: item.playerColor || item.color || 'white',
+      playerColor,
       endReason: normalizeEndReason(item.endReason || item.finishReason || '', result),
       moves: Number(item.moves || item.totalMoves || 0),
       duration: Number(item.duration || item.durationSeconds || 0),

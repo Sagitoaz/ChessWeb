@@ -64,6 +64,7 @@ interface AuthUserPayload {
   sub?: unknown
   id?: unknown
   userId?: unknown
+  sid?: unknown
 }
 
 interface UserResponseData {
@@ -349,6 +350,7 @@ export class IdentityService {
   async logout(
     dto: LogoutDto | undefined,
     authUser: unknown,
+    accessToken: string | undefined,
     requestId: string | null
   ): Promise<ApiResponse<LogoutResponseData>> {
     try {
@@ -356,21 +358,41 @@ export class IdentityService {
       const refreshTokens = this.refreshTokens(db)
       const now = new Date()
       const refreshToken = dto?.refreshToken?.trim() || null
-      const userId =
-        this.extractUserId(authUser) ||
-        this.extractUserIdFromRefreshToken(refreshToken)
+      const refreshSession = this.extractRefreshSession(refreshToken)
+      const accessSession = this.extractAccessSession(accessToken || null)
+      const authUserId = this.extractUserId(authUser)
+      const authUserSid = this.extractSessionId(authUser)
+      const userId = authUserId || refreshSession?.userId || accessSession?.userId || null
+      const sessionId = authUserSid || refreshSession?.sessionId || accessSession?.sessionId || null
 
-      if (refreshToken && userId) {
+      if (!refreshToken && !accessToken && !userId && !sessionId) {
+        return this.errorResponse(requestId, 'AUTH_UNAUTHORIZED', 'Ban chua dang nhap')
+      }
+
+      let revokeResult:
+        | { matchedCount?: number; modifiedCount?: number }
+        | undefined
+
+      if (refreshToken && refreshSession?.userId) {
         const tokenHash = this.hashToken(refreshToken)
-        await refreshTokens.updateOne(
-          { userId, tokenHash, revokedAt: null },
+        revokeResult = await refreshTokens.updateOne(
+          { userId: refreshSession.userId, tokenHash, revokedAt: null },
+          { $set: { revokedAt: now, updatedAt: now } }
+        )
+      } else if (userId && sessionId) {
+        revokeResult = await refreshTokens.updateOne(
+          { userId, sessionId, revokedAt: null },
           { $set: { revokedAt: now, updatedAt: now } }
         )
       } else if (userId) {
-        await refreshTokens.updateMany(
+        revokeResult = await refreshTokens.updateMany(
           { userId, revokedAt: null },
           { $set: { revokedAt: now, updatedAt: now } }
         )
+      }
+
+      if (!revokeResult || Number(revokeResult.matchedCount || 0) === 0) {
+        return this.errorResponse(requestId, 'AUTH_UNAUTHORIZED', 'Ban chua dang nhap')
       }
 
       return successResponse({ message: 'Dang xuat thanh cong' }, requestId)
@@ -753,6 +775,21 @@ export class IdentityService {
   }
 
   private extractUserIdFromRefreshToken(refreshToken: string | null): string | null {
+    return this.extractRefreshSession(refreshToken)?.userId || null
+  }
+
+  private extractSessionId(authUser: unknown): string | null {
+    if (!authUser || typeof authUser !== 'object') {
+      return null
+    }
+
+    const payload = authUser as AuthUserPayload
+    return typeof payload.sid === 'string' && payload.sid ? payload.sid : null
+  }
+
+  private extractRefreshSession(
+    refreshToken: string | null
+  ): { userId: string; sessionId: string } | null {
     if (!refreshToken) {
       return null
     }
@@ -763,11 +800,45 @@ export class IdentityService {
         ignoreExpiration: true,
       })
 
-      if (payload?.type !== 'refresh' || typeof payload?.sub !== 'string' || !payload.sub) {
+      if (
+        payload?.type !== 'refresh' ||
+        typeof payload?.sub !== 'string' ||
+        !payload.sub ||
+        typeof payload?.sid !== 'string' ||
+        !payload.sid
+      ) {
         return null
       }
 
-      return payload.sub
+      return {
+        userId: payload.sub,
+        sessionId: payload.sid,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  private extractAccessSession(
+    accessToken: string | null
+  ): { userId: string; sessionId: string } | null {
+    if (!accessToken) {
+      return null
+    }
+
+    try {
+      const payload = this.jwtService.verify<AuthUserPayload>(accessToken, {
+        secret: env.jwtAccessSecret,
+        ignoreExpiration: true,
+      })
+
+      const userId = typeof payload?.sub === 'string' ? payload.sub : null
+      const sessionId = typeof payload?.sid === 'string' ? payload.sid : null
+      if (!userId || !sessionId) {
+        return null
+      }
+
+      return { userId, sessionId }
     } catch {
       return null
     }
@@ -812,9 +883,11 @@ export class IdentityService {
 
   private async issueAuthTokens(db: Db, user: UserProfileDocument): Promise<{ token: string; refreshToken: string }> {
     const role = this.resolveRole(user.role)
+    const sessionId = randomUUID()
     const token = this.jwtService.sign(
       {
         sub: user._id,
+        sid: sessionId,
         username: user.username,
         role,
       },
@@ -824,7 +897,6 @@ export class IdentityService {
       }
     )
 
-    const sessionId = randomUUID()
     const refreshToken = this.jwtService.sign(
       {
         sub: user._id,

@@ -47,6 +47,7 @@ export class IdentityController {
         throw new BadRequestException(response)
       case 'AUTH_INVALID_CREDENTIALS':
       case 'AUTH_TOKEN_EXPIRED':
+      case 'AUTH_UNAUTHORIZED':
         throw new UnauthorizedException(response)
       case 'AUTH_FORBIDDEN':
         throw new ForbiddenException(response)
@@ -230,12 +231,18 @@ export class IdentityController {
     @Headers('x-request-id') requestId?: string
   ): Promise<ApiResponse<{ message: string }>> {
     const tokenFromCookie = this.readCookie(request, env.authRefreshCookieName)
+    const rawAuthHeader = request?.headers?.authorization || request?.headers?.Authorization
+    const accessToken =
+      typeof rawAuthHeader === 'string' && rawAuthHeader.startsWith('Bearer ')
+        ? rawAuthHeader.slice(7).trim()
+        : undefined
     const result = await this.identityService.logout(
       {
         ...dto,
         refreshToken: dto?.refreshToken || tokenFromCookie || undefined,
       },
       request.user,
+      accessToken,
       requestId || null
     )
     this.clearRefreshCookie(response)

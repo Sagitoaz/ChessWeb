@@ -1011,16 +1011,37 @@ export class CompetitionService {
     }
 
     if (game.finishedAt || game.status === "completed" || game.result) {
+      const normalizedExistingResult =
+        typeof game.result === "string" ? game.result.toLowerCase() : "";
+      const persistedExistingResult: "1-0" | "0-1" | "draw" =
+        normalizedExistingResult === "1-0" ||
+        normalizedExistingResult === "white_win" ||
+        normalizedExistingResult === "whitewin" ||
+        normalizedExistingResult === "white"
+          ? "1-0"
+          : normalizedExistingResult === "0-1" ||
+              normalizedExistingResult === "black_win" ||
+              normalizedExistingResult === "blackwin" ||
+              normalizedExistingResult === "black"
+            ? "0-1"
+            : "draw";
       const userRating = await this.getUserRating(user.userId);
       const userStats = await this.statsCollection().findOne({
         userId: user.userId,
       });
+      const existingOutcome = this.resolveOutcomeForUser(
+        persistedExistingResult,
+        user.userId,
+        whitePlayerId,
+        blackPlayerId,
+      );
       return {
         matchId: String(match.matchId || matchId),
         alreadyCompleted: true,
-        result: game.result,
+        result: persistedExistingResult,
         player: {
           userId: user.userId,
+          outcome: existingOutcome,
           ratingAfter: userRating,
           gamesPlayed: Number(
             userStats?.gamesPlayed ?? userStats?.totalGames ?? 0,

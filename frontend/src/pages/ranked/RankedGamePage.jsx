@@ -162,8 +162,7 @@ const PlayerBar = ({
   isActive,
   capturedPieces,
   capturedColor,
-  materialAdv,
-  isTop,
+  materialAdvantage,
 }) => {
   const rank = getRankInfo(player.rating)
   const low = timeMs < 30_000
@@ -199,15 +198,7 @@ const PlayerBar = ({
           <CapturedPieces
             pieces={capturedPieces}
             color={capturedColor}
-            advantage={
-              isTop
-                ? materialAdv < 0
-                  ? Math.abs(materialAdv)
-                  : 0
-                : materialAdv > 0
-                  ? materialAdv
-                  : 0
-            }
+            advantage={materialAdvantage}
           />
         </div>
       </div>
@@ -1276,11 +1267,17 @@ const RankedGamePage = () => {
   const bottomActive =
     playing && ((isWhite && currentTurn === 'w') || (!isWhite && currentTurn === 'b'))
 
-  // Captured pieces for each bar
-  const topCaptured = isWhite ? capturedByBlack : capturedByWhite
-  const bottomCaptured = isWhite ? capturedByWhite : capturedByBlack
-  const topCapColor = isWhite ? 'w' : 'b' // color of pieces captured by top
-  const botCapColor = isWhite ? 'b' : 'w'
+  // Captured pieces are tied to the player's actual side, not the screen position.
+  const topSide = isWhite ? 'black' : 'white'
+  const bottomSide = isWhite ? 'white' : 'black'
+  const topCaptured = topSide === 'white' ? capturedByWhite : capturedByBlack
+  const bottomCaptured = bottomSide === 'white' ? capturedByWhite : capturedByBlack
+  const topCapColor = topSide === 'white' ? 'b' : 'w'
+  const botCapColor = bottomSide === 'white' ? 'b' : 'w'
+  const topMaterialAdvantage =
+    topSide === 'white' ? Math.max(0, matAdv) : Math.max(0, -matAdv)
+  const bottomMaterialAdvantage =
+    bottomSide === 'white' ? Math.max(0, matAdv) : Math.max(0, -matAdv)
 
   // Status text
   const whiteSideName = isWhite ? player.username : opponent.username
@@ -1378,8 +1375,7 @@ const RankedGamePage = () => {
               isActive={topActive}
               capturedPieces={topCaptured}
               capturedColor={topCapColor}
-              materialAdv={matAdv}
-              isTop
+              materialAdvantage={topMaterialAdvantage}
             />
 
             <div className="my-2 w-full" style={{ maxWidth: 'min(calc(100vh - 210px), 100%)', margin: '8px auto' }}>
@@ -1402,8 +1398,7 @@ const RankedGamePage = () => {
               isActive={bottomActive}
               capturedPieces={bottomCaptured}
               capturedColor={botCapColor}
-              materialAdv={matAdv}
-              isTop={false}
+              materialAdvantage={bottomMaterialAdvantage}
             />
           </section>
 
