@@ -80,7 +80,14 @@ type GameClockState = {
   turn: "w" | "b";
   running: boolean;
   lastTickAtMs: number;
+  turnStartedAtMs: number;
   ending: boolean;
+};
+
+type PendingDisconnectForfeit = {
+  matchId: string;
+  userId: string;
+  timer: NodeJS.Timeout;
 };
 
 type TournamentRegisterPayload = {
@@ -107,10 +114,16 @@ export class RankedGateway
   private readonly matchBySocketId = new Map<string, string>();
   private readonly matchmakingTickMs = 3000;
   private readonly clockTickMs = 1000;
+  private readonly afkAutoLoseMs = 120_000;
+  private readonly disconnectAutoLoseMs = 30_000;
   private matchmakingTimer: NodeJS.Timeout | null = null;
   private gameClockTimer: NodeJS.Timeout | null = null;
   private isMatchmakingCycleRunning = false;
   private readonly gameClocks = new Map<string, GameClockState>();
+  private readonly pendingDisconnectForfeits = new Map<
+    string,
+    PendingDisconnectForfeit
+  >();
   private readonly logger = new Logger(RankedGateway.name);
 
   constructor(
@@ -134,6 +147,10 @@ export class RankedGateway
       clearInterval(this.gameClockTimer);
       this.gameClockTimer = null;
     }
+    for (const pending of this.pendingDisconnectForfeits.values()) {
+      clearTimeout(pending.timer);
+    }
+    this.pendingDisconnectForfeits.clear();
   }
 
   private tournamentRoom(tournamentId: string): string {
@@ -305,6 +322,7 @@ export class RankedGateway
       turn: "w",
       running: true,
       lastTickAtMs: now,
+      turnStartedAtMs: now,
       ending: false,
     };
     this.gameClocks.set(matchId, clock);
@@ -333,6 +351,7 @@ export class RankedGateway
     clock.turn = clock.turn === "w" ? "b" : "w";
     clock.running = true;
     clock.lastTickAtMs = Date.now();
+    clock.turnStartedAtMs = clock.lastTickAtMs;
     return clock;
   }
 
@@ -375,6 +394,122 @@ export class RankedGateway
       clock.ending = true;
     }
     this.gameClocks.delete(matchId);
+    this.clearPendingDisconnectsForMatch(matchId);
+  }
+
+  private pendingDisconnectKey(matchId: string, userId: string): string {
+    return `${matchId}:${userId}`;
+  }
+
+  private clearPendingDisconnectsForMatch(matchId: string): void {
+    for (const [key, pending] of this.pendingDisconnectForfeits.entries()) {
+      if (pending.matchId !== matchId) continue;
+      clearTimeout(pending.timer);
+      this.pendingDisconnectForfeits.delete(key);
+    }
+  }
+
+  private clearPendingDisconnectsForUser(userId: string): void {
+    for (const [key, pending] of this.pendingDisconnectForfeits.entries()) {
+      if (pending.userId !== userId) continue;
+      clearTimeout(pending.timer);
+      this.pendingDisconnectForfeits.delete(key);
+      this.server.to(`match:${pending.matchId}`).emit("game:opponentReconnected", {
+        matchId: pending.matchId,
+        userId,
+        at: new Date().toISOString(),
+      });
+    }
+  }
+
+  private scheduleDisconnectForfeit(matchId: string, user: SocketUser): void {
+    const key = this.pendingDisconnectKey(matchId, user.userId);
+    if (this.pendingDisconnectForfeits.has(key)) return;
+
+    this.server.to(`match:${matchId}`).emit("game:opponentDisconnected", {
+      matchId,
+      userId: user.userId,
+      graceSeconds: Math.ceil(this.disconnectAutoLoseMs / 1000),
+      at: new Date().toISOString(),
+    });
+
+    const timer = setTimeout(() => {
+      this.pendingDisconnectForfeits.delete(key);
+      if (this.socketsByUser.has(user.userId)) return;
+      void this.completeGameByDisconnectForfeit(matchId, user);
+    }, this.disconnectAutoLoseMs);
+
+    this.pendingDisconnectForfeits.set(key, {
+      matchId,
+      userId: user.userId,
+      timer,
+    });
+  }
+
+  private async completeGameByDisconnectForfeit(
+    matchId: string,
+    user: SocketUser,
+  ): Promise<void> {
+    let didEmitGameEnd = false;
+    try {
+      const completion =
+        await this.competitionService.completeRankedMatchByDisconnect(
+          matchId,
+          user.userId,
+        );
+
+      if (completion) {
+        const payload: GameEndPayload = {
+          matchId,
+          reason: "disconnect_forfeit",
+          result: completion.result,
+          resignedByUserId: user.userId,
+          at: completion.finishedAt,
+        };
+        this.emitGameEnd(
+          matchId,
+          {
+            whitePlayerId: completion.whitePlayerId,
+            blackPlayerId: completion.blackPlayerId,
+          },
+          payload,
+        );
+        this.stopGameClock(matchId);
+        didEmitGameEnd = true;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Disconnect completion skipped for match=${matchId}: ${(error as Error).message}`,
+      );
+    }
+
+    if (didEmitGameEnd) return;
+
+    try {
+      const roomCompletion =
+        await this.competitionService.completeRoomGameByResignation(
+          matchId,
+          user.userId,
+        );
+      if (!roomCompletion) return;
+
+      const participants =
+        await this.competitionService.getMatchParticipants(matchId);
+      const payload: GameEndPayload = {
+        matchId,
+        reason: "disconnect_forfeit",
+        result: roomCompletion.result,
+        resignedByUserId: user.userId,
+        at: roomCompletion.finishedAt,
+      };
+
+      this.emitGameEnd(matchId, participants, payload);
+      this.stopGameClock(matchId);
+    } catch (error) {
+      this.logger.warn(
+        `Room disconnect completion skipped for match=${matchId}: ${(error as Error).message}`,
+      );
+    }
   }
 
   private async tickGameClocks(): Promise<void> {
@@ -391,6 +526,15 @@ export class RankedGateway
           matchId,
           clock.whiteTimeMs <= 0 ? "w" : "b",
         );
+        continue;
+      }
+
+      if (
+        !clock.ending &&
+        Date.now() - clock.turnStartedAtMs >= this.afkAutoLoseMs
+      ) {
+        clock.ending = true;
+        await this.completeGameByTimeout(matchId, clock.turn, "afk");
       }
     }
   }
@@ -398,6 +542,7 @@ export class RankedGateway
   private async completeGameByTimeout(
     matchId: string,
     timedOutSide: "w" | "b",
+    reason: "timeout" | "afk" = "timeout",
   ): Promise<void> {
     const participants =
       await this.competitionService.getMatchParticipants(matchId);
@@ -419,11 +564,12 @@ export class RankedGateway
       await this.competitionService.completeRoomGameByTimeout(
         matchId,
         timedOutSide === "w" ? "white" : "black",
+        reason,
       );
     if (roomCompletion) {
       const payload: GameEndPayload = {
         matchId,
-        reason: "timeout",
+        reason,
         result: roomCompletion.result,
         at: roomCompletion.finishedAt,
       };
@@ -436,11 +582,11 @@ export class RankedGateway
       const completion = await this.competitionService.completeRankedMatch(
         { userId: timedOutUserId, roles: [] },
         matchId,
-        { reason: "timeout", result: winnerResult },
+        { reason, result: winnerResult },
       );
       const payload: GameEndPayload = {
         matchId,
-        reason: "timeout",
+        reason,
         result: String(completion.result),
         at: new Date().toISOString(),
       };
@@ -463,6 +609,7 @@ export class RankedGateway
         this.socketsByUser.get(user.userId) || new Set<string>();
       socketSet.add(client.id);
       this.socketsByUser.set(user.userId, socketSet);
+      this.clearPendingDisconnectsForUser(user.userId);
 
       const waitingCount = await this.competitionService.getWaitingQueueCount();
       this.server.emit("ranked:queueUpdate", { playersInQueue: waitingCount });
@@ -494,67 +641,7 @@ export class RankedGateway
     }
 
     if (!userStillConnected && activeMatchId) {
-      let didEmitGameEnd = false;
-      try {
-        const completion =
-          await this.competitionService.completeRankedMatchByDisconnect(
-            activeMatchId,
-            user.userId,
-          );
-
-        if (completion) {
-          const payload: GameEndPayload = {
-            matchId: activeMatchId,
-            reason: "forfeit",
-            result: completion.result,
-            resignedByUserId: user.userId,
-            at: completion.finishedAt,
-          };
-          this.emitGameEnd(
-            activeMatchId,
-            {
-              whitePlayerId: completion.whitePlayerId,
-              blackPlayerId: completion.blackPlayerId,
-            },
-            payload,
-          );
-          this.stopGameClock(activeMatchId);
-          didEmitGameEnd = true;
-        }
-      } catch (error) {
-        this.logger.warn(
-          `Disconnect completion skipped for match=${activeMatchId}: ${(error as Error).message}`,
-        );
-      }
-
-      if (!didEmitGameEnd) {
-        try {
-          const roomCompletion =
-            await this.competitionService.completeRoomGameByResignation(
-              activeMatchId,
-              user.userId,
-            );
-          if (roomCompletion) {
-            const participants =
-              await this.competitionService.getMatchParticipants(activeMatchId);
-
-            const payload: GameEndPayload = {
-              matchId: activeMatchId,
-              reason: "disconnect_forfeit",
-              result: roomCompletion.result,
-              resignedByUserId: user.userId,
-              at: roomCompletion.finishedAt,
-            };
-
-            this.emitGameEnd(activeMatchId, participants, payload);
-            this.stopGameClock(activeMatchId);
-          }
-        } catch (error) {
-          this.logger.warn(
-            `Room disconnect completion skipped for match=${activeMatchId}: ${(error as Error).message}`,
-          );
-        }
-      }
+      this.scheduleDisconnectForfeit(activeMatchId, user);
     }
 
     const waitingCount = await this.competitionService.getWaitingQueueCount();

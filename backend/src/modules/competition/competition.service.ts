@@ -378,6 +378,9 @@ export class CompetitionService {
     ) {
       return "forfeit";
     }
+    if (value === "afk" || value === "inactivity" || value === "inactive") {
+      return "afk";
+    }
     if (
       value === "timeout" ||
       value === "time_out" ||
@@ -1285,8 +1288,11 @@ export class CompetitionService {
 
   private resolveInitialClockMs(timeControl: string): number {
     const normalized = String(timeControl || "").toLowerCase();
-    if (normalized === RankedTimeControl.BLITZ || normalized === "5+0") {
+    if (normalized === "5+0") {
       return 5 * 60 * 1000;
+    }
+    if (normalized === RankedTimeControl.BLITZ || normalized === "10+0") {
+      return 10 * 60 * 1000;
     }
     if (normalized === RankedTimeControl.CLASSICAL || normalized === "30+0") {
       return 30 * 60 * 1000;
@@ -1424,6 +1430,7 @@ export class CompetitionService {
   async completeRoomGameByTimeout(
     matchId: string,
     timedOutColor: "white" | "black",
+    endReason: "timeout" | "afk" = "timeout",
   ): Promise<{ result: string; finishedAt: string } | null> {
     const query = ObjectId.isValid(matchId)
       ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
@@ -1490,7 +1497,7 @@ export class CompetitionService {
           rawResult: persistedResult,
           status: "completed",
           state: "Finished",
-          endReason: "timeout",
+          endReason,
           moves,
           updatedAt: now,
           finishedAt: now,

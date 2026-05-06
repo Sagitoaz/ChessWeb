@@ -40,6 +40,7 @@ const END_REASON_ICONS = {
   checkmate: { icon: Crown, label: 'Chiếu hết', color: 'text-yellow-500' },
   resignation: { icon: Flag, label: 'Đầu hàng', color: 'text-red-500' },
   forfeit: { icon: Flag, label: 'Bỏ trận', color: 'text-red-500' },
+  afk: { icon: AlertTriangle, label: 'AFK', color: 'text-orange-500' },
   timeout: { icon: Timer, label: 'Hết giờ', color: 'text-orange-500' },
   draw: { icon: Handshake, label: 'Hòa', color: 'text-blue-500' },
   draw_agreement: { icon: Handshake, label: 'Đồng ý hòa', color: 'text-blue-500' },

@@ -16,6 +16,7 @@ const ChessBoard = ({
   const [moveFrom, setMoveFrom] = useState('')
   const [optionSquares, setOptionSquares] = useState({})
   const [rightClickedSquares, setRightClickedSquares] = useState({})
+  const [pendingPromotion, setPendingPromotion] = useState(null)
 
   const safeMove = useCallback(
     (move) => {
@@ -75,6 +76,52 @@ const ChessBoard = ({
     [gameState, showMoveHints]
   )
 
+  const getPromotionMove = useCallback(
+    (from, to) => {
+      if (!gameState) return null
+      const moves = gameState.moves({ square: from, verbose: true })
+      return moves.find((move) => move.from === from && move.to === to && move.promotion)
+    },
+    [gameState]
+  )
+
+  const completeMove = useCallback(
+    ({ from, to, promotion }) => {
+      const result = safeMove({
+        from,
+        to,
+        ...(promotion ? { promotion } : {}),
+      })
+
+      if (!result) return false
+
+      playSound(result.captured ? 'capture' : 'move')
+      onMove?.(result)
+      setMoveFrom('')
+      setOptionSquares({})
+      setPendingPromotion(null)
+      return true
+    },
+    [onMove, playSound, safeMove]
+  )
+
+  const startPromotionChoice = useCallback(
+    (from, to) => {
+      const promotionMove = getPromotionMove(from, to)
+      if (!promotionMove) return false
+
+      setPendingPromotion({
+        from,
+        to,
+        color: promotionMove.color,
+      })
+      setMoveFrom('')
+      setOptionSquares({})
+      return true
+    },
+    [getPromotionMove]
+  )
+
   const onSquareClick = useCallback(
     (square) => {
       if (disabled || !gameState) return
@@ -98,44 +145,37 @@ const ChessBoard = ({
         return
       }
 
-      const result = safeMove({
-        from: moveFrom,
-        to: square,
-        promotion: 'q',
-      })
-
-      if (result) {
-        playSound(result.captured ? 'capture' : 'move')
-        onMove?.(result)
-      }
-
-      setMoveFrom('')
-      setOptionSquares({})
+      if (startPromotionChoice(moveFrom, square)) return
+      completeMove({ from: moveFrom, to: square })
     },
-    [moveFrom, disabled, gameState, getMoveOptions, onMove, playSound, safeMove]
+    [moveFrom, completeMove, disabled, gameState, getMoveOptions, startPromotionChoice]
   )
 
   const onPieceDrop = useCallback(
     (sourceSquare, targetSquare) => {
       if (disabled || !gameState) return false
 
-      const move = safeMove({
-        from: sourceSquare,
-        to: targetSquare,
-        promotion: 'q',
-      })
-
-      if (move === null) return false
-
-      playSound(move.captured ? 'capture' : 'move')
-      onMove?.(move)
-
-      setMoveFrom('')
-      setOptionSquares({})
-      return true
+      if (startPromotionChoice(sourceSquare, targetSquare)) return false
+      return completeMove({ from: sourceSquare, to: targetSquare })
     },
-    [disabled, gameState, onMove, playSound, safeMove]
+    [completeMove, disabled, gameState, startPromotionChoice]
   )
+
+  const selectPromotionPiece = useCallback(
+    (promotion) => {
+      if (!pendingPromotion) return
+      completeMove({
+        from: pendingPromotion.from,
+        to: pendingPromotion.to,
+        promotion,
+      })
+    },
+    [completeMove, pendingPromotion]
+  )
+
+  const cancelPromotion = useCallback(() => {
+    setPendingPromotion(null)
+  }, [])
 
   const onSquareRightClick = useCallback((square) => {
     const color = 'rgba(0, 0, 255, 0.4)'
@@ -184,8 +224,18 @@ const ChessBoard = ({
     }
   }, [gameState, playSound])
 
+  const promotionOptions = useMemo(
+    () => [
+      { value: 'q', label: 'Hậu', white: '♕', black: '♛' },
+      { value: 'r', label: 'Xe', white: '♖', black: '♜' },
+      { value: 'b', label: 'Tượng', white: '♗', black: '♝' },
+      { value: 'n', label: 'Mã', white: '♘', black: '♞' },
+    ],
+    []
+  )
+
   return (
-    <div className="w-full max-w-[600px] mx-auto">
+    <div className="relative w-full max-w-[600px] mx-auto">
       <Chessboard
         position={position}
         onPieceDrop={onPieceDrop}
@@ -203,6 +253,40 @@ const ChessBoard = ({
         animationDuration={animationDuration}
         showBoardNotation={showCoordinates}
       />
+      {pendingPromotion && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/35 backdrop-blur-[2px] rounded-lg">
+          <div className="w-[min(92%,360px)] rounded-2xl bg-white shadow-2xl border border-slate-200 p-4">
+            <div className="text-center mb-3">
+              <h3 className="text-base font-bold text-slate-900">Chọn quân phong cấp</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Tốt tới hàng cuối, chọn quân bạn muốn đổi thành.
+              </p>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {promotionOptions.map((piece) => (
+                <button
+                  key={piece.value}
+                  type="button"
+                  onClick={() => selectPromotionPiece(piece.value)}
+                  className="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition p-3 flex flex-col items-center gap-1"
+                >
+                  <span className="text-3xl leading-none text-slate-900 group-hover:text-blue-700">
+                    {pendingPromotion.color === 'b' ? piece.black : piece.white}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-600">{piece.label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={cancelPromotion}
+              className="mt-3 w-full rounded-lg border border-slate-200 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+            >
+              Hủy
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
