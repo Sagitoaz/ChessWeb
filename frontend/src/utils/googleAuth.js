@@ -1,13 +1,11 @@
 const GOOGLE_GSI_SRC = 'https://accounts.google.com/gsi/client'
-const DEFAULT_GOOGLE_CLIENT_ID =
-  '81316592871-a9408j3kfpnearnnirb5uaj7dbceh38a.apps.googleusercontent.com'
 
 let googleScriptPromise = null
 let initializedClientId = null
 let credentialListener = null
 
-export const getGoogleClientId = () =>
-  String(import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID).trim()
+export const getGoogleClientId = () => String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()
+export const isGoogleOAuthConfigured = () => getGoogleClientId().length > 0
 
 export const loadGoogleScript = () => {
   if (typeof window === 'undefined') {
@@ -43,7 +41,7 @@ export const loadGoogleScript = () => {
 export const initializeGoogleIdentity = async (callback) => {
   const clientId = getGoogleClientId()
   if (!clientId) {
-    throw new Error('Thiếu VITE_GOOGLE_CLIENT_ID. Vui lòng cấu hình Google OAuth.')
+    throw new Error('Google OAuth chưa được cấu hình (thiếu VITE_GOOGLE_CLIENT_ID).')
   }
 
   const google = await loadGoogleScript()

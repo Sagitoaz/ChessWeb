@@ -26,7 +26,7 @@ const api = axios.create({
 
 let refreshPromise = null
 const shouldSkipRefreshFor = (url = '') =>
-  ['/auth/login', '/auth/register', '/auth/google', '/auth/refresh'].some((path) =>
+  ['/auth/login', '/auth/register', '/auth/google', '/auth/refresh', '/auth/logout'].some((path) =>
     String(url || '').includes(path)
   )
 

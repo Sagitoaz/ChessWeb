@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useNotification, Card, Button, Input, GoogleAuthButton } from '@/components/common'
+import { isGoogleOAuthConfigured } from '@/utils/googleAuth'
 
 // ─── Schema ────────────────────────────────────────────────────────────────
 const registerSchema = z
@@ -62,6 +63,7 @@ const RegisterPage = () => {
   })
 
   const busy = loading || isSubmitting
+  const googleEnabled = isGoogleOAuthConfigured()
 
   const notifySuccess = useCallback(
     (title, message) => showNotification({ type: 'success', title, message, duration: 3000 }),
@@ -189,13 +191,16 @@ const RegisterPage = () => {
                   Đăng ký
                 </Button>
 
-                <Divider />
-
-                <GoogleAuthButton
-                  onCredential={onGoogleRegister}
-                  disabled={busy}
-                  text="signup_with"
-                />
+                {googleEnabled ? (
+                  <>
+                    <Divider />
+                    <GoogleAuthButton
+                      onCredential={onGoogleRegister}
+                      disabled={busy}
+                      text="signup_with"
+                    />
+                  </>
+                ) : null}
 
                 <div className="pt-5 mt-3 border-t border-gray-100 text-center">
                   <p className="text-sm text-gray-600">

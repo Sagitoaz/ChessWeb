@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useNotification, Card, Button, Input, GoogleAuthButton } from '@/components/common'
+import { isGoogleOAuthConfigured } from '@/utils/googleAuth'
 
 const loginSchema = z.object({
   identifier: z
@@ -52,6 +53,7 @@ const LoginPage = () => {
   })
 
   const busy = loading || isSubmitting
+  const googleEnabled = isGoogleOAuthConfigured()
 
   const notifySuccess = useCallback(
     (title, message) =>
@@ -177,13 +179,16 @@ const LoginPage = () => {
                   Đăng nhập
                 </Button>
 
-                <Divider />
-
-                <GoogleAuthButton
-                  onCredential={onGoogleLogin}
-                  disabled={busy}
-                  text="signin_with"
-                />
+                {googleEnabled ? (
+                  <>
+                    <Divider />
+                    <GoogleAuthButton
+                      onCredential={onGoogleLogin}
+                      disabled={busy}
+                      text="signin_with"
+                    />
+                  </>
+                ) : null}
 
                 <div className="flex items-center justify-between pt-2">
                   <label className="flex items-center gap-2 cursor-pointer group select-none">

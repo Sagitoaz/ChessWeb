@@ -1,5 +1,6 @@
 import { apiCall } from './api'
 import { API_ENDPOINTS } from '../utils/constants'
+import { isGoogleOAuthConfigured } from '../utils/googleAuth'
 
 /**
  * Auth Service - Quản lý tất cả API calls liên quan đến authentication
@@ -8,6 +9,37 @@ import { API_ENDPOINTS } from '../utils/constants'
  */
 
 const authService = {
+  getErrorMessageFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return 'An error occurred'
+    }
+
+    const nestedMessage = payload.message
+    if (nestedMessage && typeof nestedMessage === 'object') {
+      if (typeof nestedMessage.error?.message === 'string' && nestedMessage.error.message.trim()) {
+        return nestedMessage.error.message.trim()
+      }
+      if (typeof nestedMessage.error === 'string' && nestedMessage.error.trim()) {
+        return nestedMessage.error.trim()
+      }
+      if (typeof nestedMessage.message === 'string' && nestedMessage.message.trim()) {
+        return nestedMessage.message.trim()
+      }
+    }
+
+    if (typeof payload.error?.message === 'string' && payload.error.message.trim()) {
+      return payload.error.message.trim()
+    }
+    if (typeof payload.message === 'string' && payload.message.trim()) {
+      return payload.message.trim()
+    }
+    if (typeof payload.error === 'string' && payload.error.trim()) {
+      return payload.error.trim()
+    }
+
+    return 'An error occurred'
+  },
+
   unwrapApiData(response) {
     if (response && typeof response === 'object' && 'success' in response) {
       if (response.success === false) {
@@ -181,6 +213,12 @@ const authService = {
    * @param {string} idToken
    */
   async googleAuth(idToken) {
+    if (!isGoogleOAuthConfigured()) {
+      const err = new Error('Đăng nhập Google chưa được bật trên frontend (thiếu VITE_GOOGLE_CLIENT_ID).')
+      err.statusCode = 503
+      throw err
+    }
+
     try {
       const response = await apiCall('POST', '/auth/google', { idToken })
       return this.unwrapApiData(response)
@@ -253,17 +291,14 @@ const authService = {
   handleError(error) {
     if (error.response) {
       // Server responded với error status
-      const message =
-        error.response.data?.message ||
-        error.response.data?.error?.message ||
-        error.response.data?.error ||
-        'An error occurred'
-      const statusCode = error.response.status
+      const payload = error.response.data
+      const message = this.getErrorMessageFromPayload(payload)
+      const statusCode = error.response.status || payload?.statusCode || 500
       
       // Tạo error object với thông tin chi tiết
       const err = new Error(message)
       err.statusCode = statusCode
-      err.data = error.response.data
+      err.data = payload
       
       return err
     } else if (error.request) {

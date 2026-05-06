@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 
-import { initializeGoogleIdentity, renderGoogleButton } from '@/utils/googleAuth'
+import { initializeGoogleIdentity, isGoogleOAuthConfigured, renderGoogleButton } from '@/utils/googleAuth'
 
 const GoogleAuthButton = ({ onCredential, disabled = false, text = 'continue_with' }) => {
   const containerRef = useRef(null)
@@ -26,6 +26,12 @@ const GoogleAuthButton = ({ onCredential, disabled = false, text = 'continue_wit
 
     setLoading(true)
     setError('')
+
+    if (!isGoogleOAuthConfigured()) {
+      setLoading(false)
+      setError('Đăng nhập Google hiện chưa khả dụng trên môi trường này.')
+      return
+    }
 
     try {
       await initializeGoogleIdentity((response) => {
