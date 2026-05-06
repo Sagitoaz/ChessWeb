@@ -181,9 +181,7 @@ const getHeatColor = (count, max) => {
 }
 
 const StatCard = ({ icon: Icon, title, value, caption }) => (
-  <div
-    className="ui-surface ui-card-padding transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-  >
+  <div className="ui-surface ui-card-padding transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
     <div className="flex items-start justify-between mb-3">
       <p className={`text-[11px] uppercase tracking-[0.14em] font-semibold ${THEME.text.muted}`}>
         {title}
@@ -211,7 +209,8 @@ export default function DashboardPage() {
   const token = useAuthStore((state) => state.token)
   const setAuthLogin = useAuthStore((state) => state.login)
   const currentUsername = user?.username
-  const currentUserId = user?.id
+  const currentUserId = user?.id || user?.userId || user?._id || user?.sub
+  const hasAvatarUrl = typeof user?.avatarUrl === 'string' && user.avatarUrl.trim().length > 0
 
   const [loading, setLoading] = useState(true)
   const [rankedStats, setRankedStats] = useState(null)
@@ -229,9 +228,10 @@ export default function DashboardPage() {
       setLoading(true)
       try {
         const storeUser = useAuthStore.getState().user
-        const profileTask = currentUserId
-          ? Promise.resolve({ user: storeUser })
-          : authService.getCurrentUser()
+        const profileTask =
+          currentUserId && hasAvatarUrl
+            ? Promise.resolve({ user: storeUser })
+            : authService.getCurrentUser()
 
         const [profileResult, gamesResult, rankedStatsResult] = await Promise.allSettled([
           profileTask,
@@ -290,7 +290,7 @@ export default function DashboardPage() {
     return () => {
       mounted = false
     }
-  }, [currentUserId, currentUsername, hasHydrated, setAuthLogin, token])
+  }, [currentUserId, currentUsername, hasAvatarUrl, hasHydrated, setAuthLogin, token])
 
   const analytics = useMemo(() => {
     const totalGames = matches.length
@@ -399,7 +399,11 @@ export default function DashboardPage() {
             icon={BadgeCheck}
             title="Elo hiện tại"
             value={currentRating}
-            caption={rankedStats?.peakRating ? `Elo cao nhất ${rankedStats.peakRating}` : 'Xếp hạng hiện tại'}
+            caption={
+              rankedStats?.peakRating
+                ? `Elo cao nhất ${rankedStats.peakRating}`
+                : 'Xếp hạng hiện tại'
+            }
           />
           <StatCard
             icon={Target}
@@ -420,15 +424,22 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Trận gần đây</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Dễ scan theo chế độ, kết quả và thời gian</p>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Dễ scan theo chế độ, kết quả và thời gian
+                </p>
               </div>
-              <Link to="/replays" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+              <Link
+                to="/replays"
+                className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+              >
                 Xem toàn bộ
               </Link>
             </div>
 
             {recentMatches.length === 0 ? (
-              <p className="text-sm text-gray-500 py-8 text-center">Chưa có trận nào để hiển thị.</p>
+              <p className="text-sm text-gray-500 py-8 text-center">
+                Chưa có trận nào để hiển thị.
+              </p>
             ) : (
               <div className="space-y-2.5">
                 {recentMatches.map((match) => {
@@ -445,7 +456,9 @@ export default function DashboardPage() {
                       className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr_auto] items-center gap-3 px-3.5 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
                     >
                       <MatchModeBadge mode={match.mode} />
-                      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${resultClass}`}>
+                      <span
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${resultClass}`}
+                      >
                         {match.result.toUpperCase()}
                       </span>
                       <p className="text-sm font-medium text-gray-700 truncate">{match.opponent}</p>
@@ -482,11 +495,26 @@ export default function DashboardPage() {
 
               <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500">
                 <span>Ít</span>
-                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(0, 4) }} />
-                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(1, 4) }} />
-                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(2, 4) }} />
-                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(3, 4) }} />
-                <span className="w-3.5 h-3.5 rounded" style={{ backgroundColor: getHeatColor(4, 4) }} />
+                <span
+                  className="w-3.5 h-3.5 rounded"
+                  style={{ backgroundColor: getHeatColor(0, 4) }}
+                />
+                <span
+                  className="w-3.5 h-3.5 rounded"
+                  style={{ backgroundColor: getHeatColor(1, 4) }}
+                />
+                <span
+                  className="w-3.5 h-3.5 rounded"
+                  style={{ backgroundColor: getHeatColor(2, 4) }}
+                />
+                <span
+                  className="w-3.5 h-3.5 rounded"
+                  style={{ backgroundColor: getHeatColor(3, 4) }}
+                />
+                <span
+                  className="w-3.5 h-3.5 rounded"
+                  style={{ backgroundColor: getHeatColor(4, 4) }}
+                />
                 <span>Nhiều</span>
               </div>
             </section>
