@@ -32,7 +32,6 @@ class SocketService {
     if (this.socket && tokenChanged) {
       this.socket.disconnect()
       this.socket = null
-      this.listeners.clear()
     }
 
     this.authToken = nextToken
@@ -70,6 +69,12 @@ class SocketService {
       console.error('⚠️ Socket connection error:', error)
     })
 
+    this.listeners.forEach((callbacks, event) => {
+      callbacks.forEach((callback) => {
+        this.socket.on(event, callback)
+      })
+    })
+
     return this.socket
   }
 
@@ -86,16 +91,16 @@ class SocketService {
   }
 
   on(event, callback) {
-    if (!this.socket) {
-      console.warn('Socket not connected. Call connect() first.')
-      return
-    }
-
     // Store listener for cleanup
     if (!this.listeners.has(event)) {
       this.listeners.set(event, [])
     }
     this.listeners.get(event).push(callback)
+
+    if (!this.socket) {
+      console.warn('Socket not connected. Listener queued for event:', event)
+      return
+    }
 
     this.socket.on(event, callback)
   }

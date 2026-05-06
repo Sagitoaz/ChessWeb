@@ -137,6 +137,7 @@ export default function RoomPlayPage() {
     acceptDraw,
     declineDraw,
     onMoveUpdate,
+    onTimeUpdate,
     onGameEnd,
     onDrawOffer,
     off,
@@ -370,6 +371,7 @@ export default function RoomPlayPage() {
 
   useEffect(() => {
     if (gamePhase !== 'playing') return
+    if (activeGameId && isSocketConnected) return
 
     lastTickRef.current = performance.now()
     clockRef.current = setInterval(() => {
@@ -388,7 +390,7 @@ export default function RoomPlayPage() {
     return () => {
       if (clockRef.current) clearInterval(clockRef.current)
     }
-  }, [gamePhase])
+  }, [activeGameId, gamePhase, isSocketConnected])
 
   const checkGameEnd = useCallback(() => {
     if (chessRef.current.isCheckmate()) {
@@ -417,8 +419,34 @@ export default function RoomPlayPage() {
       })
       if (!applied) return
 
+      if (Number.isFinite(Number(move?.clocks?.whiteTimeSeconds))) {
+        setWhiteTime(Math.max(0, Number(move.clocks.whiteTimeSeconds)))
+      }
+      if (Number.isFinite(Number(move?.clocks?.blackTimeSeconds))) {
+        setBlackTime(Math.max(0, Number(move.clocks.blackTimeSeconds)))
+      }
       setMoveHistory(chessRef.current.history({ verbose: true }))
       checkGameEnd()
+    }
+
+    const handleTimeUpdate = (payload) => {
+      const clocks = payload?.clocks || payload
+      const nextWhiteMs = Number(clocks?.whiteTimeMs)
+      const nextBlackMs = Number(clocks?.blackTimeMs)
+      const nextWhiteSeconds = Number(clocks?.whiteTimeSeconds)
+      const nextBlackSeconds = Number(clocks?.blackTimeSeconds)
+
+      if (Number.isFinite(nextWhiteMs)) {
+        setWhiteTime(Math.max(0, nextWhiteMs / 1000))
+      } else if (Number.isFinite(nextWhiteSeconds)) {
+        setWhiteTime(Math.max(0, nextWhiteSeconds))
+      }
+
+      if (Number.isFinite(nextBlackMs)) {
+        setBlackTime(Math.max(0, nextBlackMs / 1000))
+      } else if (Number.isFinite(nextBlackSeconds)) {
+        setBlackTime(Math.max(0, nextBlackSeconds))
+      }
     }
 
     const handleGameEnd = (payload) => {
@@ -476,10 +504,12 @@ export default function RoomPlayPage() {
     }
 
     onMoveUpdate(handleMoveUpdate)
+    onTimeUpdate(handleTimeUpdate)
     onGameEnd(handleGameEnd)
     onDrawOffer(handleDrawOfferEvent)
     return () => {
       off('game:moveUpdate', handleMoveUpdate)
+      off('game:timeUpdate', handleTimeUpdate)
       off('game:end', handleGameEnd)
       off('game:drawOffer', handleDrawOfferEvent)
     }
@@ -492,6 +522,7 @@ export default function RoomPlayPage() {
     onDrawOffer,
     onGameEnd,
     onMoveUpdate,
+    onTimeUpdate,
     opponentName,
     playerColor,
     showNotification,
@@ -571,7 +602,16 @@ export default function RoomPlayPage() {
   }
 
   const handleOfferDraw = () => {
-    if (gamePhase !== 'playing' || !activeGameId || drawOffer || !isSocketConnected) return
+    if (gamePhase !== 'playing' || !activeGameId || drawOffer) return
+    if (!isSocketConnected) {
+      showNotification({
+        type: 'warning',
+        title: 'Chưa kết nối realtime',
+        message: 'Cầu hòa cần kết nối socket. Vui lòng thử lại sau vài giây.',
+      })
+      return
+    }
+    joinGame()
     offerDraw()
     setDrawOffer('sent')
     showNotification({
@@ -916,7 +956,7 @@ export default function RoomPlayPage() {
               <Button
                 variant="outline"
                 onClick={handleOfferDraw}
-                disabled={gamePhase !== 'playing' || Boolean(drawOffer) || !isSocketConnected}
+                disabled={gamePhase !== 'playing' || Boolean(drawOffer)}
               >
                 <Handshake className="w-4 h-4" />
                 Cầu hòa

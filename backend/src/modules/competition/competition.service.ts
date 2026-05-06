@@ -1226,6 +1226,84 @@ export class CompetitionService {
     };
   }
 
+  async getInitialClockMs(matchId: string): Promise<number> {
+    const query = ObjectId.isValid(matchId)
+      ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
+      : { matchId };
+
+    const rankedMatch = await this.matchesCollection().findOne(query, {
+      projection: { timeControl: 1 },
+    });
+    if (rankedMatch?.timeControl) {
+      return this.resolveInitialClockMs(String(rankedMatch.timeControl));
+    }
+
+    const gameMatch = await this.gamesCollection().findOne(query, {
+      projection: {
+        mode: 1,
+        roomCode: 1,
+        roomId: 1,
+        initialTimeSeconds: 1,
+      },
+    });
+
+    const gameInitialSeconds = Number(gameMatch?.initialTimeSeconds);
+    if (Number.isFinite(gameInitialSeconds) && gameInitialSeconds > 0) {
+      return Math.round(gameInitialSeconds * 1000);
+    }
+
+    const roomCode =
+      typeof gameMatch?.roomCode === "string"
+        ? gameMatch.roomCode.trim().toUpperCase()
+        : "";
+    const roomId = gameMatch?.roomId;
+    const roomQuery =
+      roomId instanceof ObjectId
+        ? { _id: roomId }
+        : roomCode
+          ? { $or: [{ roomCode }, { code: roomCode }] }
+          : null;
+
+    if (roomQuery) {
+      const room = await this.mongoService
+        .getDb()
+        .collection("rooms")
+        .findOne(roomQuery, {
+          projection: { initialTimeSeconds: 1, timeControl: 1 },
+        });
+      const roomInitialSeconds = Number(room?.initialTimeSeconds);
+      if (Number.isFinite(roomInitialSeconds) && roomInitialSeconds > 0) {
+        return Math.round(roomInitialSeconds * 1000);
+      }
+      if (room?.timeControl) {
+        return this.resolveInitialClockMs(String(room.timeControl));
+      }
+    }
+
+    return this.resolveInitialClockMs(RankedTimeControl.RAPID);
+  }
+
+  private resolveInitialClockMs(timeControl: string): number {
+    const normalized = String(timeControl || "").toLowerCase();
+    if (normalized === RankedTimeControl.BLITZ || normalized === "5+0") {
+      return 5 * 60 * 1000;
+    }
+    if (normalized === RankedTimeControl.CLASSICAL || normalized === "30+0") {
+      return 30 * 60 * 1000;
+    }
+    if (normalized === "3+0") {
+      return 3 * 60 * 1000;
+    }
+    if (normalized === "15+0") {
+      return 15 * 60 * 1000;
+    }
+    const minuteMatch = normalized.match(/^(\d+)\s*\+\s*\d+$/);
+    if (minuteMatch) {
+      return Math.max(1, Number(minuteMatch[1])) * 60 * 1000;
+    }
+    return 10 * 60 * 1000;
+  }
+
   async completeRoomGameByResignation(
     matchId: string,
     resignedByUserId: string,
@@ -1309,6 +1387,110 @@ export class CompetitionService {
           status: "completed",
           state: "Finished",
           endReason: "resignation",
+          moves,
+          updatedAt: now,
+          finishedAt: now,
+        },
+      },
+    );
+
+    await this.replaceGameMoves(String(game._id), moves, now);
+
+    const roomCode =
+      typeof game.roomCode === "string" ? game.roomCode.trim() : "";
+    if (roomCode) {
+      await this.mongoService
+        .getDb()
+        .collection("rooms")
+        .updateOne(
+          { $or: [{ roomCode }, { code: roomCode }] },
+          {
+            $set: {
+              status: "finished",
+              activeGameId: null,
+              updatedAt: now,
+              finishedAt: now,
+            },
+          },
+        );
+    }
+
+    return {
+      result: persistedResult === "white_win" ? "WhiteWin" : "BlackWin",
+      finishedAt: now.toISOString(),
+    };
+  }
+
+  async completeRoomGameByTimeout(
+    matchId: string,
+    timedOutColor: "white" | "black",
+  ): Promise<{ result: string; finishedAt: string } | null> {
+    const query = ObjectId.isValid(matchId)
+      ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
+      : { matchId };
+
+    const game = await this.gamesCollection().findOne(query, {
+      projection: {
+        _id: 1,
+        mode: 1,
+        roomCode: 1,
+        whitePlayerId: 1,
+        blackPlayerId: 1,
+        moves: 1,
+        result: 1,
+        finishedAt: 1,
+        status: 1,
+      },
+    });
+
+    if (!game || String(game.mode || "") !== "room") {
+      return null;
+    }
+
+    const toGatewayResult = (raw: unknown): string => {
+      const normalized = typeof raw === "string" ? raw.toLowerCase() : "";
+      if (
+        normalized === "1-0" ||
+        normalized === "white_win" ||
+        normalized === "whitewin"
+      ) {
+        return "WhiteWin";
+      }
+      if (
+        normalized === "0-1" ||
+        normalized === "black_win" ||
+        normalized === "blackwin"
+      ) {
+        return "BlackWin";
+      }
+      return "Draw";
+    };
+
+    if (game.finishedAt || game.status === "completed" || game.result) {
+      return {
+        result: toGatewayResult(game.result),
+        finishedAt: game.finishedAt
+          ? new Date(game.finishedAt).toISOString()
+          : new Date().toISOString(),
+      };
+    }
+
+    const persistedResult =
+      timedOutColor === "white" ? "black_win" : "white_win";
+    const now = new Date();
+    const moves = Array.isArray(game.moves)
+      ? (game.moves as Array<Record<string, unknown>>)
+      : [];
+
+    await this.gamesCollection().updateOne(
+      { _id: game._id },
+      {
+        $set: {
+          result: persistedResult,
+          rawResult: persistedResult,
+          status: "completed",
+          state: "Finished",
+          endReason: "timeout",
           moves,
           updatedAt: now,
           finishedAt: now,

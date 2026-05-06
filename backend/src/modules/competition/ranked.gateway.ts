@@ -7,7 +7,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
-import { Logger, UnauthorizedException } from "@nestjs/common";
+import { Logger, OnModuleDestroy, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Server, Socket } from "socket.io";
 import { env } from "../../shared/config/env";
@@ -42,6 +42,12 @@ type GameMovePayload = {
     to?: string;
     promotion?: string;
     san?: string;
+    clocks?: {
+      whiteTimeMs?: number;
+      blackTimeMs?: number;
+      whiteTimeSeconds?: number;
+      blackTimeSeconds?: number;
+    };
   };
 };
 
@@ -67,6 +73,16 @@ type GameEndPayload = {
   resignedByUserId?: string;
 };
 
+type GameClockState = {
+  matchId: string;
+  whiteTimeMs: number;
+  blackTimeMs: number;
+  turn: "w" | "b";
+  running: boolean;
+  lastTickAtMs: number;
+  ending: boolean;
+};
+
 type TournamentRegisterPayload = {
   tournamentId?: string;
 };
@@ -81,15 +97,20 @@ type RoomJoinPayload = {
     credentials: true,
   },
 })
-export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RankedGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
+{
   @WebSocketServer()
   server!: Server;
 
   private readonly socketsByUser = new Map<string, Set<string>>();
   private readonly matchBySocketId = new Map<string, string>();
   private readonly matchmakingTickMs = 3000;
+  private readonly clockTickMs = 1000;
   private matchmakingTimer: NodeJS.Timeout | null = null;
+  private gameClockTimer: NodeJS.Timeout | null = null;
   private isMatchmakingCycleRunning = false;
+  private readonly gameClocks = new Map<string, GameClockState>();
   private readonly logger = new Logger(RankedGateway.name);
 
   constructor(
@@ -99,6 +120,20 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.matchmakingTimer = setInterval(() => {
       void this.runMatchmakingCycle();
     }, this.matchmakingTickMs);
+    this.gameClockTimer = setInterval(() => {
+      void this.tickGameClocks();
+    }, this.clockTickMs);
+  }
+
+  onModuleDestroy(): void {
+    if (this.matchmakingTimer) {
+      clearInterval(this.matchmakingTimer);
+      this.matchmakingTimer = null;
+    }
+    if (this.gameClockTimer) {
+      clearInterval(this.gameClockTimer);
+      this.gameClockTimer = null;
+    }
   }
 
   private tournamentRoom(tournamentId: string): string {
@@ -253,6 +288,172 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  private async ensureGameClock(matchId: string): Promise<GameClockState> {
+    const existing = this.gameClocks.get(matchId);
+    if (existing) {
+      this.settleGameClock(existing);
+      return existing;
+    }
+
+    const initialClockMs =
+      await this.competitionService.getInitialClockMs(matchId);
+    const now = Date.now();
+    const clock: GameClockState = {
+      matchId,
+      whiteTimeMs: initialClockMs,
+      blackTimeMs: initialClockMs,
+      turn: "w",
+      running: true,
+      lastTickAtMs: now,
+      ending: false,
+    };
+    this.gameClocks.set(matchId, clock);
+    return clock;
+  }
+
+  private settleGameClock(clock: GameClockState): GameClockState {
+    if (!clock.running || clock.ending) return clock;
+
+    const now = Date.now();
+    const elapsedMs = Math.max(0, now - clock.lastTickAtMs);
+    clock.lastTickAtMs = now;
+
+    if (clock.turn === "w") {
+      clock.whiteTimeMs = Math.max(0, clock.whiteTimeMs - elapsedMs);
+    } else {
+      clock.blackTimeMs = Math.max(0, clock.blackTimeMs - elapsedMs);
+    }
+
+    return clock;
+  }
+
+  private async applyMoveToGameClock(matchId: string): Promise<GameClockState> {
+    const clock = await this.ensureGameClock(matchId);
+    this.settleGameClock(clock);
+    clock.turn = clock.turn === "w" ? "b" : "w";
+    clock.running = true;
+    clock.lastTickAtMs = Date.now();
+    return clock;
+  }
+
+  private buildClockSnapshot(clock: GameClockState): {
+    whiteTimeMs: number;
+    blackTimeMs: number;
+    whiteTimeSeconds: number;
+    blackTimeSeconds: number;
+    turn: "w" | "b";
+    serverTimeMs: number;
+  } {
+    return {
+      whiteTimeMs: Math.max(0, Math.round(clock.whiteTimeMs)),
+      blackTimeMs: Math.max(0, Math.round(clock.blackTimeMs)),
+      whiteTimeSeconds: Math.max(0, Math.ceil(clock.whiteTimeMs / 1000)),
+      blackTimeSeconds: Math.max(0, Math.ceil(clock.blackTimeMs / 1000)),
+      turn: clock.turn,
+      serverTimeMs: Date.now(),
+    };
+  }
+
+  private emitGameClock(matchId: string, clock: GameClockState): void {
+    this.server.to(`match:${matchId}`).emit("game:timeUpdate", {
+      matchId,
+      clocks: this.buildClockSnapshot(clock),
+    });
+  }
+
+  private emitGameClockToSocket(socketId: string, clock: GameClockState): void {
+    this.server.to(socketId).emit("game:timeUpdate", {
+      matchId: clock.matchId,
+      clocks: this.buildClockSnapshot(clock),
+    });
+  }
+
+  private stopGameClock(matchId: string): void {
+    const clock = this.gameClocks.get(matchId);
+    if (clock) {
+      clock.running = false;
+      clock.ending = true;
+    }
+    this.gameClocks.delete(matchId);
+  }
+
+  private async tickGameClocks(): Promise<void> {
+    for (const [matchId, clock] of this.gameClocks.entries()) {
+      this.settleGameClock(clock);
+      this.emitGameClock(matchId, clock);
+
+      if (
+        !clock.ending &&
+        (clock.whiteTimeMs <= 0 || clock.blackTimeMs <= 0)
+      ) {
+        clock.ending = true;
+        await this.completeGameByTimeout(
+          matchId,
+          clock.whiteTimeMs <= 0 ? "w" : "b",
+        );
+      }
+    }
+  }
+
+  private async completeGameByTimeout(
+    matchId: string,
+    timedOutSide: "w" | "b",
+  ): Promise<void> {
+    const participants =
+      await this.competitionService.getMatchParticipants(matchId);
+    if (!participants) {
+      this.stopGameClock(matchId);
+      return;
+    }
+
+    const timedOutUserId =
+      timedOutSide === "w"
+        ? participants.whitePlayerId
+        : participants.blackPlayerId;
+    const winnerResult =
+      timedOutSide === "w"
+        ? RankedMatchCompletionResult.BLACK_WIN
+        : RankedMatchCompletionResult.WHITE_WIN;
+
+    const roomCompletion =
+      await this.competitionService.completeRoomGameByTimeout(
+        matchId,
+        timedOutSide === "w" ? "white" : "black",
+      );
+    if (roomCompletion) {
+      const payload: GameEndPayload = {
+        matchId,
+        reason: "timeout",
+        result: roomCompletion.result,
+        at: roomCompletion.finishedAt,
+      };
+      this.stopGameClock(matchId);
+      this.emitGameEnd(matchId, participants, payload);
+      return;
+    }
+
+    try {
+      const completion = await this.competitionService.completeRankedMatch(
+        { userId: timedOutUserId, roles: [] },
+        matchId,
+        { reason: "timeout", result: winnerResult },
+      );
+      const payload: GameEndPayload = {
+        matchId,
+        reason: "timeout",
+        result: String(completion.result),
+        at: new Date().toISOString(),
+      };
+      this.stopGameClock(matchId);
+      this.emitGameEnd(matchId, participants, payload);
+    } catch (error) {
+      this.logger.warn(
+        `Could not complete match ${matchId} by timeout: ${(error as Error).message}`,
+      );
+      this.stopGameClock(matchId);
+    }
+  }
+
   async handleConnection(client: Socket): Promise<void> {
     try {
       const user = this.authenticateClient(client);
@@ -317,6 +518,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
             },
             payload,
           );
+          this.stopGameClock(activeMatchId);
           didEmitGameEnd = true;
         }
       } catch (error) {
@@ -345,6 +547,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
             };
 
             this.emitGameEnd(activeMatchId, participants, payload);
+            this.stopGameClock(activeMatchId);
           }
         } catch (error) {
           this.logger.warn(
@@ -476,6 +679,8 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.join(`match:${matchId}`);
     this.matchBySocketId.set(client.id, matchId);
+    const clock = await this.ensureGameClock(matchId);
+    this.emitGameClockToSocket(client.id, clock);
   }
 
   @SubscribeMessage("tournament:register")
@@ -544,6 +749,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.matchBySocketId.set(client.id, matchId);
+    client.join(`match:${matchId}`);
 
     if (!move?.from || !move?.to) {
       return;
@@ -559,15 +765,22 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
     }
 
+    const clock = await this.applyMoveToGameClock(matchId);
+    const authoritativeMove = {
+      ...move,
+      clocks: this.buildClockSnapshot(clock),
+    };
+
     this.server
       .to(`match:${matchId}`)
       .except(client.id)
       .emit("game:moveUpdate", {
         matchId,
-        move,
+        move: authoritativeMove,
         byUserId: user.userId,
         at: new Date().toISOString(),
       });
+    this.emitGameClock(matchId, clock);
   }
 
   @SubscribeMessage("game:chat")
@@ -621,6 +834,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.matchBySocketId.set(client.id, matchId);
+    client.join(`match:${matchId}`);
 
     const participants =
       await this.competitionService.getMatchParticipants(matchId);
@@ -646,6 +860,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         user.userId,
       );
     if (roomCompletion) {
+      this.stopGameClock(matchId);
       const payload: GameEndPayload = {
         matchId,
         reason: "resignation",
@@ -679,6 +894,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         resignedByUserId: user.userId,
         at: new Date().toISOString(),
       };
+      this.stopGameClock(matchId);
       this.emitGameEnd(matchId, participants, payload);
       return;
     } catch {
@@ -689,6 +905,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         resignedByUserId: user.userId,
         at: new Date().toISOString(),
       };
+      this.stopGameClock(matchId);
       this.emitGameEnd(matchId, participants, payload);
     }
   }
@@ -715,15 +932,15 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
     }
 
-    this.server
-      .to(`match:${matchId}`)
-      .except(client.id)
-      .emit("game:drawOffer", {
-        matchId,
-        type: "offer",
-        fromUserId: user.userId,
-        at: new Date().toISOString(),
-      });
+    client.join(`match:${matchId}`);
+    const participants =
+      await this.competitionService.getMatchParticipants(matchId);
+    this.emitGameDrawOffer(matchId, participants, client.id, {
+      matchId,
+      type: "offer",
+      fromUserId: user.userId,
+      at: new Date().toISOString(),
+    });
   }
 
   @SubscribeMessage("game:acceptDraw")
@@ -748,15 +965,16 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
     }
 
-    this.server.to(`match:${matchId}`).emit("game:drawOffer", {
+    client.join(`match:${matchId}`);
+    const participants =
+      await this.competitionService.getMatchParticipants(matchId);
+
+    this.emitGameDrawOffer(matchId, participants, null, {
       matchId,
       type: "accepted",
       byUserId: user.userId,
       at: new Date().toISOString(),
     });
-
-    const participants =
-      await this.competitionService.getMatchParticipants(matchId);
 
     try {
       const completion = await this.competitionService.completeRankedMatch(
@@ -774,6 +992,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         result: String(completion.result),
         at: new Date().toISOString(),
       };
+      this.stopGameClock(matchId);
       this.emitGameEnd(matchId, participants, payload);
       return;
     } catch {
@@ -786,6 +1005,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
           result: roomCompletion.result,
           at: roomCompletion.finishedAt,
         };
+        this.stopGameClock(matchId);
         this.emitGameEnd(matchId, participants, payload);
         return;
       }
@@ -796,6 +1016,7 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
         result: RankedMatchCompletionResult.DRAW,
         at: new Date().toISOString(),
       };
+      this.stopGameClock(matchId);
       this.emitGameEnd(matchId, participants, payload);
     }
   }
@@ -822,7 +1043,10 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
     }
 
-    this.server.to(`match:${matchId}`).emit("game:drawOffer", {
+    client.join(`match:${matchId}`);
+    const participants =
+      await this.competitionService.getMatchParticipants(matchId);
+    this.emitGameDrawOffer(matchId, participants, null, {
       matchId,
       type: "declined",
       byUserId: user.userId,
@@ -883,6 +1107,48 @@ export class RankedGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     for (const socketId of blackSockets || []) {
       this.server.to(socketId).emit("game:end", payload);
+    }
+  }
+
+  private emitGameDrawOffer(
+    matchId: string,
+    participants: { whitePlayerId: string; blackPlayerId: string } | null,
+    exceptSocketId: string | null,
+    payload: Record<string, unknown>,
+  ): void {
+    if (!participants) {
+      const roomEmitter = this.server.to(`match:${matchId}`);
+      if (exceptSocketId) {
+        roomEmitter.except(exceptSocketId).emit("game:drawOffer", payload);
+      } else {
+        roomEmitter.emit("game:drawOffer", payload);
+      }
+      return;
+    }
+
+    const targetSocketIds = new Set<string>();
+    for (const socketId of this.socketsByUser.get(participants.whitePlayerId) || []) {
+      targetSocketIds.add(socketId);
+    }
+    for (const socketId of this.socketsByUser.get(participants.blackPlayerId) || []) {
+      targetSocketIds.add(socketId);
+    }
+    if (exceptSocketId) {
+      targetSocketIds.delete(exceptSocketId);
+    }
+
+    if (targetSocketIds.size === 0) {
+      const roomEmitter = this.server.to(`match:${matchId}`);
+      if (exceptSocketId) {
+        roomEmitter.except(exceptSocketId).emit("game:drawOffer", payload);
+      } else {
+        roomEmitter.emit("game:drawOffer", payload);
+      }
+      return;
+    }
+
+    for (const socketId of targetSocketIds) {
+      this.server.to(socketId).emit("game:drawOffer", payload);
     }
   }
 

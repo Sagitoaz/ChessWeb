@@ -817,6 +817,7 @@ const RankedGamePage = () => {
   // ═══════════════════════════════════════════
   useEffect(() => {
     if (gamePhase !== GAME_PHASE.PLAYING) return
+    if (matchId && gameSocket?.isConnected) return
 
     lastTickRef.current = performance.now()
     clockRef.current = setInterval(() => {
@@ -836,7 +837,7 @@ const RankedGamePage = () => {
     return () => {
       if (clockRef.current) clearInterval(clockRef.current)
     }
-  }, [gamePhase])
+  }, [gamePhase, gameSocket?.isConnected, matchId])
 
   // ═══════════════════════════════════════════
   // END GAME HELPER
@@ -927,6 +928,12 @@ const RankedGamePage = () => {
       setFen(gameRef.current.fen())
       setMoveHistory(gameRef.current.history({ verbose: true }))
       setLastMove({ from: result.from, to: result.to })
+      if (Number.isFinite(Number(move?.clocks?.whiteTimeMs))) {
+        setWhiteTime(Math.max(0, Number(move.clocks.whiteTimeMs)))
+      }
+      if (Number.isFinite(Number(move?.clocks?.blackTimeMs))) {
+        setBlackTime(Math.max(0, Number(move.clocks.blackTimeMs)))
+      }
       setDrawOffer(null)
 
       if (result.captured) playSound('capture')
@@ -934,6 +941,19 @@ const RankedGamePage = () => {
 
       const ended = checkGameEnd()
       if (!ended && gameRef.current.inCheck()) playSound('check')
+    }
+
+    const handleTimeUpdate = (payload) => {
+      const clocks = payload?.clocks || payload
+      const nextWhite = Number(clocks?.whiteTimeMs)
+      const nextBlack = Number(clocks?.blackTimeMs)
+
+      if (Number.isFinite(nextWhite)) {
+        setWhiteTime(Math.max(0, nextWhite))
+      }
+      if (Number.isFinite(nextBlack)) {
+        setBlackTime(Math.max(0, nextBlack))
+      }
     }
 
     const handleOpponentDisconnect = () => {
@@ -1014,6 +1034,7 @@ const RankedGamePage = () => {
     }
 
     gameSocket.onMoveUpdate(handleMoveUpdate)
+    gameSocket.onTimeUpdate?.(handleTimeUpdate)
     gameSocket.onGameEnd(handleGameEnd)
     gameSocket.onDrawOffer(handleDrawOfferEvent)
     gameSocket.onChatMessage?.(handleChatMessage)
@@ -1021,6 +1042,7 @@ const RankedGamePage = () => {
     gameSocket.onOpponentReconnected(handleOpponentReconnect)
     return () => {
       gameSocket.off('game:moveUpdate', handleMoveUpdate)
+      gameSocket.off('game:timeUpdate', handleTimeUpdate)
       gameSocket.off('game:end', handleGameEnd)
       gameSocket.off('game:drawOffer', handleDrawOfferEvent)
       gameSocket.off('game:chat', handleChatMessage)
@@ -1089,6 +1111,7 @@ const RankedGamePage = () => {
   const handleOfferDraw = useCallback(() => {
     if (drawOffer) return
     if (gameSocket?.isConnected && matchId) {
+      gameSocket.joinGame?.()
       gameSocket.offerDraw()
       setDrawOffer('sent')
       setChatMessages((prev) => [
@@ -1097,6 +1120,16 @@ const RankedGamePage = () => {
       ])
       return
     }
+
+    if (matchId) {
+      showNotification({
+        type: 'warning',
+        title: 'Chưa kết nối realtime',
+        message: 'Đề nghị hòa cần kết nối socket. Vui lòng thử lại sau vài giây.',
+      })
+      return
+    }
+
     const whiteName = playerColor === 'white' ? player.username : opponent.username
     const blackName = playerColor === 'black' ? player.username : opponent.username
     const side = gameRef.current.turn() === 'w' ? whiteName : blackName
@@ -1104,7 +1137,7 @@ const RankedGamePage = () => {
       ...prev,
       { text: `${side} đề nghị hòa. Chấp nhận hay từ chối?`, isSystem: true },
     ])
-  }, [drawOffer, gameSocket, matchId, opponent.username, player.username, playerColor])
+  }, [drawOffer, gameSocket, matchId, opponent.username, player.username, playerColor, showNotification])
 
   const handleAcceptDraw = useCallback(() => {
     if (gameSocket?.isConnected && matchId) {
@@ -1481,9 +1514,9 @@ const RankedGamePage = () => {
 
               <button
                 onClick={handleOfferDraw}
-                disabled={!playing || drawOffer !== null || !gameSocket?.isConnected}
+                disabled={!playing || drawOffer !== null}
                 className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  !playing || drawOffer !== null || !gameSocket?.isConnected
+                  !playing || drawOffer !== null
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-white border border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-gray-700'
                 }`}
