@@ -229,9 +229,11 @@ export default function RoomPlayPage() {
       const members = Array.isArray(room.members) ? room.members : []
       const expectedOpponentId =
         playerColor === 'white' ? normalizeId(room.blackPlayerId) : normalizeId(room.whitePlayerId)
-      const opponent = members.find(
-        (member) => member?.userId && normalizeId(member.userId) === expectedOpponentId
-      ) || members.find((member) => member?.userId && normalizeId(member.userId) !== currentUserId)
+      const opponent =
+        members.find(
+          (member) => member?.userId && normalizeId(member.userId) === expectedOpponentId
+        ) ||
+        members.find((member) => member?.userId && normalizeId(member.userId) !== currentUserId)
       const meName = getUserDisplayName(user, 'Bạn')
       const oppName = getUserDisplayName(opponent, 'Đối thủ')
       const whiteName = playerColor === 'white' ? meName : oppName
@@ -343,7 +345,12 @@ export default function RoomPlayPage() {
 
   useEffect(() => {
     if (room.status !== 'playing') {
-      setGamePhase('waiting')
+      if (room.activeGameId && !endedRef.current) {
+        return
+      }
+      if (!endedRef.current) {
+        setGamePhase('waiting')
+      }
       return
     }
 
@@ -639,9 +646,10 @@ export default function RoomPlayPage() {
     const members = Array.isArray(room.members) ? room.members : []
     const expectedOpponentId =
       playerColor === 'white' ? normalizeId(room.blackPlayerId) : normalizeId(room.whitePlayerId)
-    const opponent = members.find(
-      (member) => member?.userId && normalizeId(member.userId) === expectedOpponentId
-    ) || members.find((member) => member?.userId && normalizeId(member.userId) !== currentUserId)
+    const opponent =
+      members.find(
+        (member) => member?.userId && normalizeId(member.userId) === expectedOpponentId
+      ) || members.find((member) => member?.userId && normalizeId(member.userId) !== currentUserId)
     const meName = user?.username || user?.displayName || 'Bạn'
     const oppName = opponent?.username || 'Đối thủ'
     const whiteName = playerColor === 'white' ? meName : oppName
@@ -918,7 +926,11 @@ export default function RoomPlayPage() {
                 <div className="mb-3 w-full rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                   <p className="font-semibold mb-2">{opponentName} đang đề nghị hòa.</p>
                   <div className="flex gap-2">
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={handleAcceptDraw}>
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={handleAcceptDraw}
+                    >
                       Đồng ý hòa
                     </Button>
                     <Button size="sm" variant="outline" onClick={handleDeclineDraw}>
@@ -1029,8 +1041,12 @@ export default function RoomPlayPage() {
                       className="grid grid-cols-[36px_1fr_1fr] gap-2 items-center"
                     >
                       <span className="text-gray-400">{pair.fullMove}.</span>
-                      <span className="font-mono text-gray-800">{getMoveLabel(pair.white) || '-'}</span>
-                      <span className="font-mono text-gray-800">{getMoveLabel(pair.black) || '-'}</span>
+                      <span className="font-mono text-gray-800">
+                        {getMoveLabel(pair.white) || '-'}
+                      </span>
+                      <span className="font-mono text-gray-800">
+                        {getMoveLabel(pair.black) || '-'}
+                      </span>
                     </div>
                   ))}
                 </div>

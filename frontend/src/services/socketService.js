@@ -122,7 +122,9 @@ class SocketService {
 
   emit(event, data) {
     if (!this.socket) {
-      console.warn('⚠️ Socket not ready. Cannot emit event:', event)
+      // Queue emits until the socket is created, then flush after connect.
+      this.pendingEmits.push({ event, data })
+      this.connect()
       return
     }
 

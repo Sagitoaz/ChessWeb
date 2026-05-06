@@ -40,16 +40,23 @@ export class ProfileRepository implements ProfileRepositoryPort {
   constructor(private readonly mongoService: MongoService) {}
 
   private normalizeGameOutcomeForUser(
-    game: Pick<GameDoc, "whitePlayerId" | "blackPlayerId" | "result" | "rawResult">,
+    game: Pick<
+      GameDoc,
+      "whitePlayerId" | "blackPlayerId" | "result" | "rawResult"
+    >,
     userId: string,
   ): "win" | "lose" | "draw" | null {
     const rawResult =
       typeof game.rawResult === "string" ? game.rawResult.toLowerCase() : "";
-    const result = typeof game.result === "string" ? game.result.toLowerCase() : "";
+    const result =
+      typeof game.result === "string" ? game.result.toLowerCase() : "";
     const isWhite = game.whitePlayerId === userId;
     const isBlack = game.blackPlayerId === userId;
 
-    if (["draw", "1/2-1/2"].includes(rawResult) || ["draw", "1/2-1/2"].includes(result)) {
+    if (
+      ["draw", "1/2-1/2"].includes(rawResult) ||
+      ["draw", "1/2-1/2"].includes(result)
+    ) {
       return "draw";
     }
 
@@ -152,7 +159,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
       { returnDocument: "after" },
     );
 
-    return result;
+    return result?.value ?? null;
   }
 
   async findUserStatsByUserId(userId: string): Promise<UserStatsDoc | null> {
@@ -179,7 +186,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
       { returnDocument: "after" },
     );
 
-    return result;
+    return result?.value ?? null;
   }
 
   async findLeaderboard(
@@ -363,9 +370,10 @@ export class ProfileRepository implements ProfileRepositoryPort {
     for (const profile of profiles as UsernameDoc[]) {
       const displayName =
         (typeof profile?.displayName === "string" &&
-          profile.displayName.trim().length > 0
+        profile.displayName.trim().length > 0
           ? profile.displayName
-          : typeof profile?.username === "string" && profile.username.trim().length > 0
+          : typeof profile?.username === "string" &&
+              profile.username.trim().length > 0
             ? profile.username
             : null) || null;
       if (profile?._id && displayName) {

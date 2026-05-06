@@ -268,11 +268,24 @@ const RankedLobbyPage = () => {
   const [queueTimeControl, setQueueTimeControl] = useState('blitz')
   const [queuePreferredColor, setQueuePreferredColor] = useState('random')
   const searchTimerRef = useRef(null)
+  const matchTransitionTimersRef = useRef([])
   const matchFoundRef = useRef(false) // guard against double-navigation
 
+  const clearMatchTransitionTimers = useCallback(() => {
+    matchTransitionTimersRef.current.forEach((timerId) => clearTimeout(timerId))
+    matchTransitionTimersRef.current = []
+  }, [])
+
   // ──── WebSocket Hook ────
-  const { isConnected, connect, joinQueue, leaveQueue, onMatchFound, onQueueUpdate, onRankedError } =
-    useRankedSocket()
+  const {
+    isConnected,
+    connect,
+    joinQueue,
+    leaveQueue,
+    onMatchFound,
+    onQueueUpdate,
+    onRankedError,
+  } = useRankedSocket()
 
   // ──── Load Recent Games ────
   useEffect(() => {
@@ -306,14 +319,17 @@ const RankedLobbyPage = () => {
       setMatchData(data)
 
       // After 1.5s → connecting state
-      setTimeout(() => {
+      clearMatchTransitionTimers()
+      const connectingTimer = setTimeout(() => {
         setQueueStatus(QUEUE_STATUS.CONNECTING)
       }, 1500)
 
       // After 3s → redirect to game
-      setTimeout(() => {
+      const redirectTimer = setTimeout(() => {
         navigate(`/ranked/game/${data.matchId}`, { state: { matchData: data } })
       }, 3000)
+
+      matchTransitionTimersRef.current = [connectingTimer, redirectTimer]
     }
 
     const handleQueueUpdate = (data) => {
@@ -343,6 +359,10 @@ const RankedLobbyPage = () => {
     onMatchFound(handleMatchFound)
     onQueueUpdate(handleQueueUpdate)
     onRankedError(handleRankedError)
+
+    return () => {
+      clearMatchTransitionTimers()
+    }
   }, [navigate, onMatchFound, onQueueUpdate, onRankedError, showNotification])
 
   // ──── Search Timer ────
@@ -383,13 +403,14 @@ const RankedLobbyPage = () => {
   }, [connect, isConnected, joinQueue, queuePreferredColor, queueTimeControl])
 
   const handleCancelSearch = useCallback(() => {
+    clearMatchTransitionTimers()
     setQueueStatus(QUEUE_STATUS.IDLE)
     setSearchTime(0)
     setMatchData(null)
     setQueueCount(0)
 
     leaveQueue()
-  }, [leaveQueue])
+  }, [clearMatchTransitionTimers, leaveQueue])
 
   // ──── Derived State ────
   const rankInfo = getRankInfo(user.rating)
