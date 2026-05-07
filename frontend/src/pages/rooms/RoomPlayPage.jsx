@@ -145,6 +145,20 @@ export default function RoomPlayPage() {
   } = useGameSocket(activeGameId)
   const { on: onSocketEvent, off: offSocketEvent, emit } = useWebSocket()
 
+  const roomMembers = room.members || []
+  const host = roomMembers.find((member) => member.role === 'owner') || roomMembers[0]
+  const expectedOpponentId =
+    playerColor === 'white' ? normalizeId(room.blackPlayerId) : normalizeId(room.whitePlayerId)
+  const opponentMember =
+    roomMembers.find((member) => normalizeId(member.userId) === expectedOpponentId) ||
+    roomMembers.find((member) => normalizeId(member.userId) !== currentUserId) ||
+    null
+  const isPlayerTurn =
+    gamePhase === 'playing' && chessRef.current.turn() === myColorCode && !endedRef.current
+  const boardDisabled = gamePhase !== 'playing' || !activeGameId || !isPlayerTurn
+  const opponentName = opponentMember?.username || 'Đang chờ đối thủ'
+  const playerName = user?.username || user?.displayName || 'Bạn'
+
   const refreshRoom = useCallback(async () => {
     if (!roomId) return
     try {
@@ -794,20 +808,6 @@ export default function RoomPlayPage() {
     document.addEventListener('click', handleDocumentNavigation, true)
     return () => document.removeEventListener('click', handleDocumentNavigation, true)
   }, [gamePhase])
-
-  const roomMembers = room.members || []
-  const host = roomMembers.find((member) => member.role === 'owner') || roomMembers[0]
-  const expectedOpponentId =
-    playerColor === 'white' ? normalizeId(room.blackPlayerId) : normalizeId(room.whitePlayerId)
-  const opponentMember =
-    roomMembers.find((member) => normalizeId(member.userId) === expectedOpponentId) ||
-    roomMembers.find((member) => normalizeId(member.userId) !== currentUserId) ||
-    null
-  const isPlayerTurn =
-    gamePhase === 'playing' && chessRef.current.turn() === myColorCode && !endedRef.current
-  const boardDisabled = gamePhase !== 'playing' || !activeGameId || !isPlayerTurn
-  const opponentName = opponentMember?.username || 'Đang chờ đối thủ'
-  const playerName = user?.username || user?.displayName || 'Bạn'
 
   if (loading && !room.code) {
     return (
