@@ -158,7 +158,10 @@ export default function CreateTournamentPage() {
       const data = response?.data ?? response
       const createdId = data?.id || data?._id
       if (createdId) {
-        navigate(`/tournaments/${createdId}`)
+        navigate(`/tournaments/${createdId}`, {
+          replace: true,
+          state: { justCreatedTournament: true },
+        })
       } else {
         navigate('/tournaments')
       }

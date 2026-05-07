@@ -2384,7 +2384,11 @@ export class SocialBotService {
 
     const checkIn =
       match?.checkIn && typeof match.checkIn === "object" ? match.checkIn : {};
-    if (!checkIn.player1Ready || !checkIn.player2Ready) {
+    const matchStatus = this.normalizeMatchStatus(match?.status);
+    if (
+      matchStatus !== "ready" &&
+      (!checkIn.player1Ready || !checkIn.player2Ready)
+    ) {
       throw new BadRequestException(
         "Both players must join the room before the organizer can start",
       );

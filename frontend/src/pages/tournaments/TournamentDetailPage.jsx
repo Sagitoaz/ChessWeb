@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Card, Button, Loader, Pagination } from '@/components/common'
 import { useNotification } from '@/components/common/Notification'
 import gameService from '@/services/gameService'
@@ -122,10 +122,31 @@ const normalizeTournament = (tournament, tournamentId) => ({
 
 const DETAIL_PAGE_SIZE = 10
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const getApiErrorMessage = (error, fallback) =>
+  error?.response?.data?.error?.message ||
+  error?.response?.data?.message ||
+  error?.message ||
+  fallback
+
+const isNotFoundError = (error) => {
+  const status = Number(error?.response?.status || 0)
+  const code = String(error?.response?.data?.error?.code || '').toLowerCase()
+  const message = String(
+    error?.response?.data?.error?.message ||
+      error?.response?.data?.message ||
+      error?.message ||
+      ''
+  ).toLowerCase()
+  return status === 404 || code.includes('not_found') || message.includes('not found')
+}
+
 export default function TournamentDetailPage() {
   const { showNotification } = useNotification()
   const { tournamentId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const authUser = useAuthStore((state) => state.user)
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
@@ -161,6 +182,24 @@ export default function TournamentDetailPage() {
     [pendingAction]
   )
 
+  const patchTournamentMatch = useCallback((matchId, updater) => {
+    setTournament((prev) => {
+      if (!prev || !Array.isArray(prev.rounds)) return prev
+
+      return {
+        ...prev,
+        rounds: prev.rounds.map((round) => ({
+          ...round,
+          matches: Array.isArray(round?.matches)
+            ? round.matches.map((match) =>
+                String(match?.id || '') === String(matchId || '') ? updater(match) : match
+              )
+            : [],
+        })),
+      }
+    })
+  }, [])
+
   const authRoles = Array.isArray(authUser?.roles)
     ? authUser.roles.filter((role) => typeof role === 'string')
     : authUser?.role && typeof authUser.role === 'string'
@@ -180,7 +219,7 @@ export default function TournamentDetailPage() {
     [tournament]
   )
 
-  const loadTournament = useCallback(async ({ background = false } = {}) => {
+  const loadTournament = useCallback(async ({ background = false, retries = 1 } = {}) => {
     if (!tournamentId) return
     if (isRefreshingRef.current) return
     isRefreshingRef.current = true
@@ -191,7 +230,22 @@ export default function TournamentDetailPage() {
       setIsBackgroundRefreshing(true)
     }
     try {
-      const response = await gameService.getTournament(tournamentId)
+      let response = null
+      let lastError = null
+      for (let attempt = 0; attempt <= retries; attempt += 1) {
+        try {
+          response = await gameService.getTournament(tournamentId)
+          lastError = null
+          break
+        } catch (error) {
+          lastError = error
+          if (!isNotFoundError(error) || attempt >= retries) {
+            break
+          }
+          await sleep(300 + attempt * 250)
+        }
+      }
+      if (lastError) throw lastError
       const payload = response?.data ?? response
       const normalized = normalizeTournament(payload, tournamentId)
       setTournament(normalized)
@@ -232,9 +286,17 @@ export default function TournamentDetailPage() {
         .filter(Boolean)
 
       setIsOrganizer(Boolean(currentUserId && ownerCandidates.includes(String(currentUserId))))
-    } catch (_error) {
-      setTournament(null)
-      hasTournamentSnapshotRef.current = false
+    } catch (error) {
+      if (!background || !hasTournamentSnapshotRef.current) {
+        setTournament(null)
+        hasTournamentSnapshotRef.current = false
+      } else {
+        showNotification({
+          type: 'error',
+          title: 'Cập nhật giải đấu thất bại',
+          message: getApiErrorMessage(error, 'Không thể làm mới thông tin giải đấu lúc này.'),
+        })
+      }
     } finally {
       if (!background || !hasTournamentSnapshotRef.current) {
         setLoading(false)
@@ -245,8 +307,10 @@ export default function TournamentDetailPage() {
   }, [currentUserId, tournamentId, showNotification])
 
   useEffect(() => {
-    void loadTournament()
-  }, [loadTournament])
+    void loadTournament({
+      retries: location.state?.justCreatedTournament ? 4 : 1,
+    })
+  }, [loadTournament, location.state?.justCreatedTournament])
 
   useEffect(() => {
     setParticipantsPage(1)
@@ -419,7 +483,19 @@ export default function TournamentDetailPage() {
     setPendingAction('start-tournament')
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
-      await gameService.startTournament(tournamentId)
+      const response = await gameService.startTournament(tournamentId)
+      const payload = response?.data ?? response
+      setTournament((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: payload?.status || 'ongoing',
+              currentRound: payload?.currentRound || prev.currentRound || 1,
+              rounds: Array.isArray(payload?.rounds) ? payload.rounds : prev.rounds,
+              standings: Array.isArray(payload?.standings) ? payload.standings : prev.standings,
+            }
+          : prev
+      )
       await loadTournament({ background: true })
       showNotification({
         type: 'success',
@@ -430,7 +506,10 @@ export default function TournamentDetailPage() {
       showNotification({
         type: 'error',
         title: 'Lỗi bắt đầu giải',
-        message: 'Không thể bắt đầu giải đấu. Vui lòng kiểm tra số người chơi.',
+        message: getApiErrorMessage(
+          _error,
+          'Không thể bắt đầu giải đấu. Vui lòng kiểm tra số người chơi.'
+        ),
       })
     } finally {
       setPendingAction(null)
@@ -490,10 +569,21 @@ export default function TournamentDetailPage() {
     setPendingAction('open-current-round')
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
-      await gameService.openTournamentRound(tournamentId, {
+      const response = await gameService.openTournamentRound(tournamentId, {
         roundIndex: Number(tournament?.currentRound || 1),
         checkInMinutes: Number(checkInMinutes || 3),
       })
+      const payload = response?.data ?? response
+      setTournament((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: payload?.status || prev.status,
+              currentRound: payload?.roundIndex || prev.currentRound,
+              rounds: Array.isArray(payload?.rounds) ? payload.rounds : prev.rounds,
+            }
+          : prev
+      )
       showNotification({
         type: 'success',
         title: 'Mở bàn đấu',
@@ -516,7 +606,14 @@ export default function TournamentDetailPage() {
     setPendingAction(`check-in:${matchId}`)
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
-      await gameService.checkInTournamentMatch(tournamentId, matchId)
+      const response = await gameService.checkInTournamentMatch(tournamentId, matchId)
+      const payload = response?.data ?? response
+      patchTournamentMatch(matchId, (match) => ({
+        ...match,
+        gameId: payload?.gameId || match.gameId,
+        status: payload?.bothReady ? 'ready' : match.status,
+        checkIn: payload?.checkIn && typeof payload.checkIn === 'object' ? payload.checkIn : match.checkIn,
+      }))
       showNotification({
         type: 'success',
         title: 'Check-in thành công',
@@ -527,7 +624,7 @@ export default function TournamentDetailPage() {
       showNotification({
         type: 'error',
         title: 'Lỗi check-in',
-        message: 'Không thể check-in cho trận này.',
+        message: getApiErrorMessage(_error, 'Không thể check-in cho trận này.'),
       })
     } finally {
       setPendingAction(null)
@@ -583,7 +680,13 @@ export default function TournamentDetailPage() {
     setPendingAction(`start-match:${matchId}`)
     try {
       skipSocketRefreshUntilRef.current = Date.now() + 1500
-      await gameService.startTournamentMatch(tournamentId, matchId)
+      const response = await gameService.startTournamentMatch(tournamentId, matchId)
+      const payload = response?.data ?? response
+      patchTournamentMatch(matchId, (match) => ({
+        ...match,
+        status: payload?.status || 'ongoing',
+        startedAt: new Date().toISOString(),
+      }))
       showNotification({
         type: 'success',
         title: 'Đã bắt đầu trận',
@@ -1136,6 +1239,11 @@ export default function TournamentDetailPage() {
                           : null
                         const bothPlayersReady =
                           Boolean(checkIn?.player1Ready) && Boolean(checkIn?.player2Ready)
+                        const matchStatus = String(match?.status || '').toLowerCase()
+                        const matchReadyForOrganizerStart =
+                          Boolean(match.gameId) &&
+                          (bothPlayersReady || matchStatus === 'ready') &&
+                          matchStatus !== 'ongoing'
                         const currentUserIsP1 =
                           String(match?.player1?.userId || '') === String(currentUserId || '')
                         const currentUserIsP2 =
@@ -1156,9 +1264,9 @@ export default function TournamentDetailPage() {
                               : match.result === 'double_forfeit'
                                 ? 'Cả hai xử thua (walkover)'
                                 : match.result || 'Kết thúc'
-                          : String(match?.status || '').toLowerCase() === 'ready'
+                          : matchStatus === 'ready'
                             ? 'Đủ người, chờ BTC bắt đầu'
-                            : String(match?.status || '').toLowerCase() === 'ongoing'
+                            : matchStatus === 'ongoing'
                               ? 'Đang thi đấu'
                               : match.gameId
                                 ? 'Phòng đã mở'
@@ -1208,9 +1316,7 @@ export default function TournamentDetailPage() {
                                 )}
                                 {canManageTournament && match.status !== 'completed' && (
                                   <>
-                                    {match.gameId &&
-                                      bothPlayersReady &&
-                                      String(match?.status || '').toLowerCase() !== 'ongoing' && (
+                                    {matchReadyForOrganizerStart && (
                                         <Button
                                           variant="primary"
                                           size="sm"

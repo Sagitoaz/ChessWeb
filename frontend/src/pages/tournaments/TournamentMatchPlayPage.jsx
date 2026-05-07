@@ -54,6 +54,12 @@ const normalizeId = (value) => {
   return String(value)
 }
 
+const getApiErrorMessage = (error, fallback) =>
+  error?.response?.data?.error?.message ||
+  error?.response?.data?.message ||
+  error?.message ||
+  fallback
+
 export default function TournamentMatchPlayPage() {
   const navigate = useNavigate()
   const { tournamentId, gameId } = useParams()
@@ -331,7 +337,14 @@ export default function TournamentMatchPlayPage() {
 
     setSubmittingReady(true)
     try {
-      await gameService.checkInTournamentMatch(tournamentId, matchIdInBracket)
+      const response = await gameService.checkInTournamentMatch(tournamentId, matchIdInBracket)
+      const payload = response?.data ?? response
+      if (payload?.checkIn && typeof payload.checkIn === 'object') {
+        setMatchCheckIn(payload.checkIn)
+      }
+      if (payload?.bothReady) {
+        setMatchStatus('ready')
+      }
       showNotification({
         type: 'success',
         title: 'Đã vào phòng',
@@ -341,9 +354,7 @@ export default function TournamentMatchPlayPage() {
       await loadGame()
     } catch (submitError) {
       const message =
-        submitError?.response?.data?.message ||
-        submitError?.message ||
-        'Không thể xác nhận có mặt trong phòng đấu.'
+        getApiErrorMessage(submitError, 'Không thể xác nhận có mặt trong phòng đấu.')
       showNotification({
         type: 'error',
         title: 'Không thể vào phòng',
@@ -393,9 +404,10 @@ export default function TournamentMatchPlayPage() {
       }
     } catch (submitError) {
       const message =
-        submitError?.response?.data?.message ||
-        submitError?.message ||
-        'Không thể cập nhật kết quả đầu hàng trước khi rời trận.'
+        getApiErrorMessage(
+          submitError,
+          'Không thể cập nhật kết quả đầu hàng trước khi rời trận.'
+        )
       showNotification({
         type: 'error',
         title: 'Rời trận thất bại',
@@ -494,9 +506,10 @@ export default function TournamentMatchPlayPage() {
       void loadGame()
     } catch (submitError) {
       const message =
-        submitError?.response?.data?.message ||
-        submitError?.message ||
-        'Không thể cập nhật kết quả đầu hàng. Vui lòng thử lại.'
+        getApiErrorMessage(
+          submitError,
+          'Không thể cập nhật kết quả đầu hàng. Vui lòng thử lại.'
+        )
       showNotification({
         type: 'error',
         title: 'Lỗi đầu hàng',

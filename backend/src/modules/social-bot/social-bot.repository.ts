@@ -514,9 +514,8 @@ export class SocialBotRepository {
     const collection = this.db.collection<Record<string, unknown>>(
       "tournament_matches",
     );
-    await collection.deleteMany({ tournamentId });
-
     if (!Array.isArray(rounds) || rounds.length === 0) {
+      await collection.deleteMany({ tournamentId });
       return { insertedCount: 0 };
     }
 
@@ -590,11 +589,46 @@ export class SocialBotRepository {
     });
 
     if (documents.length === 0) {
+      await collection.deleteMany({ tournamentId });
       return { insertedCount: 0 };
     }
 
-    const result = await collection.insertMany(documents, { ordered: true });
-    return { insertedCount: Number(result.insertedCount || 0) };
+    const matchKeys = documents
+      .map((document) => String(document.matchKey || ""))
+      .filter((value) => value.length > 0);
+
+    const operations = documents.map((document) => {
+      const { _id, createdAt, ...setDocument } = document;
+      return {
+        updateOne: {
+          filter: {
+            $or: [
+              { matchKey: document.matchKey },
+              { tournamentId, matchId: document.matchId },
+            ],
+          },
+          update: {
+            $set: setDocument,
+            $setOnInsert: {
+              _id,
+              createdAt,
+            },
+          },
+          upsert: true,
+        },
+      };
+    });
+
+    const result = await collection.bulkWrite(operations, { ordered: false });
+    await collection.deleteMany({
+      tournamentId,
+      matchKey: { $nin: matchKeys },
+    });
+
+    return {
+      insertedCount: Number(result.upsertedCount || 0),
+      modifiedCount: Number(result.modifiedCount || 0),
+    };
   }
 
   async updateUserStatsByOutcome(
