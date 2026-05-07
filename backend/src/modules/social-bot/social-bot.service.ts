@@ -2237,11 +2237,13 @@ export class SocialBotService {
       this.rankedGateway.emitTournamentStarted({
         tournamentId,
         status: String(updated.status || "ongoing"),
+        currentRound: 1,
         rounds,
       });
       this.rankedGateway.emitTournamentRoundUpdate({
         tournamentId,
         roundIndex: 0,
+        currentRound: 1,
         status: String(updated.status || "ongoing"),
         rounds,
       });
@@ -2251,6 +2253,7 @@ export class SocialBotService {
       started: true,
       tournamentId,
       status: "ongoing",
+      currentRound: 1,
       rounds: Array.isArray(updated?.rounds) ? updated.rounds : rounds,
       standings,
     };
@@ -2420,6 +2423,7 @@ export class SocialBotService {
     this.rankedGateway.emitTournamentRoundUpdate({
       tournamentId,
       roundIndex: found.roundIndex,
+      currentRound: found.roundIndex + 1,
       status: "ongoing",
       rounds,
     });
@@ -2532,6 +2536,7 @@ export class SocialBotService {
     this.rankedGateway.emitTournamentRoundUpdate({
       tournamentId,
       roundIndex: targetRoundIndex,
+      currentRound: targetRoundIndex + 1,
       status: "ongoing",
       rounds,
     });
@@ -2617,6 +2622,7 @@ export class SocialBotService {
     this.rankedGateway.emitTournamentRoundUpdate({
       tournamentId,
       roundIndex: found.roundIndex,
+      currentRound: found.roundIndex + 1,
       status: this.normalizeTournamentStatus(tournament.status),
       rounds,
     });

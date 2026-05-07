@@ -204,6 +204,7 @@ export class RankedGateway
   emitTournamentStarted(payload: {
     tournamentId: string;
     status?: string;
+    currentRound?: number;
     rounds?: unknown;
   }): void {
     this.emitTournamentEvent(payload.tournamentId, "tournament:started", payload);
@@ -212,6 +213,7 @@ export class RankedGateway
   emitTournamentRoundUpdate(payload: {
     tournamentId: string;
     roundIndex?: number;
+    currentRound?: number;
     status?: string;
     rounds?: unknown;
   }): void {

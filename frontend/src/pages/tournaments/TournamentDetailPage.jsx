@@ -360,6 +360,24 @@ export default function TournamentDetailPage() {
       ].join(':')
       if (eventKey && lastSocketEventKeyRef.current === eventKey) return
       lastSocketEventKeyRef.current = eventKey
+
+      if (Array.isArray(payload?.rounds)) {
+        setTournament((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: typeof payload?.status === 'string' ? payload.status : prev.status,
+                currentRound: Number.isFinite(Number(payload?.currentRound))
+                  ? Number(payload.currentRound)
+                  : Number.isFinite(Number(payload?.roundIndex))
+                    ? Number(payload.roundIndex) + 1
+                    : prev.currentRound || 1,
+                rounds: payload.rounds,
+              }
+            : prev
+        )
+      }
+
       if (Date.now() < skipSocketRefreshUntilRef.current) return
       if (!options.silent) {
         showNotification({

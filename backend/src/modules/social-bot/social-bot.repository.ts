@@ -1,10 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ObjectId } from "mongodb";
 import { COLLECTIONS } from "../../shared/db/collections";
 import { MongoService } from "../../shared/db/mongo.service";
 
 @Injectable()
 export class SocialBotRepository {
+  private readonly logger = new Logger(SocialBotRepository.name);
+
   constructor(private readonly mongo: MongoService) {}
 
   private get db() {
@@ -150,7 +152,15 @@ export class SocialBotRepository {
       return;
     }
 
-    await this.replaceTournamentMatches(tournamentId, rounds, now);
+    try {
+      await this.replaceTournamentMatches(tournamentId, rounds, now);
+    } catch (error) {
+      this.logger.warn(
+        `Cannot sync tournament_matches for tournament=${tournamentId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   async createRoom(doc: Record<string, unknown>) {
@@ -545,6 +555,7 @@ export class SocialBotRepository {
           matchId,
           roundIndex,
           roundNumber: roundIndex + 1,
+          matchNumber: matchIndex + 1,
           roundName:
             typeof round?.name === "string" && round.name.trim().length > 0
               ? round.name.trim()
