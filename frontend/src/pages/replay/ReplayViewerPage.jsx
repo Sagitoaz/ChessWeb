@@ -8,11 +8,18 @@ import { Loader } from '@components/common'
 import { THEME } from '@/styles/theme'
 import { getMoveLabel } from '@/utils/moveNotation'
 import { getUserDisplayName } from '@/utils/userDisplay'
+import {
+  getGameMoves,
+  getGamePlayerId,
+  getGamePlayerObject,
+  getInitialFen,
+  getViewerColor,
+} from '@/utils/gameShape'
 import { useAuthStore } from '@/store'
 
 const getReplayPlayer = (gameData, color) => {
-  const player = color === 'white' ? gameData?.whitePlayer : gameData?.blackPlayer
-  const playerId = color === 'white' ? gameData?.whitePlayerId : gameData?.blackPlayerId
+  const player = getGamePlayerObject(gameData, color)
+  const playerId = getGamePlayerId(gameData, color)
   const isBot = Boolean(player?.isBot) || playerId === 'bot'
   const fallbackName = isBot ? 'Bot' : color === 'white' ? 'Trắng' : 'Đen'
 
@@ -59,12 +66,12 @@ export default function ReplayViewerPage() {
           return
         }
         // S2: validate FEN
-        if (!data.initialFEN) {
+        if (!getInitialFen(data)) {
           setLoadError('Dữ liệu bị lỗi: FEN không hợp lệ')
           return
         }
         // S2: validate moves
-        if (!Array.isArray(data.moves) || data.moves.length === 0) {
+        if (getGameMoves(data).length === 0) {
           setLoadError('Không có nước đi để replay')
           return
         }
@@ -122,8 +129,8 @@ export default function ReplayViewerPage() {
     ).trim()
 
     if (authUserId) {
-      if (String(gameData?.whitePlayerId || '').trim() === authUserId) return 'white'
-      if (String(gameData?.blackPlayerId || '').trim() === authUserId) return 'black'
+      const color = getViewerColor(gameData, authUserId)
+      if (color) return color
     }
 
     if (whitePlayer.isBot && !blackPlayer.isBot) return 'black'
