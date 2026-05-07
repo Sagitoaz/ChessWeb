@@ -678,9 +678,15 @@ export default function TournamentDetailPage() {
   }
 
   const isRegistrationPhase = ['registration', 'full'].includes(String(tournament.status || ''))
+  const registrationDeadlineAt = tournament.registrationDeadline
+    ? new Date(tournament.registrationDeadline).getTime()
+    : NaN
+  const isRegistrationOpen =
+    Number.isFinite(registrationDeadlineAt) && registrationDeadlineAt > Date.now()
 
   const canRegister =
     isRegistrationPhase &&
+    isRegistrationOpen &&
     tournament.participants.length < tournament.maxParticipants &&
     !participantStatus &&
     !isOrganizer

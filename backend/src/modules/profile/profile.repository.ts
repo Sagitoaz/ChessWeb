@@ -25,6 +25,7 @@ interface GameDoc {
   players?: Array<{ userId?: string | null; color?: string | null }>;
   result?: string | null;
   rawResult?: string | null;
+  totalMoves?: number | null;
   moves?: unknown[] | null;
   metadata?: { totalMoves?: number | null } | null;
   createdAt?: Date | null;
@@ -64,9 +65,6 @@ export class ProfileRepository implements ProfileRepositoryPort {
       return "draw";
     }
 
-    if (result === "win") return "win";
-    if (["lose", "loss"].includes(result)) return "lose";
-
     const whiteWinValues = ["white_win", "whitewin", "1-0", "white"];
     const blackWinValues = ["black_win", "blackwin", "0-1", "black"];
 
@@ -78,6 +76,10 @@ export class ProfileRepository implements ProfileRepositoryPort {
       return isBlack ? "win" : isWhite ? "lose" : null;
     }
 
+    // Legacy bot games stored result from the requesting user's perspective.
+    if (!rawResult && result === "win") return "win";
+    if (!rawResult && ["lose", "loss"].includes(result)) return "lose";
+
     return null;
   }
 
@@ -85,8 +87,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
     game: Pick<GameDoc, "whitePlayerId" | "blackPlayerId" | "players">,
     color: "white" | "black",
   ): string | null {
-    const legacy =
-      color === "white" ? game.whitePlayerId : game.blackPlayerId;
+    const legacy = color === "white" ? game.whitePlayerId : game.blackPlayerId;
     if (typeof legacy === "string" && legacy.length > 0) {
       return legacy;
     }
@@ -452,7 +453,8 @@ export class ProfileRepository implements ProfileRepositoryPort {
         result: game.result ?? null,
         rawResult: game.rawResult ?? null,
         totalMoves: Number(
-          game.metadata?.totalMoves ??
+          game.totalMoves ??
+            game.metadata?.totalMoves ??
             (Array.isArray(game.moves) ? game.moves.length : 0),
         ),
         createdAt: game.createdAt ?? null,

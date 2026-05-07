@@ -59,6 +59,7 @@ type GameChatPayload = {
 
 type GameResignPayload = {
   matchId?: string;
+  moves?: Array<Record<string, unknown>>;
 };
 
 type GameDrawPayload = {
@@ -940,11 +941,13 @@ export class RankedGateway
 
     const result =
       user.userId === participants.whitePlayerId ? "BlackWin" : "WhiteWin";
+    const moves = Array.isArray(body?.moves) ? body.moves : [];
 
     const roomCompletion =
       await this.competitionService.completeRoomGameByResignation(
         matchId,
         user.userId,
+        moves,
       );
     if (roomCompletion) {
       this.stopGameClock(matchId);
@@ -962,6 +965,7 @@ export class RankedGateway
     try {
       const completionPayload: CompleteRankedMatchDto = {
         reason: "resignation",
+        moves,
         result:
           user.userId === participants.whitePlayerId
             ? RankedMatchCompletionResult.BLACK_WIN

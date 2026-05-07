@@ -3315,12 +3315,16 @@ export class SocialBotService {
     }
 
     let normalizedResult: "win" | "lose" | "draw" = "draw";
+    let persistedResult: "white_win" | "black_win" | "draw" = "draw";
     if (payload.result === "Draw") {
       normalizedResult = "draw";
+      persistedResult = "draw";
     } else if (payload.result === "WhiteWin") {
       normalizedResult = isWhite ? "win" : "lose";
+      persistedResult = "white_win";
     } else if (payload.result === "BlackWin") {
       normalizedResult = isBlack ? "win" : "lose";
+      persistedResult = "black_win";
     }
 
     const whiteOutcome: "win" | "lose" | "draw" =
@@ -3354,7 +3358,8 @@ export class SocialBotService {
         : [];
 
     const updatedGame = await this.repo.updateGameIfNotSaved(gameId, {
-      result: normalizedResult,
+      result: persistedResult,
+      playerResult: normalizedResult,
       rawResult: payload.result,
       state: "Saved",
       endReason:

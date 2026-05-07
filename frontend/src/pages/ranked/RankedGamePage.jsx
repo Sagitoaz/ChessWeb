@@ -1102,7 +1102,7 @@ const RankedGamePage = () => {
   const handleResign = useCallback(() => {
     if (showResignConfirm) {
       if (gameSocket?.isConnected && matchId) {
-        gameSocket.resign()
+        gameSocket.resign({ moves: gameRef.current.history({ verbose: true }) })
       } else {
         endGame('resignation', 'lose')
       }
@@ -1259,7 +1259,7 @@ const RankedGamePage = () => {
 
     if (gamePhase === GAME_PHASE.PLAYING && !endedRef.current) {
       if (gameSocket?.isConnected && matchId) {
-        gameSocket.resign()
+        gameSocket.resign({ moves: gameRef.current.history({ verbose: true }) })
       }
       await persistRankedResult('resignation', 'lose')
     }

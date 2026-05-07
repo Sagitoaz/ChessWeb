@@ -164,9 +164,12 @@ export function useGameSocket(matchId) {
   )
 
   // Resign game
-  const resign = useCallback(() => {
+  const resign = useCallback((payload = {}) => {
     if (!matchId) return
-    emit('game:resign', { matchId })
+    emit('game:resign', {
+      matchId,
+      moves: Array.isArray(payload?.moves) ? payload.moves : undefined,
+    })
   }, [matchId, emit])
 
   // Offer draw

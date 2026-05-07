@@ -1418,6 +1418,7 @@ export class CompetitionService {
   async completeRoomGameByResignation(
     matchId: string,
     resignedByUserId: string,
+    submittedMoves: Array<Record<string, unknown>> = [],
   ): Promise<{ result: string; finishedAt: string } | null> {
     const query = ObjectId.isValid(matchId)
       ? { $or: [{ _id: new ObjectId(matchId) }, { matchId }] }
@@ -1486,7 +1487,9 @@ export class CompetitionService {
     const persistedResult =
       resignedByUserId === whitePlayerId ? "black_win" : "white_win";
     const now = new Date();
-    const moves = Array.isArray(game.moves)
+    const moves = submittedMoves.length > 0
+      ? submittedMoves
+      : Array.isArray(game.moves)
       ? (game.moves as Array<Record<string, unknown>>)
       : [];
 
@@ -2624,6 +2627,16 @@ export class CompetitionService {
             ? snapshotOpponentRating
             : Number(ratingMap.get(opponentId) ?? 0);
 
+        // Prioritize totalMoves per v2 schema: games.totalMoves → metadata.totalMoves → moves.length
+        const computedTotalMoves =
+          typeof item?.totalMoves === "number" && Number.isFinite(item.totalMoves)
+            ? item.totalMoves
+            : typeof item?.metadata?.totalMoves === "number" && Number.isFinite(item.metadata.totalMoves)
+              ? item.metadata.totalMoves
+              : Array.isArray(item.moves)
+                ? item.moves.length
+                : 0;
+
         return {
           id: item._id?.toString?.() || item._id,
           gameId: item._id?.toString?.() || item._id,
@@ -2643,9 +2656,7 @@ export class CompetitionService {
           createdAt: item.createdAt,
           finishedAt: item.finishedAt || null,
           ratingChange,
-          totalMoves: Array.isArray(item.moves)
-            ? item.moves.length
-            : Number(item?.metadata?.totalMoves ?? 0),
+          totalMoves: computedTotalMoves,
           endReason: this.normalizeEndReason(
             typeof item?.endReason === "string"
               ? item.endReason
@@ -2748,6 +2759,7 @@ export class CompetitionService {
     let losses = 0;
     let draws = 0;
     const opponentIds = new Set<string>();
+    const outcomes: Array<"win" | "lose" | "draw"> = [];
 
     let currentStreak = 0;
     let currentStreakType: "win" | "lose" | null = null;
@@ -2760,31 +2772,21 @@ export class CompetitionService {
     for (const game of rankedGames) {
       const outcome = resolveOutcome(game);
       if (!outcome) continue;
+      outcomes.push(outcome);
 
+      const ids = this.resolveWhiteBlackIds(game);
       const opponentId =
-        this.resolveWhiteBlackIds(game).whitePlayerId === user.userId
-          ? this.resolveWhiteBlackIds(game).blackPlayerId
-          : this.resolveWhiteBlackIds(game).whitePlayerId;
+        ids.whitePlayerId === user.userId ? ids.blackPlayerId : ids.whitePlayerId;
       if (typeof opponentId === "string" && opponentId.length > 0) {
         opponentIds.add(opponentId);
       }
 
       if (outcome === "draw") {
         draws += 1;
-        if (!currentStreakActive) {
-          break;
-        }
         bestRunType = null;
         bestRunLength = 0;
       } else if (outcome === "win") {
         wins += 1;
-        if (!currentStreakActive) {
-          currentStreakActive = true;
-          currentStreakType = "win";
-          currentStreak = 1;
-        } else if (currentStreakType === "win") {
-          currentStreak += 1;
-        }
         if (bestRunType === "win") {
           bestRunLength += 1;
         } else {
@@ -2793,13 +2795,6 @@ export class CompetitionService {
         }
       } else if (outcome === "lose") {
         losses += 1;
-        if (!currentStreakActive) {
-          currentStreakActive = true;
-          currentStreakType = "lose";
-          currentStreak = 1;
-        } else if (currentStreakType === "lose") {
-          currentStreak += 1;
-        }
         if (bestRunType === "lose") {
           bestRunLength += 1;
         } else {
@@ -2812,17 +2807,23 @@ export class CompetitionService {
       if (bestStreak === bestRunLength) {
         bestStreakType = bestRunType;
       }
-
-      if (
-        currentStreak > 0 &&
-        currentStreakType &&
-        outcome !== currentStreakType
-      ) {
-        break;
-      }
     }
 
-    const totalGames = rankedGames.length;
+    for (const outcome of outcomes) {
+      if (outcome === "draw") break;
+      if (!currentStreakActive) {
+        currentStreakActive = true;
+        currentStreakType = outcome;
+        currentStreak = 1;
+        continue;
+      }
+      if (currentStreakType !== outcome) {
+        break;
+      }
+      currentStreak += 1;
+    }
+
+    const totalGames = outcomes.length;
     const winRate =
       totalGames === 0 ? 0 : Number(((wins / totalGames) * 100).toFixed(2));
     const currentRating = await this.getUserRating(user.userId);

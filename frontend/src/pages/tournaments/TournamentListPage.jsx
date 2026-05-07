@@ -49,6 +49,14 @@ const normalizeTournament = (tournament = {}) => ({
       : tournament.status || 'registration',
 })
 
+const isTournamentRegistrationOpen = (tournament) => {
+  if (tournament.status !== 'registration') return false
+  const deadline = tournament.registrationDeadline
+    ? new Date(tournament.registrationDeadline).getTime()
+    : NaN
+  return Number.isFinite(deadline) && deadline > Date.now()
+}
+
 export default function TournamentListPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('upcoming')
@@ -260,7 +268,7 @@ export default function TournamentListPage() {
 
         <div className="flex items-center justify-between pt-4 border-t border-gray-100">
           <div className="flex gap-2">
-            {tournament.status === 'registration' && (
+            {isTournamentRegistrationOpen(tournament) && (
               <Button
                 variant="primary"
                 size="sm"

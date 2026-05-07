@@ -594,7 +594,7 @@ export default function RoomPlayPage() {
     if (gamePhase !== 'playing') return
     setShowResignConfirm(false)
     if (activeGameId && isSocketConnected) {
-      resign()
+      resign({ moves: chessRef.current.history({ verbose: true }) })
       showNotification({
         type: 'info',
         title: 'Đang xử lý đầu hàng',
@@ -714,7 +714,7 @@ export default function RoomPlayPage() {
     if (gamePhase === 'playing' && !endedRef.current) {
       try {
         if (activeGameId && isSocketConnected) {
-          resign()
+          resign({ moves: chessRef.current.history({ verbose: true }) })
         }
         await persistLeaveForfeit()
         showNotification({
