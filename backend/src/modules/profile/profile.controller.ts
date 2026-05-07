@@ -217,7 +217,7 @@ export class ProfileController {
   ): Promise<
     ApiResponse<{
       userId: string;
-      totalGames: number;
+      gamesPlayed: number;
       wins: number;
       losses: number;
       draws: number;

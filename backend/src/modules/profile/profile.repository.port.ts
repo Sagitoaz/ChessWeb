@@ -21,7 +21,6 @@ export interface UserStatsDoc {
   userId: string;
   mode?: string | null;
   gamesPlayed?: number | null;
-  totalGames?: number | null;
   wins?: number | null;
   losses?: number | null;
   draws?: number | null;
@@ -106,7 +105,7 @@ export interface UserGamesQueryResult {
 }
 
 export interface UserModeStatsResult {
-  totalGames: number;
+  gamesPlayed: number;
   wins: number;
   losses: number;
   draws: number;

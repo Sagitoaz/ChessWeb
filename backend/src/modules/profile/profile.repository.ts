@@ -472,7 +472,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
     userId: string,
     mode?: "ranked" | "room" | "bot" | "tournament",
   ): Promise<{
-    totalGames: number;
+    gamesPlayed: number;
     wins: number;
     losses: number;
     draws: number;
@@ -504,7 +504,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
       })
       .toArray();
 
-    let totalGames = 0;
+    let gamesPlayed = 0;
     let wins = 0;
     let losses = 0;
     let draws = 0;
@@ -512,14 +512,14 @@ export class ProfileRepository implements ProfileRepositoryPort {
     for (const game of items) {
       const outcome = this.normalizeGameOutcomeForUser(game, userId);
       if (!outcome) continue;
-      totalGames += 1;
+      gamesPlayed += 1;
       if (outcome === "win") wins += 1;
       else if (outcome === "lose") losses += 1;
       else if (outcome === "draw") draws += 1;
     }
 
     return {
-      totalGames,
+      gamesPlayed,
       wins,
       losses,
       draws,

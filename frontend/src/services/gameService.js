@@ -174,7 +174,7 @@ const normalizeRankedHistory = (payload) => {
 
 const normalizeRankedStats = (payload) => {
   const data = unwrapApiEnvelope(payload)
-  const gamesPlayed = Number(data?.gamesPlayed ?? data?.totalGames ?? 0)
+  const gamesPlayed = Number(data?.gamesPlayed ?? 0)
   const wins = Number(data?.wins ?? 0)
   const losses = Number(data?.losses ?? 0)
   const draws = Number(data?.draws ?? 0)

@@ -293,11 +293,11 @@ export default function DashboardPage() {
   }, [currentUserId, currentUsername, hasAvatarUrl, hasHydrated, setAuthLogin, token])
 
   const analytics = useMemo(() => {
-    const totalGames = matches.length
+    const gameCount = matches.length
     const wins = matches.filter((m) => m.result === 'win').length
     const losses = matches.filter((m) => m.result === 'lose').length
     const draws = matches.filter((m) => m.result === 'draw').length
-    const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0
+    const winRate = gameCount > 0 ? Math.round((wins / gameCount) * 100) : 0
     const winStreak = calcWinStreak(matches)
     const byMode = matches.reduce(
       (acc, match) => {
@@ -309,7 +309,7 @@ export default function DashboardPage() {
     )
 
     return {
-      totalGames,
+      gameCount,
       wins,
       losses,
       draws,
@@ -392,7 +392,7 @@ export default function DashboardPage() {
           <StatCard
             icon={Swords}
             title="Tổng ván đấu"
-            value={analytics.totalGames}
+            value={analytics.gameCount}
             caption={`Đấu hạng ${analytics.byMode.ranked} · Bot ${analytics.byMode.bot} · Giải đấu ${analytics.byMode.tournament} · Giao hữu ${analytics.byMode.friendly}`}
           />
           <StatCard

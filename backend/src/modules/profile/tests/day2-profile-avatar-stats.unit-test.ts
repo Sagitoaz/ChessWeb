@@ -113,9 +113,9 @@ class InMemoryProfileRepository implements ProfileRepositoryPort {
     }
   }
 
-  async findUserModeStats(): Promise<{ totalGames: number; wins: number; losses: number; draws: number }> {
+  async findUserModeStats(): Promise<{ gamesPlayed: number; wins: number; losses: number; draws: number }> {
     return {
-      totalGames: 0,
+      gamesPlayed: 0,
       wins: 0,
       losses: 0,
       draws: 0,
@@ -191,14 +191,14 @@ async function run(): Promise<void> {
   const defaultStatsResult = await service.getStats({ sub: 'u-day2-001' })
   assert.equal(defaultStatsResult.ok, true)
   if (defaultStatsResult.ok) {
-    assert.equal(defaultStatsResult.data.totalGames, 0)
+    assert.equal(defaultStatsResult.data.gamesPlayed, 0)
     assert.equal(defaultStatsResult.data.winRate, 0)
     assert.equal(defaultStatsResult.data.rating, null)
   }
 
   repo.seedStats({
     userId: 'u-day2-001',
-    totalGames: 20,
+    gamesPlayed: 20,
     wins: 12,
     losses: 6,
     draws: 2,
@@ -214,7 +214,7 @@ async function run(): Promise<void> {
   const statsResult = await service.getStats({ sub: 'u-day2-001' })
   assert.equal(statsResult.ok, true)
   if (statsResult.ok) {
-    assert.equal(statsResult.data.totalGames, 20)
+    assert.equal(statsResult.data.gamesPlayed, 20)
     assert.equal(statsResult.data.wins, 12)
     assert.equal(statsResult.data.winRate, 60)
     assert.equal(statsResult.data.rating, 1450)

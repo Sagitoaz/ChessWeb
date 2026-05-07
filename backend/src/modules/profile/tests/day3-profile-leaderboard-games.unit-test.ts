@@ -137,7 +137,7 @@ class InMemoryProfileRepository implements ProfileRepositoryPort {
   async findUserModeStats(
     userId: string,
     mode?: 'ranked' | 'room' | 'bot' | 'tournament',
-  ): Promise<{ totalGames: number; wins: number; losses: number; draws: number }> {
+  ): Promise<{ gamesPlayed: number; wins: number; losses: number; draws: number }> {
     const filtered = this.games.filter((game) => {
       if (game.whitePlayerId !== userId && game.blackPlayerId !== userId) return false
       if (mode && game.mode !== mode) return false
@@ -145,7 +145,7 @@ class InMemoryProfileRepository implements ProfileRepositoryPort {
     })
 
     return {
-      totalGames: filtered.length,
+      gamesPlayed: filtered.length,
       wins: filtered.filter((g) => g.result === 'win').length,
       losses: filtered.filter((g) => g.result === 'lose').length,
       draws: filtered.filter((g) => g.result === 'draw').length,

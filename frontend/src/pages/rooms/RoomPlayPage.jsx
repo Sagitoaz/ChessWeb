@@ -698,6 +698,26 @@ export default function RoomPlayPage() {
     user,
   ])
 
+  const isRoomResultAlreadyStored = useCallback(async () => {
+    if (!activeGameId) return false
+
+    try {
+      const game = await gameService.getGameById(activeGameId)
+      const state = String(game?.state || '').toLowerCase()
+      const status = String(game?.status || '').toLowerCase()
+      return Boolean(
+        game?.result ||
+          game?.rawResult ||
+          game?.finishedAt ||
+          state === 'saved' ||
+          state === 'finished' ||
+          status === 'completed'
+      )
+    } catch {
+      return false
+    }
+  }, [activeGameId])
+
   const leaveRoomViaApi = useCallback(async () => {
     if (!room.code) return
     try {
@@ -728,20 +748,35 @@ export default function RoomPlayPage() {
     if (gamePhase === 'playing' && !endedRef.current) {
       try {
         if (activeGameId && isSocketConnected) {
+          // Socket is the authoritative path for human games: it saves the
+          // result and notifies the opponent. Do not call /games/:id/save again,
+          // otherwise the user can see a false duplicate-save error.
           resign({ moves: chessRef.current.history({ verbose: true }) })
+        } else {
+          await persistLeaveForfeit()
         }
-        await persistLeaveForfeit()
         showNotification({
           type: 'info',
           title: 'Rời phòng',
           message: 'Bạn rời trận giữa chừng và bị tính thua.',
         })
-      } catch {
-        showNotification({
-          type: 'error',
-          title: 'Lỗi lưu kết quả',
-          message: 'Không thể lưu kết quả thua khi rời phòng.',
-        })
+      } catch (error) {
+        const alreadyStored = await isRoomResultAlreadyStored()
+        if (alreadyStored) {
+          showNotification({
+            type: 'info',
+            title: 'Rời phòng',
+            message: 'Kết quả ván đấu đã được lưu. Bạn rời trận giữa chừng và bị tính thua.',
+          })
+        } else {
+          showNotification({
+            type: 'error',
+            title: 'Lỗi lưu kết quả',
+            message:
+              error?.message ||
+              'Không thể lưu kết quả thua khi rời phòng. Vui lòng thử lại sau.',
+          })
+        }
       }
     }
 
@@ -750,6 +785,7 @@ export default function RoomPlayPage() {
   }, [
     activeGameId,
     gamePhase,
+    isRoomResultAlreadyStored,
     isSocketConnected,
     leaveRoomViaApi,
     navigate,

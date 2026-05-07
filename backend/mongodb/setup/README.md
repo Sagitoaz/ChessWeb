@@ -2,7 +2,7 @@
 
 Use only the scripts in `v2/`.
 
-Legacy MongoDB setup, audit, and backfill scripts were removed because they recreated old collections such as `user_profiles`, `user_ratings`, `ranked_queue`, and `ranked_matches`.
+Legacy MongoDB setup, audit, and backfill scripts were removed because they recreated the v1 database shape.
 
 Current source of truth:
 

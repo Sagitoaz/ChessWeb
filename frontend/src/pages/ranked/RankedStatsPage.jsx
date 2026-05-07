@@ -442,7 +442,7 @@ const RankedStatsPage = () => {
 
       setStats(data)
       setBotStats({
-        games: Number(botModeStats?.totalGames || 0),
+        games: Number(botModeStats?.gamesPlayed || 0),
         wins: Number(botModeStats?.wins || 0),
         losses: Number(botModeStats?.losses || 0),
         draws: Number(botModeStats?.draws || 0),

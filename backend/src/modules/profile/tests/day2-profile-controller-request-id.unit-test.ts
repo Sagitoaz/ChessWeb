@@ -70,12 +70,12 @@ class StubProfileService {
     }
   }
 
-  async getStats(): Promise<ServiceResult<{ userId: string; totalGames: number; wins: number; losses: number; draws: number; winRate: number; rating: number | null; peakRating: number | null; updatedAt: string | null }>> {
+  async getStats(): Promise<ServiceResult<{ userId: string; gamesPlayed: number; wins: number; losses: number; draws: number; winRate: number; rating: number | null; peakRating: number | null; updatedAt: string | null }>> {
     return {
       ok: true,
       data: {
         userId: 'u-request-id-001',
-        totalGames: 10,
+        gamesPlayed: 10,
         wins: 6,
         losses: 3,
         draws: 1,

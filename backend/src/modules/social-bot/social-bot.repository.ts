@@ -154,17 +154,17 @@ export class SocialBotRepository {
   }
 
   async createRoom(doc: Record<string, unknown>) {
-    const result = await this.db.collection("rooms").insertOne(doc);
+    const result = await this.db.collection(COLLECTIONS.ROOMS).insertOne(doc);
     return { ...doc, _id: result.insertedId };
   }
 
   async addRoomMember(doc: Record<string, unknown>) {
-    await this.db.collection("room_members").insertOne(doc);
+    await this.db.collection(COLLECTIONS.ROOM_MEMBERS).insertOne(doc);
     return doc;
   }
 
   async findRoomByCode(roomCode: string) {
-    return this.db.collection("rooms").findOne({
+    return this.db.collection(COLLECTIONS.ROOMS).findOne({
       $or: [{ roomCode }, { code: roomCode }],
     });
   }
@@ -186,7 +186,7 @@ export class SocialBotRepository {
     }
 
     return this.db
-      .collection("rooms")
+      .collection(COLLECTIONS.ROOMS)
       .find(query)
       .sort({ updatedAt: -1, createdAt: -1 })
       .limit(limit)
@@ -195,7 +195,7 @@ export class SocialBotRepository {
 
   async updateRoomByCode(roomCode: string, update: Record<string, unknown>) {
     return this.db
-      .collection("rooms")
+      .collection(COLLECTIONS.ROOMS)
       .findOneAndUpdate(
         { $or: [{ roomCode }, { code: roomCode }] },
         { $set: update },
@@ -204,7 +204,7 @@ export class SocialBotRepository {
   }
 
   async findRoomMembers(roomId: ObjectId | string) {
-    return this.db.collection("room_members").find({ roomId }).toArray();
+    return this.db.collection(COLLECTIONS.ROOM_MEMBERS).find({ roomId }).toArray();
   }
 
   async findRoomMembersByRoomIds(roomIds: Array<ObjectId | string>) {
@@ -212,21 +212,21 @@ export class SocialBotRepository {
       return [];
     }
     return this.db
-      .collection("room_members")
+      .collection(COLLECTIONS.ROOM_MEMBERS)
       .find({ roomId: { $in: roomIds } })
       .toArray();
   }
 
   async removeRoomMember(roomId: ObjectId | string, userId: string) {
-    return this.db.collection("room_members").deleteOne({ roomId, userId });
+    return this.db.collection(COLLECTIONS.ROOM_MEMBERS).deleteOne({ roomId, userId });
   }
 
   async removeRoomMembers(roomId: ObjectId | string) {
-    return this.db.collection("room_members").deleteMany({ roomId });
+    return this.db.collection(COLLECTIONS.ROOM_MEMBERS).deleteMany({ roomId });
   }
 
   async deleteRoomByCode(roomCode: string) {
-    return this.db.collection("rooms").deleteOne({
+    return this.db.collection(COLLECTIONS.ROOMS).deleteOne({
       $or: [{ roomCode }, { code: roomCode }],
     });
   }
@@ -236,7 +236,7 @@ export class SocialBotRepository {
       return null;
     }
     const objectId = new ObjectId(id);
-    return this.db.collection("tournaments").findOne({ _id: objectId });
+    return this.db.collection(COLLECTIONS.TOURNAMENTS).findOne({ _id: objectId });
   }
 
   async updateTournamentById(id: string, update: Record<string, unknown>) {
@@ -247,7 +247,7 @@ export class SocialBotRepository {
     const now =
       update.updatedAt instanceof Date ? update.updatedAt : new Date();
     const result = await this.db
-      .collection("tournaments")
+      .collection(COLLECTIONS.TOURNAMENTS)
       .findOneAndUpdate(
         { _id: objectId },
         { $set: update },
@@ -265,14 +265,14 @@ export class SocialBotRepository {
     }
 
     return this.db
-      .collection("tournaments")
+      .collection(COLLECTIONS.TOURNAMENTS)
       .find({ status: { $in: statuses } })
       .toArray();
   }
 
   async findTournamentParticipants(tournamentId: ObjectId | string) {
     return this.db
-      .collection("tournament_participants")
+      .collection(COLLECTIONS.TOURNAMENT_PARTICIPANTS)
       .find({ tournamentId })
       .sort({ joinedAt: 1 })
       .toArray();
@@ -283,13 +283,13 @@ export class SocialBotRepository {
     userId: string,
   ) {
     return this.db
-      .collection("tournament_participants")
+      .collection(COLLECTIONS.TOURNAMENT_PARTICIPANTS)
       .findOne({ tournamentId, userId });
   }
 
   async countTournamentParticipants(tournamentId: ObjectId | string) {
     return this.db
-      .collection("tournament_participants")
+      .collection(COLLECTIONS.TOURNAMENT_PARTICIPANTS)
       .countDocuments({ tournamentId, status: { $ne: "withdrawn" } });
   }
 
@@ -321,7 +321,7 @@ export class SocialBotRepository {
   }
 
   async addTournamentParticipant(doc: Record<string, unknown>) {
-    await this.db.collection("tournament_participants").insertOne(doc);
+    await this.db.collection(COLLECTIONS.TOURNAMENT_PARTICIPANTS).insertOne(doc);
     return doc;
   }
 
@@ -331,7 +331,7 @@ export class SocialBotRepository {
     status: string,
   ) {
     return this.db
-      .collection("tournament_participants")
+      .collection(COLLECTIONS.TOURNAMENT_PARTICIPANTS)
       .findOneAndUpdate(
         { tournamentId, userId },
         { $set: { status, updatedAt: new Date() } },
@@ -344,7 +344,7 @@ export class SocialBotRepository {
     userId: string,
   ) {
     return this.db
-      .collection("tournament_participants")
+      .collection(COLLECTIONS.TOURNAMENT_PARTICIPANTS)
       .deleteOne({ tournamentId, userId });
   }
 
@@ -604,7 +604,6 @@ export class SocialBotRepository {
   ) {
     const inc = {
       gamesPlayed: 1,
-      totalGames: 1,
       wins: outcome === "win" ? 1 : 0,
       losses: outcome === "lose" ? 1 : 0,
       draws: outcome === "draw" ? 1 : 0,

@@ -1046,7 +1046,6 @@ export class IdentityService {
             userId,
             mode: 'ranked',
             rating: 1200,
-            currentRating: 1200,
             peakRating: 1200,
             gamesPlayed: 0,
             createdAt: now,

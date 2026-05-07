@@ -67,7 +67,7 @@ export default function ReplayListPage() {
   const [resultFilter, setResultFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [totalGames, setTotalGames] = useState(0)
+  const [totalGameCount, setTotalGameCount] = useState(0)
 
   useEffect(() => {
     setCurrentPage(1)
@@ -187,7 +187,7 @@ export default function ReplayListPage() {
         setGames(Array.isArray(normalized?.items) ? normalized.items : [])
         const total = Number(normalized?.total || 0)
         const pageSize = Number(normalized?.pageSize || PAGE_SIZE)
-        setTotalGames(total)
+        setTotalGameCount(total)
         setTotalPages(Math.max(1, Math.ceil(total / pageSize)))
       })
       .catch(() => showError('Không thể tải lịch sử'))
@@ -210,7 +210,7 @@ export default function ReplayListPage() {
                 Xem lại ván đã chơi theo chế độ, kết quả và thời gian
               </p>
             </div>
-            <span className="ui-chip">{totalGames} ván</span>
+            <span className="ui-chip">{totalGameCount} ván</span>
           </div>
         </div>
 

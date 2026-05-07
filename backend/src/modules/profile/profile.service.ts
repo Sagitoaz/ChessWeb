@@ -101,7 +101,7 @@ export interface UserGamesResponse {
 export interface UserModeStatsResponse {
   userId: string;
   mode: "ranked" | "room" | "bot" | "tournament" | null;
-  totalGames: number;
+  gamesPlayed: number;
   wins: number;
   losses: number;
   draws: number;
@@ -205,10 +205,6 @@ export class ProfileService {
       this.repository.findUserRatingByUserId(userId),
     ]);
 
-    const statsWithLegacy = stats as
-      | ({ gamesPlayed?: number } & typeof stats)
-      | null;
-
     return {
       ok: true,
       data: {
@@ -225,9 +221,7 @@ export class ProfileService {
             : Boolean(profile.isActive),
         rating: rating?.rating ?? null,
         peakRating: rating?.peakRating ?? null,
-        gamesPlayed: Number(
-          statsWithLegacy?.gamesPlayed ?? stats?.totalGames ?? 0,
-        ),
+        gamesPlayed: Number(stats?.gamesPlayed ?? 0),
         wins: Number(stats?.wins || 0),
         losses: Number(stats?.losses || 0),
         draws: Number(stats?.draws || 0),
@@ -456,7 +450,7 @@ export class ProfileService {
   async getStats(authUser: unknown): Promise<
     ServiceResult<{
       userId: string;
-      totalGames: number;
+      gamesPlayed: number;
       wins: number;
       losses: number;
       draws: number;
@@ -494,18 +488,18 @@ export class ProfileService {
       this.repository.findUserRatingByUserId(userId),
     ]);
 
-    const totalGames = Number(stats?.gamesPlayed ?? stats?.totalGames ?? 0);
+    const gamesPlayed = Number(stats?.gamesPlayed ?? 0);
     const wins = Number(stats?.wins || 0);
     const losses = Number(stats?.losses || 0);
     const draws = Number(stats?.draws || 0);
     const winRate =
-      totalGames > 0 ? Number(((wins / totalGames) * 100).toFixed(2)) : 0;
+      gamesPlayed > 0 ? Number(((wins / gamesPlayed) * 100).toFixed(2)) : 0;
 
     return {
       ok: true,
       data: {
         userId,
-        totalGames,
+        gamesPlayed,
         wins,
         losses,
         draws,
@@ -745,8 +739,8 @@ export class ProfileService {
 
     const stats = await this.repository.findUserModeStats(userId, mode);
     const winRate =
-      stats.totalGames > 0
-        ? Number(((stats.wins / stats.totalGames) * 100).toFixed(2))
+      stats.gamesPlayed > 0
+        ? Number(((stats.wins / stats.gamesPlayed) * 100).toFixed(2))
         : 0;
 
     return {
@@ -754,7 +748,7 @@ export class ProfileService {
       data: {
         userId,
         mode: mode || null,
-        totalGames: Number(stats.totalGames || 0),
+        gamesPlayed: Number(stats.gamesPlayed || 0),
         wins: Number(stats.wins || 0),
         losses: Number(stats.losses || 0),
         draws: Number(stats.draws || 0),

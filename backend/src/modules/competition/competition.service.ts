@@ -92,8 +92,6 @@ export class CompetitionService {
       userId?: string;
       mode?: string;
       rating?: number;
-      currentRating?: number;
-      rankedElo?: number;
       peakRating?: number;
       gamesPlayed?: number;
       createdAt?: Date;
@@ -107,7 +105,6 @@ export class CompetitionService {
       userId: string;
       mode?: string;
       gamesPlayed?: number;
-      totalGames?: number;
       wins?: number;
       losses?: number;
       draws?: number;
@@ -469,8 +466,6 @@ export class CompetitionService {
       {
         $set: {
           rating: nextRating,
-          currentRating: nextRating,
-          rankedElo: nextRating,
           peakRating,
           updatedAt: now,
         },
@@ -502,7 +497,6 @@ export class CompetitionService {
   }> {
     const inc = {
       gamesPlayed: 1,
-      totalGames: 1,
       wins: outcome === "win" ? 1 : 0,
       losses: outcome === "lose" ? 1 : 0,
       draws: outcome === "draw" ? 1 : 0,
@@ -533,7 +527,6 @@ export class CompetitionService {
       {
         projection: {
           gamesPlayed: 1,
-          totalGames: 1,
           wins: 1,
           losses: 1,
           draws: 1,
@@ -1096,9 +1089,7 @@ export class CompetitionService {
           userId: user.userId,
           outcome: existingOutcome,
           ratingAfter: userRating,
-          gamesPlayed: Number(
-            userStats?.gamesPlayed ?? userStats?.totalGames ?? 0,
-          ),
+          gamesPlayed: Number(userStats?.gamesPlayed ?? 0),
           wins: Number(userStats?.wins ?? 0),
           losses: Number(userStats?.losses ?? 0),
           draws: Number(userStats?.draws ?? 0),
@@ -1375,7 +1366,7 @@ export class CompetitionService {
     if (roomQuery) {
       const room = await this.mongoService
         .getDb()
-        .collection("rooms")
+        .collection(COLLECTIONS.ROOMS)
         .findOne(roomQuery, {
           projection: { initialTimeSeconds: 1, timeControl: 1 },
         });
@@ -1515,7 +1506,7 @@ export class CompetitionService {
     if (roomCode) {
       await this.mongoService
         .getDb()
-        .collection("rooms")
+        .collection(COLLECTIONS.ROOMS)
         .updateOne(
           { $or: [{ roomCode }, { code: roomCode }] },
           {
@@ -1620,7 +1611,7 @@ export class CompetitionService {
     if (roomCode) {
       await this.mongoService
         .getDb()
-        .collection("rooms")
+        .collection(COLLECTIONS.ROOMS)
         .updateOne(
           { $or: [{ roomCode }, { code: roomCode }] },
           {
@@ -1700,7 +1691,7 @@ export class CompetitionService {
     if (roomCode) {
       await this.mongoService
         .getDb()
-        .collection("rooms")
+        .collection(COLLECTIONS.ROOMS)
         .updateOne(
           { $or: [{ roomCode }, { code: roomCode }] },
           {
@@ -1838,7 +1829,7 @@ export class CompetitionService {
     const tournament = await this
       .mongoService
       .getDb()
-      .collection("tournaments")
+      .collection(COLLECTIONS.TOURNAMENTS)
       .findOne(tournamentQuery, {
         projection: {
           createdBy: 1,
@@ -2679,7 +2670,7 @@ export class CompetitionService {
     user: AuthenticatedUser,
   ): Promise<Record<string, unknown>> {
     const db = this.mongoService.getDb();
-    const games = db.collection("games");
+    const games = db.collection(COLLECTIONS.GAMES);
 
     const trackedModes = [CompetitionGameMode.RANKED];
     const completedResults = [
@@ -2823,9 +2814,9 @@ export class CompetitionService {
       currentStreak += 1;
     }
 
-    const totalGames = outcomes.length;
+    const gamesPlayed = outcomes.length;
     const winRate =
-      totalGames === 0 ? 0 : Number(((wins / totalGames) * 100).toFixed(2));
+      gamesPlayed === 0 ? 0 : Number(((wins / gamesPlayed) * 100).toFixed(2));
     const currentRating = await this.getUserRating(user.userId);
     const opponentRatings =
       opponentIds.size > 0
@@ -2848,8 +2839,7 @@ export class CompetitionService {
     return {
       userId: user.userId,
       currentRating,
-      gamesPlayed: totalGames,
-      totalGames,
+      gamesPlayed,
       wins,
       losses,
       draws,
@@ -3079,7 +3069,7 @@ export class CompetitionService {
     }
 
     const db = this.mongoService.getDb();
-    const tournaments = db.collection("tournaments");
+    const tournaments = db.collection(COLLECTIONS.TOURNAMENTS);
     const organizerProfile = await this.profilesCollection().findOne(
       { _id: user.userId },
       { projection: { _id: 1, username: 1, displayName: 1 } },
@@ -3129,8 +3119,8 @@ export class CompetitionService {
     tournamentId: string,
   ): Promise<Record<string, unknown>> {
     const db = this.mongoService.getDb();
-    const tournaments = db.collection("tournaments");
-    const tournamentParticipants = db.collection("tournament_participants");
+    const tournaments = db.collection(COLLECTIONS.TOURNAMENTS);
+    const tournamentParticipants = db.collection(COLLECTIONS.TOURNAMENT_PARTICIPANTS);
     const userProfiles = db.collection<{
       _id: string;
       username?: string;
@@ -3361,7 +3351,7 @@ export class CompetitionService {
     }
 
     const db = this.mongoService.getDb();
-    const games = db.collection("games");
+    const games = db.collection(COLLECTIONS.GAMES);
 
     const now = new Date();
     const game = {
