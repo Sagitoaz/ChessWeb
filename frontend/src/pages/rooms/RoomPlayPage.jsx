@@ -10,8 +10,9 @@ import { useAuthStore } from '@store'
 import { ArrowLeft, Clock, Flag, Handshake, Play, Trophy, Users } from 'lucide-react'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 import { getUserDisplayName } from '@/utils/userDisplay'
+import { DEFAULT_INITIAL_FEN, getGameMoves, getGamePlayerId } from '@/utils/gameShape'
 
-const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const INITIAL_FEN = DEFAULT_INITIAL_FEN
 
 const formatTime = (seconds) => {
   const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0))
@@ -41,8 +42,8 @@ const normalizeRoom = (room, roomId) => {
     : []
   const ownerMember = members.find((member) => member?.role === 'owner') || null
   const ownerUserId = normalizeId(room?.ownerUserId || room?.host?.id || ownerMember?.userId)
-  const whitePlayerId = normalizeId(room?.whitePlayerId)
-  const blackPlayerId = normalizeId(room?.blackPlayerId)
+  const whitePlayerId = normalizeId(getGamePlayerId(room, 'white') || room?.whitePlayerId)
+  const blackPlayerId = normalizeId(getGamePlayerId(room, 'black') || room?.blackPlayerId)
 
   return {
     code: room?.code || roomId,
@@ -316,9 +317,10 @@ export default function RoomPlayPage() {
         const state = String(game?.state || '').toLowerCase()
         if (state !== 'saved' && state !== 'finished') return
 
-        if (Array.isArray(game?.moves) && game.moves.length > 0) {
-          setMoveHistory(game.moves)
-          const last = game.moves[game.moves.length - 1]
+        const syncedMoves = getGameMoves(game)
+        if (syncedMoves.length > 0) {
+          setMoveHistory(syncedMoves)
+          const last = syncedMoves[syncedMoves.length - 1]
           if (last?.from && last?.to) {
             // last move highlight is not used in this page yet
           }

@@ -80,7 +80,7 @@ export class SocialBotRepository {
   }
 
   private withV2GameUpdate(update: Record<string, unknown>) {
-    const next = this.withV2GameShape(update);
+    const next: Record<string, unknown> = this.withV2GameShape(update);
     if (!Object.prototype.hasOwnProperty.call(update, "players")) {
       delete next.players;
     }

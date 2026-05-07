@@ -13,6 +13,7 @@ import { THEME } from '@/styles/theme'
 import { Loader, Button, Pagination } from '@components/common'
 import { PlayCircle } from 'lucide-react'
 import { getUserDisplayName } from '@/utils/userDisplay'
+import { getGamePlayerId, getGameTotalMoves, getViewerColor } from '@/utils/gameShape'
 
 const PAGE_SIZE = 12
 
@@ -106,8 +107,7 @@ export default function ReplayListPage() {
           const authUserId =
             authUser?.id || authUser?.userId || authUser?._id || authUser?.sub || null
           if (!playerSide && authUserId) {
-            if (String(item?.whitePlayerId || '') === String(authUserId)) playerSide = 'white'
-            if (String(item?.blackPlayerId || '') === String(authUserId)) playerSide = 'black'
+            playerSide = getViewerColor(item, authUserId)
           }
           const authDisplayName = getUserDisplayName(authUser, '')
           if (!playerSide && authDisplayName) {
@@ -144,24 +144,32 @@ export default function ReplayListPage() {
       }
 
       if (Array.isArray(payload?.items)) {
-        const items = payload.items.map((item) => ({
-          id: item.gameId || item.id,
-          mode: item.mode || 'room',
-          result:
-            normalizePerspectiveResult(item.rawResult, item.playerSide) ||
-            normalizePerspectiveResult(item.result, item.playerSide) ||
-            null,
-          createdAt: item.createdAt,
-          opponent:
-            item.playerSide === 'white'
-              ? item.blackPlayerId || 'Đối thủ'
-              : item.playerSide === 'black'
-                ? item.whitePlayerId || 'Đối thủ'
-                : 'Đối thủ',
-          whitePlayer: { username: item.whitePlayerId || 'White' },
-          blackPlayer: { username: item.blackPlayerId || 'Black' },
-          metadata: { totalMoves: null },
-        }))
+        const items = payload.items.map((item) => {
+          const whitePlayerId = getGamePlayerId(item, 'white')
+          const blackPlayerId = getGamePlayerId(item, 'black')
+          const playerSide =
+            item.playerSide ||
+            getViewerColor(item, authUser?.id || authUser?.userId || authUser?._id || authUser?.sub)
+
+          return {
+            id: item.gameId || item.id,
+            mode: item.mode || 'room',
+            result:
+              normalizePerspectiveResult(item.rawResult, playerSide) ||
+              normalizePerspectiveResult(item.result, playerSide) ||
+              null,
+            createdAt: item.createdAt,
+            opponent:
+              playerSide === 'white'
+                ? item.blackUsername || blackPlayerId || 'Đối thủ'
+                : playerSide === 'black'
+                  ? item.whiteUsername || whitePlayerId || 'Đối thủ'
+                  : 'Đối thủ',
+            whitePlayer: { username: item.whiteUsername || whitePlayerId || 'White' },
+            blackPlayer: { username: item.blackUsername || blackPlayerId || 'Black' },
+            metadata: { totalMoves: getGameTotalMoves(item) },
+          }
+        })
         return {
           items,
           total: Number(payload?.total || payload?.pagination?.total || items.length || 0),

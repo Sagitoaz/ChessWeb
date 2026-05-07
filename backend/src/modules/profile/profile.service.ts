@@ -217,9 +217,10 @@ export class ProfileService {
         email: profile.email || null,
         displayName: profile.displayName || null,
         avatarUrl: profile.avatarUrl || null,
-        isVerified: Boolean(profile.isVerified),
-        isActive:
-          profile.isActive === null || profile.isActive === undefined
+        isVerified: Boolean(profile.emailVerifiedAt || profile.isVerified),
+        isActive: profile.status
+          ? profile.status === "active"
+          : profile.isActive === null || profile.isActive === undefined
             ? true
             : Boolean(profile.isActive),
         rating: rating?.rating ?? null,
@@ -493,7 +494,7 @@ export class ProfileService {
       this.repository.findUserRatingByUserId(userId),
     ]);
 
-    const totalGames = Number(stats?.totalGames || 0);
+    const totalGames = Number(stats?.gamesPlayed ?? stats?.totalGames ?? 0);
     const wins = Number(stats?.wins || 0);
     const losses = Number(stats?.losses || 0);
     const draws = Number(stats?.draws || 0);

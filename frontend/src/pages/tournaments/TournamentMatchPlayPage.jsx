@@ -10,8 +10,9 @@ import gameService from '@/services/gameService'
 import { useGameSocket } from '@/hooks/useWebSocket'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 import { getUserDisplayName } from '@/utils/userDisplay'
+import { DEFAULT_INITIAL_FEN, getGameMoves, getGamePlayerId, getInitialFen } from '@/utils/gameShape'
 
-const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const INITIAL_FEN = DEFAULT_INITIAL_FEN
 
 const normalizeTurnLabel = (turn) => (turn === 'w' ? 'Trắng' : 'Đen')
 
@@ -127,8 +128,8 @@ export default function TournamentMatchPlayPage() {
       const payload = await gameService.getGameById(gameId)
       const game = payload?.data ?? payload
 
-      const whitePlayerId = normalizeId(game?.whitePlayerId)
-      const blackPlayerId = normalizeId(game?.blackPlayerId)
+      const whitePlayerId = normalizeId(getGamePlayerId(game, 'white'))
+      const blackPlayerId = normalizeId(getGamePlayerId(game, 'black'))
       const userIsParticipant =
         Boolean(currentUserId) &&
         (whitePlayerId === currentUserId || blackPlayerId === currentUserId)
@@ -144,8 +145,8 @@ export default function TournamentMatchPlayPage() {
       setWhiteName(getUserDisplayName(game?.whitePlayer, game?.whiteUsername || 'Người chơi Trắng'))
       setBlackName(getUserDisplayName(game?.blackPlayer, game?.blackUsername || 'Người chơi Đen'))
 
-      chessRef.current = new Chess(String(game?.initialFEN || INITIAL_FEN))
-      const moves = Array.isArray(game?.moves) ? game.moves : []
+      chessRef.current = new Chess(String(getInitialFen(game) || INITIAL_FEN))
+      const moves = getGameMoves(game)
       for (const move of moves) {
         chessRef.current.move({
           from: move.from,

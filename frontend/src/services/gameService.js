@@ -1,4 +1,5 @@
 import api from './api'
+import { getGamePlayerId, getGameTotalMoves } from '@/utils/gameShape'
 
 /**
  * Game Service
@@ -126,6 +127,9 @@ const normalizeRankedHistory = (payload) => {
   const matches = items.map((item) => {
     const playerColor = item.playerColor || item.color || 'white'
     const result = normalizeRankedHistoryResult(item, playerColor)
+    const opponentId =
+      item.opponentId ||
+      (playerColor === 'white' ? getGamePlayerId(item, 'black') : getGamePlayerId(item, 'white'))
 
     return {
       id: item.id || item.gameId || item._id,
@@ -135,7 +139,7 @@ const normalizeRankedHistory = (payload) => {
           item.opponentUsername ||
           item.blackUsername ||
           item.whiteUsername ||
-          item.opponentId ||
+          opponentId ||
           'Unknown',
         rating: Number(item.opponent?.rating ?? item.opponentRating ?? item.rating ?? 1200),
         avatarUrl: item.opponent?.avatarUrl || item.opponentAvatarUrl || null,
@@ -144,7 +148,7 @@ const normalizeRankedHistory = (payload) => {
       ratingChange: Number(item.ratingChange || item.eloChange || 0),
       playerColor,
       endReason: normalizeEndReason(item.endReason || item.finishReason || '', result),
-      moves: Number(item.moves || item.totalMoves || 0),
+      moves: getGameTotalMoves(item),
       duration: Number(item.duration || item.durationSeconds || 0),
       playedAt: item.playedAt || item.finishedAt || item.createdAt || new Date().toISOString(),
     }

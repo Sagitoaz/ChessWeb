@@ -25,6 +25,7 @@ import { RANKS } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor } from '@utils/formatters'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 import { getUserDisplayName } from '@/utils/userDisplay'
+import { getGamePlayerId } from '@/utils/gameShape'
 import gameService from '@services/gameService'
 
 // ─────────────────────────────────────────────────────
@@ -704,8 +705,12 @@ const RankedGamePage = () => {
         if (!mounted) return
 
         const data = response?.data ?? response
-        const whiteId = normalizeId(data?.whitePlayerId || data?.white?.userId || data?.white?.id)
-        const blackId = normalizeId(data?.blackPlayerId || data?.black?.userId || data?.black?.id)
+        const whiteId = normalizeId(
+          getGamePlayerId(data, 'white') || data?.white?.userId || data?.white?.id
+        )
+        const blackId = normalizeId(
+          getGamePlayerId(data, 'black') || data?.black?.userId || data?.black?.id
+        )
 
         if (currentUserId === whiteId) {
           setPlayerColor('white')

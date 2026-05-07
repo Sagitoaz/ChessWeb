@@ -180,7 +180,11 @@ export class CompetitionService {
   ): Promise<ActiveRankedMatchInfo | null> {
     const match = await this.matchesCollection().findOne(
       {
-        $or: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
+        $or: [
+          { whitePlayerId: userId },
+          { blackPlayerId: userId },
+          { "players.userId": userId },
+        ],
         status: { $in: ["active", "in_progress", "playing", "matched"] },
       },
       {
@@ -192,14 +196,14 @@ export class CompetitionService {
           status: 1,
           whitePlayerId: 1,
           blackPlayerId: 1,
+          players: 1,
         },
       },
     );
 
     if (!match) return null;
 
-    const whitePlayerId = String(match.whitePlayerId || "");
-    const blackPlayerId = String(match.blackPlayerId || "");
+    const { whitePlayerId, blackPlayerId } = this.resolveWhiteBlackIds(match);
     if (!whitePlayerId || !blackPlayerId) return null;
 
     const gameRef = match.gameId ?? match.matchId ?? match._id;
@@ -360,6 +364,38 @@ export class CompetitionService {
     if (result === "draw") return "draw";
     if (result === "1-0") return userId === whitePlayerId ? "win" : "lose";
     return userId === blackPlayerId ? "win" : "lose";
+  }
+
+  private resolvePlayerIdFromPlayers(
+    source: Record<string, unknown> | null | undefined,
+    color: "white" | "black",
+  ): string | null {
+    const player = Array.isArray(source?.players)
+      ? source.players.find(
+          (entry) =>
+            String(entry?.color || "").toLowerCase() === color &&
+            typeof entry?.userId === "string",
+        )
+      : null;
+
+    return typeof player?.userId === "string" && player.userId.length > 0
+      ? player.userId
+      : null;
+  }
+
+  private resolveWhiteBlackIds(
+    source: Record<string, unknown>,
+  ): { whitePlayerId: string; blackPlayerId: string } {
+    return {
+      whitePlayerId:
+        typeof source.whitePlayerId === "string" && source.whitePlayerId.length > 0
+          ? source.whitePlayerId
+          : this.resolvePlayerIdFromPlayers(source, "white") || "",
+      blackPlayerId:
+        typeof source.blackPlayerId === "string" && source.blackPlayerId.length > 0
+          ? source.blackPlayerId
+          : this.resolvePlayerIdFromPlayers(source, "black") || "",
+    };
   }
 
   private normalizeEndReason(
@@ -1269,35 +1305,32 @@ export class CompetitionService {
       : { matchId };
 
     const rankedMatch = await this.matchesCollection().findOne(query, {
-      projection: { whitePlayerId: 1, blackPlayerId: 1 },
+      projection: { whitePlayerId: 1, blackPlayerId: 1, players: 1 },
     });
 
-    if (
-      rankedMatch &&
-      typeof rankedMatch.whitePlayerId === "string" &&
-      typeof rankedMatch.blackPlayerId === "string"
-    ) {
+    if (rankedMatch) {
+      const { whitePlayerId, blackPlayerId } =
+        this.resolveWhiteBlackIds(rankedMatch);
+      if (!whitePlayerId || !blackPlayerId) return null;
       return {
-        whitePlayerId: rankedMatch.whitePlayerId,
-        blackPlayerId: rankedMatch.blackPlayerId,
+        whitePlayerId,
+        blackPlayerId,
       };
     }
 
     const gameMatch = await this.gamesCollection().findOne(query, {
-      projection: { whitePlayerId: 1, blackPlayerId: 1 },
+      projection: { whitePlayerId: 1, blackPlayerId: 1, players: 1 },
     });
 
-    if (
-      !gameMatch ||
-      typeof gameMatch.whitePlayerId !== "string" ||
-      typeof gameMatch.blackPlayerId !== "string"
-    ) {
+    if (!gameMatch) {
       return null;
     }
+    const { whitePlayerId, blackPlayerId } = this.resolveWhiteBlackIds(gameMatch);
+    if (!whitePlayerId || !blackPlayerId) return null;
 
     return {
-      whitePlayerId: gameMatch.whitePlayerId,
-      blackPlayerId: gameMatch.blackPlayerId,
+      whitePlayerId,
+      blackPlayerId,
     };
   }
 
@@ -2527,6 +2560,8 @@ export class CompetitionService {
 
     return {
       items: items.map((item) => {
+        const { whitePlayerId, blackPlayerId } =
+          this.resolveWhiteBlackIds(item);
         const normalizedResult =
           typeof item.result === "string" ? item.result.toLowerCase() : "";
 
@@ -2542,20 +2577,20 @@ export class CompetitionService {
               : "draw";
 
         const playerColor =
-          item.whitePlayerId === user.userId
+          whitePlayerId === user.userId
             ? "white"
-            : item.blackPlayerId === user.userId
+            : blackPlayerId === user.userId
               ? "black"
               : "white";
 
         const opponentId =
-          playerColor === "white" ? item.blackPlayerId : item.whitePlayerId;
+          playerColor === "white" ? blackPlayerId : whitePlayerId;
 
         const outcome = this.resolveOutcomeForUser(
           persistedResult,
           user.userId,
-          item.whitePlayerId,
-          item.blackPlayerId,
+          whitePlayerId,
+          blackPlayerId,
         );
 
         const gameKey =
@@ -2597,10 +2632,10 @@ export class CompetitionService {
           absoluteResult: persistedResult,
           rawResult: item.rawResult || item.result || persistedResult,
           playerColor,
-          whitePlayerId: item.whitePlayerId,
-          blackPlayerId: item.blackPlayerId,
-          whiteUsername: usernameMap.get(item.whitePlayerId) || null,
-          blackUsername: usernameMap.get(item.blackPlayerId) || null,
+          whitePlayerId,
+          blackPlayerId,
+          whiteUsername: usernameMap.get(whitePlayerId) || null,
+          blackUsername: usernameMap.get(blackPlayerId) || null,
           opponentId,
           opponentUsername: usernameMap.get(opponentId) || "Unknown",
           opponentAvatarUrl: avatarMap.get(opponentId) || null,
@@ -2655,7 +2690,11 @@ export class CompetitionService {
     const rankedGames = await games
       .find({
         mode: { $in: trackedModes },
-        $or: [{ whitePlayerId: user.userId }, { blackPlayerId: user.userId }],
+        $or: [
+          { whitePlayerId: user.userId },
+          { blackPlayerId: user.userId },
+          { "players.userId": user.userId },
+        ],
         result: { $in: completedResults },
         finishedAt: { $exists: true, $ne: null },
         endReason: { $ne: "double_no_show" },
@@ -2664,6 +2703,7 @@ export class CompetitionService {
       .project({
         whitePlayerId: 1,
         blackPlayerId: 1,
+        players: 1,
         result: 1,
         finishedAt: 1,
       })
@@ -2687,6 +2727,7 @@ export class CompetitionService {
     const resolveOutcome = (game: {
       whitePlayerId?: string | null;
       blackPlayerId?: string | null;
+      players?: Array<Record<string, unknown>>;
       result?: unknown;
     }) => {
       const rawValue =
@@ -2695,8 +2736,9 @@ export class CompetitionService {
       if (rawValue === "lose" || rawValue === "loss") return "lose" as const;
       const persistedResult = normalizeResult(game.result);
       if (!persistedResult) return null;
-      const isWhite = game.whitePlayerId === user.userId;
-      const isBlack = game.blackPlayerId === user.userId;
+      const { whitePlayerId, blackPlayerId } = this.resolveWhiteBlackIds(game);
+      const isWhite = whitePlayerId === user.userId;
+      const isBlack = blackPlayerId === user.userId;
       if (persistedResult === "draw") return "draw" as const;
       if (persistedResult === "1-0") return isWhite ? "win" : "lose";
       return isBlack ? "win" : "lose";
@@ -2720,9 +2762,9 @@ export class CompetitionService {
       if (!outcome) continue;
 
       const opponentId =
-        game.whitePlayerId === user.userId
-          ? game.blackPlayerId
-          : game.whitePlayerId;
+        this.resolveWhiteBlackIds(game).whitePlayerId === user.userId
+          ? this.resolveWhiteBlackIds(game).blackPlayerId
+          : this.resolveWhiteBlackIds(game).whitePlayerId;
       if (typeof opponentId === "string" && opponentId.length > 0) {
         opponentIds.add(opponentId);
       }
