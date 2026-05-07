@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { env } from '../config/env'
+import { COLLECTIONS } from '../db/collections'
 import { MongoService } from '../db/mongo.service'
 
 interface AccessTokenPayload {
@@ -32,10 +33,10 @@ export class JwtAuthGuard implements CanActivate {
       }
 
       const db = await this.mongoService.connect()
-      const activeSession = await db.collection('refresh_tokens').findOne({
+      const activeSession = await db.collection(COLLECTIONS.AUTH_SESSIONS).findOne({
         userId,
         sessionId,
-        revokedAt: null,
+        status: 'active',
         expiresAt: { $gt: new Date() },
       })
 

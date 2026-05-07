@@ -7,6 +7,9 @@ export interface UserProfileDoc {
   avatarUrl?: string | null;
   avatarPublicId?: string | null;
   avatarUpdatedAt?: Date | null;
+  status?: "active" | "disabled" | "pending_verification" | null;
+  emailVerifiedAt?: Date | null;
+  settings?: Record<string, unknown> | null;
   isActive?: boolean | null;
   isVerified?: boolean | null;
   createdAt: Date;
@@ -14,7 +17,10 @@ export interface UserProfileDoc {
 }
 
 export interface UserStatsDoc {
+  _id?: string;
   userId: string;
+  mode?: string | null;
+  gamesPlayed?: number | null;
   totalGames?: number | null;
   wins?: number | null;
   losses?: number | null;
@@ -25,6 +31,7 @@ export interface UserStatsDoc {
 
 export interface UserRatingDoc {
   _id: string;
+  userId?: string | null;
   mode?: string | null;
   rating?: number | null;
   peakRating?: number | null;
@@ -108,9 +115,11 @@ export interface UserModeStatsResult {
 export interface EmailVerificationTokenDoc {
   userId: string;
   purpose: "verify_email";
+  status?: "active" | "consumed" | "revoked";
   tokenHash: string;
   expiresAt: Date;
   createdAt: Date;
+  updatedAt?: Date;
   consumedAt?: Date;
 }
 

@@ -9,7 +9,7 @@ class FakeUserProfilesCollection {
 
   async updateOne(
     filter: { _id: string },
-    update: { $set: { isVerified: boolean; updatedAt: Date } }
+    update: { $set: { emailVerifiedAt: Date; updatedAt: Date } }
   ): Promise<UpdateResult> {
     const current = this.users.get(filter._id)
     if (!current) {
@@ -18,7 +18,7 @@ class FakeUserProfilesCollection {
 
     this.users.set(filter._id, {
       ...current,
-      isVerified: update.$set.isVerified,
+      emailVerifiedAt: update.$set.emailVerifiedAt,
       updatedAt: update.$set.updatedAt,
     })
 
@@ -33,19 +33,20 @@ class FakeTokensCollection {
     filter: {
       tokenHash: string
       purpose: 'verify_email'
-      consumedAt: { $exists: false }
+      status: 'active'
       expiresAt: { $gt: Date }
     },
-    update: { $set: { consumedAt: Date } }
+    update: { $set: { status: 'consumed'; consumedAt: Date; updatedAt: Date } }
   ): Promise<EmailVerificationTokenDoc | null> {
     const token = this.tokens.get(filter.tokenHash)
     if (!token) return null
     if (token.purpose !== filter.purpose) return null
-    if (token.consumedAt) return null
+    if (token.status !== 'active') return null
     if (!(token.expiresAt > filter.expiresAt.$gt)) return null
 
     this.tokens.set(filter.tokenHash, {
       ...token,
+      status: update.$set.status,
       consumedAt: update.$set.consumedAt,
     })
 
@@ -55,12 +56,12 @@ class FakeTokensCollection {
   async findOne(filter: {
     tokenHash: string
     purpose: 'verify_email'
-    consumedAt: { $exists: false }
+    status: 'active'
   }): Promise<EmailVerificationTokenDoc | null> {
     const token = this.tokens.get(filter.tokenHash)
     if (!token) return null
     if (token.purpose !== filter.purpose) return null
-    if (token.consumedAt) return null
+    if (token.status !== 'active') return null
     return token
   }
 }
@@ -73,8 +74,8 @@ class FakeDb {
   private readonly tokensCollection = new FakeTokensCollection(this.tokens)
 
   collection(name: string): unknown {
-    if (name === 'user_profiles') return this.usersCollection
-    if (name === 'email_verification_tokens') return this.tokensCollection
+    if (name === 'users') return this.usersCollection
+    if (name === 'auth_tokens') return this.tokensCollection
     throw new Error(`Unsupported collection in unit test: ${name}`)
   }
 }
@@ -107,6 +108,7 @@ async function run(): Promise<void> {
   raceDb.tokens.set('hash-race-001', {
     userId: 'u-race-001',
     purpose: 'verify_email',
+    status: 'active',
     tokenHash: 'hash-race-001',
     createdAt: new Date('2026-03-29T09:00:00.000Z'),
     expiresAt: new Date('2026-03-29T10:15:00.000Z'),
@@ -120,7 +122,7 @@ async function run(): Promise<void> {
   const raceResults = [firstRaceResult, secondRaceResult]
   assert.equal(raceResults.filter((item) => item.ok).length, 1)
   assert.equal(raceResults.filter((item) => !item.ok && item.reason === 'TOKEN_NOT_FOUND').length, 1)
-  assert.equal(raceDb.users.get('u-race-001')?.isVerified, true)
+  assert.equal(Boolean(raceDb.users.get('u-race-001')?.emailVerifiedAt), true)
   assert.equal(Boolean(raceDb.tokens.get('hash-race-001')?.consumedAt), true)
 
   const expiredDb = new FakeDb()
@@ -135,6 +137,7 @@ async function run(): Promise<void> {
   expiredDb.tokens.set('hash-expired-001', {
     userId: 'u-expired-001',
     purpose: 'verify_email',
+    status: 'active',
     tokenHash: 'hash-expired-001',
     createdAt: new Date('2026-03-29T08:00:00.000Z'),
     expiresAt: new Date('2026-03-29T09:59:59.000Z'),
@@ -149,6 +152,7 @@ async function run(): Promise<void> {
   userMissingDb.tokens.set('hash-user-missing-001', {
     userId: 'u-user-missing-001',
     purpose: 'verify_email',
+    status: 'active',
     tokenHash: 'hash-user-missing-001',
     createdAt: new Date('2026-03-29T08:00:00.000Z'),
     expiresAt: new Date('2026-03-29T10:20:00.000Z'),

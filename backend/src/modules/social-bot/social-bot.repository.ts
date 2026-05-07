@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ObjectId } from "mongodb";
+import { COLLECTIONS } from "../../shared/db/collections";
 import { MongoService } from "../../shared/db/mongo.service";
 
 @Injectable()
@@ -8,6 +9,98 @@ export class SocialBotRepository {
 
   private get db() {
     return this.mongo.getDb();
+  }
+
+  private readonly initialFen =
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+  private resolveColorPlayerId(
+    doc: Record<string, unknown>,
+    color: "white" | "black",
+  ): string | null {
+    const legacyKey = color === "white" ? "whitePlayerId" : "blackPlayerId";
+    const legacy = doc[legacyKey];
+    if (typeof legacy === "string" && legacy.length > 0) {
+      return legacy;
+    }
+
+    const players = Array.isArray(doc.players)
+      ? (doc.players as Array<Record<string, unknown>>)
+      : [];
+    const player = players.find(
+      (entry) =>
+        String(entry?.color || "").toLowerCase() === color &&
+        typeof entry?.userId === "string" &&
+        String(entry.userId).length > 0,
+    );
+
+    return typeof player?.userId === "string" ? player.userId : null;
+  }
+
+  private buildPlayers(doc: Record<string, unknown>) {
+    if (Array.isArray(doc.players) && doc.players.length > 0) {
+      return doc.players;
+    }
+
+    const whitePlayerId = this.resolveColorPlayerId(doc, "white");
+    const blackPlayerId = this.resolveColorPlayerId(doc, "black");
+    return [
+      whitePlayerId ? { userId: whitePlayerId, color: "white" } : null,
+      blackPlayerId ? { userId: blackPlayerId, color: "black" } : null,
+    ].filter(Boolean);
+  }
+
+  private withV2GameShape(doc: Record<string, unknown>) {
+    const moves = Array.isArray(doc.moves)
+      ? (doc.moves as Array<Record<string, unknown>>)
+      : [];
+    const initialFen =
+      typeof doc.initialFen === "string" && doc.initialFen.length > 0
+        ? doc.initialFen
+        : typeof doc.initialFEN === "string" && doc.initialFEN.length > 0
+          ? doc.initialFEN
+          : this.initialFen;
+
+    return {
+      ...doc,
+      players: this.buildPlayers(doc),
+      initialFen,
+      currentFen:
+        typeof doc.currentFen === "string" && doc.currentFen.length > 0
+          ? doc.currentFen
+          : initialFen,
+      totalMoves:
+        typeof doc.totalMoves === "number" && Number.isFinite(doc.totalMoves)
+          ? doc.totalMoves
+          : Number(
+              (doc.metadata as { totalMoves?: unknown } | undefined)
+                ?.totalMoves ?? moves.length,
+            ),
+    };
+  }
+
+  private withV2GameUpdate(update: Record<string, unknown>) {
+    const next = this.withV2GameShape(update);
+    if (!Object.prototype.hasOwnProperty.call(update, "players")) {
+      delete next.players;
+    }
+    if (
+      !Object.prototype.hasOwnProperty.call(update, "initialFen") &&
+      !Object.prototype.hasOwnProperty.call(update, "initialFEN")
+    ) {
+      delete next.initialFen;
+    }
+    if (!Object.prototype.hasOwnProperty.call(update, "currentFen")) {
+      delete next.currentFen;
+    }
+    if (
+      !Object.prototype.hasOwnProperty.call(update, "totalMoves") &&
+      !Object.prototype.hasOwnProperty.call(update, "metadata") &&
+      !Object.prototype.hasOwnProperty.call(update, "moves")
+    ) {
+      delete next.totalMoves;
+    }
+    return next;
   }
 
   private normalizeMovesFromUpdate(
@@ -210,7 +303,7 @@ export class SocialBotRepository {
         rating?: number;
         avatarUrl?: string;
       }>(
-        "user_profiles",
+        COLLECTIONS.USERS,
       )
       .find(
         { _id: { $in: userIds } },
@@ -256,7 +349,7 @@ export class SocialBotRepository {
   }
 
   async createBotSession(doc: Record<string, unknown>) {
-    const result = await this.db.collection("bot_sessions").insertOne(doc);
+    const result = await this.db.collection(COLLECTIONS.BOT_SESSIONS).insertOne(doc);
     return { ...doc, _id: result.insertedId };
   }
 
@@ -270,11 +363,11 @@ export class SocialBotRepository {
     } else {
       sessionId = id;
     }
-    return this.db.collection("bot_sessions").findOne({ _id: sessionId });
+    return this.db.collection(COLLECTIONS.BOT_SESSIONS).findOne({ _id: sessionId });
   }
 
   async createBotMoveRequest(doc: Record<string, unknown>) {
-    const result = await this.db.collection("bot_move_requests").insertOne(doc);
+    const result = await this.db.collection(COLLECTIONS.BOT_MOVE_REQUESTS).insertOne(doc);
     return { ...doc, _id: result.insertedId };
   }
 
@@ -284,7 +377,7 @@ export class SocialBotRepository {
     status: string,
   ) {
     await this.db
-      .collection("bot_move_requests")
+      .collection(COLLECTIONS.BOT_MOVE_REQUESTS)
       .updateOne(
         { _id: id },
         { $set: { responsePayload, status, updatedAt: new Date() } },
@@ -292,8 +385,9 @@ export class SocialBotRepository {
   }
 
   async createGame(doc: Record<string, unknown>) {
-    const result = await this.db.collection("games").insertOne(doc);
-    return { ...doc, _id: result.insertedId };
+    const normalizedDoc = this.withV2GameShape(doc);
+    const result = await this.db.collection(COLLECTIONS.GAMES).insertOne(normalizedDoc);
+    return { ...normalizedDoc, _id: result.insertedId };
   }
 
   async findGameById(id: string) {
@@ -301,7 +395,7 @@ export class SocialBotRepository {
       return null;
     }
     const objectId = new ObjectId(id);
-    return this.db.collection("games").findOne({ _id: objectId });
+    return this.db.collection(COLLECTIONS.GAMES).findOne({ _id: objectId });
   }
 
   async updateGameById(id: string, update: Record<string, unknown>) {
@@ -313,10 +407,10 @@ export class SocialBotRepository {
     const now =
       update.updatedAt instanceof Date ? update.updatedAt : new Date();
     const result = await this.db
-      .collection("games")
+      .collection(COLLECTIONS.GAMES)
       .findOneAndUpdate(
         { _id: objectId },
-        { $set: update },
+        { $set: this.withV2GameUpdate(update) },
         { returnDocument: "after" },
       );
 
@@ -334,10 +428,10 @@ export class SocialBotRepository {
     const now =
       update.updatedAt instanceof Date ? update.updatedAt : new Date();
     const result = await this.db
-      .collection("games")
+      .collection(COLLECTIONS.GAMES)
       .findOneAndUpdate(
         { _id: objectId, state: { $ne: "Saved" } },
-        { $set: update },
+        { $set: this.withV2GameUpdate(update) },
         { returnDocument: "after" },
       );
 
@@ -353,7 +447,7 @@ export class SocialBotRepository {
     moves: Array<Record<string, unknown>>,
     now: Date,
   ) {
-    const collection = this.db.collection("game_moves");
+    const collection = this.db.collection(COLLECTIONS.GAME_MOVES);
     await collection.deleteMany({ gameId });
 
     if (!Array.isArray(moves) || moves.length === 0) {
@@ -516,14 +610,26 @@ export class SocialBotRepository {
       draws: outcome === "draw" ? 1 : 0,
     };
 
-    await this.db.collection("user_stats").updateOne(
-      { userId },
-      {
-        $inc: inc,
-        $set: { updatedAt: now },
-        $setOnInsert: { userId, createdAt: now },
-      },
-      { upsert: true },
-    );
+    await this.db
+      .collection<{ _id: string }>(COLLECTIONS.PLAYER_MODE_STATS)
+      .updateOne(
+        { _id: `${userId}:bot` },
+        {
+          $inc: {
+            gamesPlayed: inc.gamesPlayed,
+            wins: inc.wins,
+            losses: inc.losses,
+            draws: inc.draws,
+          },
+          $set: { updatedAt: now },
+          $setOnInsert: {
+            _id: `${userId}:bot`,
+            userId,
+            mode: "bot",
+            createdAt: now,
+          },
+        },
+        { upsert: true },
+      );
   }
 }

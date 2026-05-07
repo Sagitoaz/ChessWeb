@@ -10,7 +10,7 @@ type VerifyResult = {
 type IntegrationUserProfileDoc = {
   _id: string
   username: string
-  isVerified: boolean
+  emailVerifiedAt?: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -18,8 +18,10 @@ type IntegrationUserProfileDoc = {
 type IntegrationEmailTokenDoc = {
   userId: string
   purpose: 'verify_email'
+  status: 'active' | 'consumed' | 'revoked'
   tokenHash: string
   createdAt: Date
+  updatedAt?: Date
   expiresAt: Date
   consumedAt?: Date
 }
@@ -48,8 +50,8 @@ async function run(): Promise<void> {
 
   const repository = new ProfileRepository(mongoService)
   const db = mongoService.getDb()
-  const userProfiles = db.collection<IntegrationUserProfileDoc>('user_profiles')
-  const emailVerificationTokens = db.collection<IntegrationEmailTokenDoc>('email_verification_tokens')
+  const userProfiles = db.collection<IntegrationUserProfileDoc>('users')
+  const emailVerificationTokens = db.collection<IntegrationEmailTokenDoc>('auth_tokens')
 
   const suffix = randomUUID().replace(/-/g, '')
   const userId = `u-it-verify-${suffix}`
@@ -61,7 +63,7 @@ async function run(): Promise<void> {
     await userProfiles.insertOne({
       _id: userId,
       username: `integration-${suffix}`,
-      isVerified: false,
+      emailVerifiedAt: null,
       createdAt: now,
       updatedAt: now,
     })
@@ -69,8 +71,10 @@ async function run(): Promise<void> {
     await emailVerificationTokens.insertOne({
       userId,
       purpose: 'verify_email',
+      status: 'active',
       tokenHash,
       createdAt: now,
+      updatedAt: now,
       expiresAt: new Date(now.getTime() + 15 * 60 * 1000),
     })
 
@@ -86,7 +90,7 @@ async function run(): Promise<void> {
     const storedUser = await userProfiles.findOne({ _id: userId })
     const storedToken = await emailVerificationTokens.findOne({ tokenHash })
 
-    assert.equal(storedUser?.isVerified, true)
+    assert.equal(Boolean(storedUser?.emailVerifiedAt), true)
     assert.equal(Boolean(storedToken?.consumedAt), true)
 
     console.log('[integration-test] Day 2 repository verify-email real Mongo concurrency test passed')

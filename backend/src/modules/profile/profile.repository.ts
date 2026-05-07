@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Collection } from "mongodb";
+import { COLLECTIONS } from "../../shared/db/collections";
 import { MongoService } from "../../shared/db/mongo.service";
 import {
   EmailVerificationTokenDoc,
@@ -21,6 +22,7 @@ interface GameDoc {
   mode?: string | null;
   whitePlayerId?: string | null;
   blackPlayerId?: string | null;
+  players?: Array<{ userId?: string | null; color?: string | null }>;
   result?: string | null;
   rawResult?: string | null;
   moves?: unknown[] | null;
@@ -42,7 +44,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
   private normalizeGameOutcomeForUser(
     game: Pick<
       GameDoc,
-      "whitePlayerId" | "blackPlayerId" | "result" | "rawResult"
+      "whitePlayerId" | "blackPlayerId" | "players" | "result" | "rawResult"
     >,
     userId: string,
   ): "win" | "lose" | "draw" | null {
@@ -50,8 +52,10 @@ export class ProfileRepository implements ProfileRepositoryPort {
       typeof game.rawResult === "string" ? game.rawResult.toLowerCase() : "";
     const result =
       typeof game.result === "string" ? game.result.toLowerCase() : "";
-    const isWhite = game.whitePlayerId === userId;
-    const isBlack = game.blackPlayerId === userId;
+    const whitePlayerId = this.resolveGamePlayerId(game, "white");
+    const blackPlayerId = this.resolveGamePlayerId(game, "black");
+    const isWhite = whitePlayerId === userId;
+    const isBlack = blackPlayerId === userId;
 
     if (
       ["draw", "1/2-1/2"].includes(rawResult) ||
@@ -77,28 +81,55 @@ export class ProfileRepository implements ProfileRepositoryPort {
     return null;
   }
 
+  private resolveGamePlayerId(
+    game: Pick<GameDoc, "whitePlayerId" | "blackPlayerId" | "players">,
+    color: "white" | "black",
+  ): string | null {
+    const legacy =
+      color === "white" ? game.whitePlayerId : game.blackPlayerId;
+    if (typeof legacy === "string" && legacy.length > 0) {
+      return legacy;
+    }
+
+    const player = Array.isArray(game.players)
+      ? game.players.find(
+          (entry) =>
+            typeof entry?.color === "string" &&
+            entry.color.toLowerCase() === color,
+        )
+      : null;
+
+    return typeof player?.userId === "string" && player.userId.length > 0
+      ? player.userId
+      : null;
+  }
+
   private userProfiles(): Collection<UserProfileDoc> {
     return this.mongoService
       .getDb()
-      .collection<UserProfileDoc>("user_profiles");
+      .collection<UserProfileDoc>(COLLECTIONS.USERS);
   }
 
   private emailVerificationTokens(): Collection<EmailVerificationTokenDoc> {
     return this.mongoService
       .getDb()
-      .collection<EmailVerificationTokenDoc>("email_verification_tokens");
+      .collection<EmailVerificationTokenDoc>(COLLECTIONS.AUTH_TOKENS);
   }
 
   private userStats(): Collection<UserStatsDoc> {
-    return this.mongoService.getDb().collection<UserStatsDoc>("user_stats");
+    return this.mongoService
+      .getDb()
+      .collection<UserStatsDoc>(COLLECTIONS.PLAYER_MODE_STATS);
   }
 
   private userRatings(): Collection<UserRatingDoc> {
-    return this.mongoService.getDb().collection<UserRatingDoc>("user_ratings");
+    return this.mongoService
+      .getDb()
+      .collection<UserRatingDoc>(COLLECTIONS.PLAYER_RATINGS);
   }
 
   private games(): Collection<GameDoc> {
-    return this.mongoService.getDb().collection<GameDoc>("games");
+    return this.mongoService.getDb().collection<GameDoc>(COLLECTIONS.GAMES);
   }
 
   async findUserProfileById(userId: string): Promise<UserProfileDoc | null> {
@@ -159,15 +190,15 @@ export class ProfileRepository implements ProfileRepositoryPort {
       { returnDocument: "after" },
     );
 
-    return result?.value ?? null;
+    return result ?? null;
   }
 
   async findUserStatsByUserId(userId: string): Promise<UserStatsDoc | null> {
-    return this.userStats().findOne({ userId });
+    return this.userStats().findOne({ userId, mode: "ranked" });
   }
 
   async findUserRatingByUserId(userId: string): Promise<UserRatingDoc | null> {
-    return this.userRatings().findOne({ _id: userId });
+    return this.userRatings().findOne({ userId, mode: "ranked" });
   }
 
   async updateUserProfileDisplayName(
@@ -186,7 +217,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
       { returnDocument: "after" },
     );
 
-    return result?.value ?? null;
+    return result ?? null;
   }
 
   async findLeaderboard(
@@ -196,19 +227,13 @@ export class ProfileRepository implements ProfileRepositoryPort {
     const skip = (page - 1) * pageSize;
     const search = query.search?.trim();
 
-    const modeFieldExists = mode
-      ? (await this.userRatings().countDocuments(
-          { mode: { $exists: true } },
-          { limit: 1 },
-        )) > 0
-      : false;
-    const canApplyMode = Boolean(mode && modeFieldExists);
+    const canApplyMode = Boolean(mode);
 
     const modeMatchStage = canApplyMode ? [{ $match: { mode } }] : [];
     const profileLookupStage = {
       $lookup: {
-        from: "user_profiles",
-        localField: "_id",
+        from: COLLECTIONS.USERS,
+        localField: "userId",
         foreignField: "_id",
         as: "profile",
       },
@@ -240,6 +265,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
       {
         $project: {
           _id: 1,
+          userId: { $ifNull: ["$userId", "$_id"] },
           rating: { $ifNull: ["$rating", 0] },
           peakRating: { $ifNull: ["$peakRating", 0] },
           updatedAt: 1,
@@ -255,7 +281,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
             { $limit: pageSize },
             {
               $project: {
-                userId: { $toString: "$_id" },
+                userId: { $toString: "$userId" },
                 rating: 1,
                 peakRating: 1,
                 updatedAt: 1,
@@ -301,7 +327,11 @@ export class ProfileRepository implements ProfileRepositoryPort {
     const skip = (page - 1) * pageSize;
 
     const match: Record<string, unknown> = {
-      $or: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
+      $or: [
+        { whitePlayerId: userId },
+        { blackPlayerId: userId },
+        { "players.userId": userId },
+      ],
       finishedAt: { $exists: true, $ne: null },
       endReason: { $ne: "double_no_show" },
       status: { $nin: ["cancelled", "canceled"] },
@@ -325,6 +355,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
           mode: 1,
           whitePlayerId: 1,
           blackPlayerId: 1,
+          players: 1,
           result: 1,
           rawResult: 1,
           moves: 1,
@@ -350,6 +381,13 @@ export class ProfileRepository implements ProfileRepositoryPort {
       new Set(
         items
           .flatMap((g) => [g.whitePlayerId, g.blackPlayerId])
+          .concat(
+            items.flatMap((g) =>
+              Array.isArray(g.players)
+                ? g.players.map((player) => player.userId)
+                : [],
+            ),
+          )
           .filter(
             (id): id is string => typeof id === "string" && id.length > 0,
           ),
@@ -397,16 +435,19 @@ export class ProfileRepository implements ProfileRepositoryPort {
         gameId = String(rawId);
       }
 
+      const whitePlayerId = this.resolveGamePlayerId(game, "white");
+      const blackPlayerId = this.resolveGamePlayerId(game, "black");
+
       return {
         gameId,
         mode: game.mode ?? null,
-        whitePlayerId: game.whitePlayerId ?? null,
-        blackPlayerId: game.blackPlayerId ?? null,
-        whiteUsername: game.whitePlayerId
-          ? (usernameMap.get(game.whitePlayerId) ?? null)
+        whitePlayerId,
+        blackPlayerId,
+        whiteUsername: whitePlayerId
+          ? (usernameMap.get(whitePlayerId) ?? null)
           : null,
-        blackUsername: game.blackPlayerId
-          ? (usernameMap.get(game.blackPlayerId) ?? null)
+        blackUsername: blackPlayerId
+          ? (usernameMap.get(blackPlayerId) ?? null)
           : null,
         result: game.result ?? null,
         rawResult: game.rawResult ?? null,
@@ -435,7 +476,11 @@ export class ProfileRepository implements ProfileRepositoryPort {
     draws: number;
   }> {
     const match: Record<string, unknown> = {
-      $or: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
+      $or: [
+        { whitePlayerId: userId },
+        { blackPlayerId: userId },
+        { "players.userId": userId },
+      ],
       finishedAt: { $exists: true, $ne: null },
       endReason: { $ne: "double_no_show" },
       status: { $nin: ["cancelled", "canceled"] },
@@ -450,6 +495,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
         projection: {
           whitePlayerId: 1,
           blackPlayerId: 1,
+          players: 1,
           result: 1,
           rawResult: 1,
         },
@@ -481,7 +527,11 @@ export class ProfileRepository implements ProfileRepositoryPort {
   async createEmailVerificationToken(
     token: EmailVerificationTokenDoc,
   ): Promise<void> {
-    await this.emailVerificationTokens().insertOne(token);
+    await this.emailVerificationTokens().insertOne({
+      ...token,
+      status: token.status || "active",
+      updatedAt: token.updatedAt || token.createdAt,
+    });
   }
 
   async verifyEmailByTokenHash(
@@ -492,12 +542,14 @@ export class ProfileRepository implements ProfileRepositoryPort {
       {
         tokenHash,
         purpose: "verify_email",
-        consumedAt: { $exists: false },
+        status: "active",
         expiresAt: { $gt: now },
       },
       {
         $set: {
+          status: "consumed",
           consumedAt: now,
+          updatedAt: now,
         },
       },
       { returnDocument: "before" },
@@ -507,7 +559,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
       const pendingToken = await this.emailVerificationTokens().findOne({
         tokenHash,
         purpose: "verify_email",
-        consumedAt: { $exists: false },
+        status: "active",
       });
 
       if (pendingToken && pendingToken.expiresAt <= now) {
@@ -521,7 +573,7 @@ export class ProfileRepository implements ProfileRepositoryPort {
       { _id: consumedToken.userId },
       {
         $set: {
-          isVerified: true,
+          emailVerifiedAt: now,
           updatedAt: now,
         },
       },

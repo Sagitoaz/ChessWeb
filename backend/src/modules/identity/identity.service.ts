@@ -4,6 +4,7 @@ import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 import { Collection, Db } from 'mongodb'
 import { Role } from '../../shared/auth/roles.enum'
 import { env } from '../../shared/config/env'
+import { COLLECTIONS } from '../../shared/db/collections'
 import { MongoService } from '../../shared/db/mongo.service'
 import { ApiResponse, successResponse } from '../../shared/http/response.util'
 import {
@@ -25,6 +26,11 @@ interface UserProfileDocument {
   googleId?: string
   passwordHash?: string
   displayName?: string | null
+  avatarUrl?: string | null
+  avatarPublicId?: string | null
+  settings?: Record<string, unknown> | null
+  status?: 'active' | 'disabled' | 'pending_verification'
+  emailVerifiedAt?: Date | string | null
   isActive?: boolean | null
   isVerified?: boolean | null
   role?: string
@@ -37,10 +43,13 @@ interface RefreshTokenDocument {
   userId: string
   sessionId: string
   remember?: boolean
+  purpose?: 'refresh' | string
+  status?: 'active' | 'revoked' | 'consumed' | string
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
   revokedAt: Date | null
+  consumedAt?: Date | null
 }
 
 interface PasswordResetTokenDocument {
@@ -51,6 +60,8 @@ interface PasswordResetTokenDocument {
   createdAt: Date
   updatedAt: Date
   usedAt: Date | null
+  consumedAt?: Date | null
+  status?: 'active' | 'revoked' | 'consumed' | string
 }
 
 interface JwtRefreshPayload {
@@ -163,7 +174,7 @@ export class IdentityService {
         return this.errorResponse(requestId, 'AUTH_INVALID_CREDENTIALS', 'Sai tai khoan hoac mat khau')
       }
 
-      if (user.isActive === false) {
+      if (this.isUserDisabled(user)) {
         return this.errorResponse(requestId, 'AUTH_FORBIDDEN', 'Tai khoan da bi khoa')
       }
 
@@ -206,8 +217,9 @@ export class IdentityService {
         email,
         displayName,
         passwordHash: this.hashPassword(dto.password),
-        isActive: true,
-        isVerified: false,
+        status: 'active',
+        emailVerifiedAt: null,
+        settings: this.defaultUserSettings(),
         role: Role.USER,
         createdAt: now,
         updatedAt: now,
@@ -295,8 +307,9 @@ export class IdentityService {
           email,
           googleId: tokenInfo.sub,
           displayName: tokenInfo.name || username,
-          isActive: true,
-          isVerified: true,
+          status: 'active',
+          emailVerifiedAt: now,
+          settings: this.defaultUserSettings(),
           role: Role.USER,
           createdAt: now,
           updatedAt: now,
@@ -305,7 +318,7 @@ export class IdentityService {
         await users.insertOne(user)
         await this.seedUserDocuments(db, user._id, now)
       } else {
-        if (user.isActive === false) {
+        if (this.isUserDisabled(user)) {
           return this.errorResponse(requestId, 'AUTH_FORBIDDEN', 'Tai khoan da bi khoa')
         }
 
@@ -320,8 +333,14 @@ export class IdentityService {
         if (!user.displayName && tokenInfo.name) {
           patch.displayName = tokenInfo.name
         }
-        if (user.isVerified !== true) {
-          patch.isVerified = true
+        if (!user.emailVerifiedAt) {
+          patch.emailVerifiedAt = now
+        }
+        if (!user.status) {
+          patch.status = 'active'
+        }
+        if (!user.settings) {
+          patch.settings = this.defaultUserSettings()
         }
 
         if (Object.keys(patch).length > 1) {
@@ -379,18 +398,35 @@ export class IdentityService {
       if (refreshToken && refreshSession?.userId) {
         const tokenHash = this.hashToken(refreshToken)
         revokeResult = await refreshTokens.updateOne(
-          { userId: refreshSession.userId, tokenHash, revokedAt: null },
-          { $set: { revokedAt: now, updatedAt: now } }
+          {
+            userId: refreshSession.userId,
+            tokenHash,
+            purpose: 'refresh',
+            status: 'active',
+          },
+          { $set: { status: 'revoked', revokedAt: now, updatedAt: now } }
         )
       } else if (userId && sessionId) {
         revokeResult = await refreshTokens.updateOne(
-          { userId, sessionId, revokedAt: null },
-          { $set: { revokedAt: now, updatedAt: now } }
+          { userId, sessionId, purpose: 'refresh', status: 'active' },
+          { $set: { status: 'revoked', revokedAt: now, updatedAt: now } }
         )
       } else if (userId) {
         revokeResult = await refreshTokens.updateMany(
-          { userId, revokedAt: null },
-          { $set: { revokedAt: now, updatedAt: now } }
+          { userId, purpose: 'refresh', status: 'active' },
+          { $set: { status: 'revoked', revokedAt: now, updatedAt: now } }
+        )
+      }
+
+      if (userId && sessionId) {
+        await db.collection(COLLECTIONS.AUTH_SESSIONS).updateOne(
+          { userId, sessionId, status: 'active' },
+          { $set: { status: 'revoked', revokedAt: now, updatedAt: now } }
+        )
+      } else if (userId) {
+        await db.collection(COLLECTIONS.AUTH_SESSIONS).updateMany(
+          { userId, status: 'active' },
+          { $set: { status: 'revoked', revokedAt: now, updatedAt: now } }
         )
       }
 
@@ -438,10 +474,11 @@ export class IdentityService {
         tokenHash,
         userId: payload.sub,
         sessionId: payload.sid,
-        revokedAt: null,
+        purpose: 'refresh',
+        status: 'active',
         expiresAt: { $gt: now },
       }, {
-        $set: { revokedAt: now, updatedAt: now },
+        $set: { status: 'consumed', consumedAt: now, revokedAt: now, updatedAt: now },
       }, {
         returnDocument: 'before',
       })
@@ -451,9 +488,14 @@ export class IdentityService {
       }
 
       const user = await this.userProfiles(db).findOne({ _id: payload.sub })
-      if (!user || user.isActive === false) {
+      if (!user || this.isUserDisabled(user)) {
         return this.errorResponse(requestId, 'AUTH_FORBIDDEN', 'Khong co quyen truy cap')
       }
+
+      await db.collection(COLLECTIONS.AUTH_SESSIONS).updateOne(
+        { userId: payload.sub, sessionId: payload.sid, status: 'active' },
+        { $set: { status: 'revoked', revokedAt: now, updatedAt: now } }
+      )
 
       const remember = this.resolveRefreshCookieRemember(refreshTokenDoc, payload)
       const newTokens = await this.issueAuthTokens(db, user, { remember })
@@ -496,12 +538,14 @@ export class IdentityService {
         {
           userId: user._id,
           purpose: IdentityService.PASSWORD_RESET_PURPOSE,
-          usedAt: null,
+          status: 'active',
           expiresAt: { $gt: now },
         },
         {
           $set: {
+            status: 'consumed',
             usedAt: now,
+            consumedAt: now,
             updatedAt: now,
           },
         }
@@ -510,9 +554,11 @@ export class IdentityService {
       await resetTokens.insertOne({
         userId: user._id,
         purpose: IdentityService.PASSWORD_RESET_PURPOSE,
+        status: 'active',
         tokenHash,
         expiresAt,
         usedAt: null,
+        consumedAt: null,
         createdAt: now,
         updatedAt: now,
       })
@@ -541,10 +587,10 @@ export class IdentityService {
       const resetTokenDoc = await resetTokens.findOneAndUpdate({
         tokenHash,
         purpose: IdentityService.PASSWORD_RESET_PURPOSE,
-        usedAt: null,
+        status: 'active',
         expiresAt: { $gt: now },
       }, {
-        $set: { usedAt: now, updatedAt: now },
+        $set: { status: 'consumed', usedAt: now, consumedAt: now, updatedAt: now },
       }, {
         returnDocument: 'before',
       })
@@ -570,8 +616,13 @@ export class IdentityService {
       )
 
       await this.refreshTokens(db).updateMany(
-        { userId: user._id, revokedAt: null },
-        { $set: { revokedAt: now, updatedAt: now } }
+        { userId: user._id, purpose: 'refresh', status: 'active' },
+        { $set: { status: 'revoked', revokedAt: now, updatedAt: now } }
+      )
+
+      await db.collection(COLLECTIONS.AUTH_SESSIONS).updateMany(
+        { userId: user._id, status: 'active' },
+        { $set: { status: 'revoked', revokedAt: now, updatedAt: now } }
       )
 
       return successResponse({ message: 'Dat lai mat khau thanh cong' }, requestId)
@@ -629,15 +680,15 @@ export class IdentityService {
   }
 
   private userProfiles(db: Db): Collection<UserProfileDocument> {
-    return db.collection<UserProfileDocument>('user_profiles')
+    return db.collection<UserProfileDocument>(COLLECTIONS.USERS)
   }
 
   private refreshTokens(db: Db): Collection<RefreshTokenDocument> {
-    return db.collection<RefreshTokenDocument>('refresh_tokens')
+    return db.collection<RefreshTokenDocument>(COLLECTIONS.AUTH_TOKENS)
   }
 
   private passwordResetTokens(db: Db): Collection<PasswordResetTokenDocument> {
-    return db.collection<PasswordResetTokenDocument>('email_verification_tokens')
+    return db.collection<PasswordResetTokenDocument>(COLLECTIONS.AUTH_TOKENS)
   }
 
   private normalizeUsername(username: string): string {
@@ -861,8 +912,8 @@ export class IdentityService {
       username: user.username,
       email: user.email || null,
       displayName: user.displayName || null,
-      isActive: user.isActive !== false,
-      isVerified: user.isVerified === true,
+      isActive: !this.isUserDisabled(user),
+      isVerified: Boolean(user.emailVerifiedAt || user.isVerified === true),
       role: this.resolveRole(user.role),
       createdAt: this.toIsoString(user.createdAt),
       updatedAt: this.toIsoString(user.updatedAt),
@@ -941,16 +992,31 @@ export class IdentityService {
     const refreshTokenExpiresAt = this.extractTokenExpiry(refreshToken)
     const now = new Date()
 
-    await this.refreshTokens(db).insertOne({
-      tokenHash: this.hashToken(refreshToken),
-      userId: user._id,
-      sessionId,
-      remember: options.remember,
-      expiresAt: refreshTokenExpiresAt,
-      createdAt: now,
-      updatedAt: now,
-      revokedAt: null,
-    })
+    await Promise.all([
+      db.collection(COLLECTIONS.AUTH_SESSIONS).insertOne({
+        userId: user._id,
+        sessionId,
+        status: 'active',
+        remember: options.remember,
+        createdAt: now,
+        updatedAt: now,
+        expiresAt: refreshTokenExpiresAt,
+        revokedAt: null,
+      }),
+      this.refreshTokens(db).insertOne({
+        tokenHash: this.hashToken(refreshToken),
+        userId: user._id,
+        sessionId,
+        purpose: 'refresh',
+        status: 'active',
+        remember: options.remember,
+        expiresAt: refreshTokenExpiresAt,
+        createdAt: now,
+        updatedAt: now,
+        revokedAt: null,
+        consumedAt: null,
+      }),
+    ])
 
     return { token, refreshToken }
   }
@@ -970,54 +1036,62 @@ export class IdentityService {
   }
 
   private async seedUserDocuments(db: Db, userId: string, now: Date): Promise<void> {
+    const modes = ['ranked', 'room', 'bot', 'tournament']
     await Promise.all([
-      db.collection<{ _id: string }>('user_settings').updateOne(
-        { _id: userId },
+      db.collection<{ _id: string }>(COLLECTIONS.PLAYER_RATINGS).updateOne(
+        { _id: `${userId}:ranked` },
         {
           $setOnInsert: {
-            _id: userId,
-            theme: 'system',
-            soundEnabled: true,
-            boardTheme: 'classic',
-            createdAt: now,
-            updatedAt: now,
-          },
-        },
-        { upsert: true }
-      ),
-      db.collection<{ userId: string }>('user_stats').updateOne(
-        { userId },
-        {
-          $setOnInsert: {
+            _id: `${userId}:ranked`,
             userId,
-            gamesPlayed: 0,
-            totalGames: 0,
-            wins: 0,
-            losses: 0,
-            draws: 0,
-            totalPlayTimeSeconds: 0,
-            createdAt: now,
-            updatedAt: now,
-          },
-        },
-        { upsert: true }
-      ),
-      db.collection<{ _id: string }>('user_ratings').updateOne(
-        { _id: userId },
-        {
-          $setOnInsert: {
-            _id: userId,
+            mode: 'ranked',
             rating: 1200,
             currentRating: 1200,
             peakRating: 1200,
-            rankedElo: 1200,
+            gamesPlayed: 0,
             createdAt: now,
             updatedAt: now,
           },
         },
         { upsert: true }
       ),
+      ...modes.map((mode) =>
+        db.collection<{ _id: string }>(COLLECTIONS.PLAYER_MODE_STATS).updateOne(
+          { _id: `${userId}:${mode}` },
+          {
+            $setOnInsert: {
+              _id: `${userId}:${mode}`,
+              userId,
+              mode,
+              gamesPlayed: 0,
+              wins: 0,
+              losses: 0,
+              draws: 0,
+              totalPlayTimeSeconds: 0,
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+          { upsert: true }
+        )
+      ),
     ])
+  }
+
+  private defaultUserSettings(): Record<string, unknown> {
+    return {
+      theme: 'system',
+      soundEnabled: true,
+      boardTheme: 'classic',
+    }
+  }
+
+  private isUserDisabled(user: UserProfileDocument): boolean {
+    if (user.status) {
+      return user.status !== 'active'
+    }
+
+    return user.isActive === false
   }
 
   private generateUserId(): string {

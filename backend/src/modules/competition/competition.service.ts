@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ObjectId } from "mongodb";
+import { COLLECTIONS } from "../../shared/db/collections";
 import { MongoService } from "../../shared/db/mongo.service";
 import {
   CompleteRankedMatchDto,
@@ -74,31 +75,37 @@ export class CompetitionService {
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
   private queueCollection() {
-    return this.mongoService.getDb().collection("ranked_queue");
+    return this.mongoService.getDb().collection(COLLECTIONS.MATCHMAKING_QUEUE);
   }
 
   private gamesCollection() {
-    return this.mongoService.getDb().collection("games");
+    return this.mongoService.getDb().collection(COLLECTIONS.GAMES);
   }
 
   private matchesCollection() {
-    return this.mongoService.getDb().collection("ranked_matches");
+    return this.mongoService.getDb().collection(COLLECTIONS.MATCHES);
   }
 
   private ratingsCollection() {
     return this.mongoService.getDb().collection<{
       _id: string;
+      userId?: string;
+      mode?: string;
       rating?: number;
+      currentRating?: number;
       rankedElo?: number;
       peakRating?: number;
+      gamesPlayed?: number;
       createdAt?: Date;
       updatedAt?: Date;
-    }>("user_ratings");
+    }>(COLLECTIONS.PLAYER_RATINGS);
   }
 
   private statsCollection() {
     return this.mongoService.getDb().collection<{
+      _id?: string;
       userId: string;
+      mode?: string;
       gamesPlayed?: number;
       totalGames?: number;
       wins?: number;
@@ -106,7 +113,7 @@ export class CompetitionService {
       draws?: number;
       createdAt?: Date;
       updatedAt?: Date;
-    }>("user_stats");
+    }>(COLLECTIONS.PLAYER_MODE_STATS);
   }
 
   private profilesCollection() {
@@ -117,7 +124,7 @@ export class CompetitionService {
       avatarUrl?: string;
       rating?: number;
       updatedAt?: Date;
-    }>("user_profiles");
+    }>(COLLECTIONS.USERS);
   }
 
   private normalizeReferenceId(value: unknown): string | null {
@@ -267,13 +274,13 @@ export class CompetitionService {
 
     await Promise.all([
       queue.createIndex(
-        { status: 1, timeControl: 1, joinedAt: 1, _id: 1 },
-        { name: "ranked_queue_waiting_scan" },
+        { mode: 1, status: 1, timeControl: 1, joinedAt: 1, _id: 1 },
+        { name: "matchmaking_queue_waiting_scan" },
       ),
       queue.createIndex(
-        { userId: 1 },
+        { userId: 1, mode: 1, timeControl: 1 },
         {
-          name: "ranked_queue_unique_waiting_user",
+          name: "matchmaking_queue_unique_waiting_user",
           unique: true,
           partialFilterExpression: { status: "waiting" },
         },
@@ -413,7 +420,7 @@ export class CompetitionService {
     now: Date,
   ): Promise<number> {
     const current = await this.ratingsCollection().findOne(
-      { _id: userId },
+      { _id: `${userId}:ranked` },
       { projection: { peakRating: 1 } },
     );
     const peakRating = Math.max(
@@ -422,30 +429,26 @@ export class CompetitionService {
     );
 
     await this.ratingsCollection().updateOne(
-      { _id: userId },
+      { _id: `${userId}:ranked` },
       {
         $set: {
           rating: nextRating,
+          currentRating: nextRating,
           rankedElo: nextRating,
           peakRating,
           updatedAt: now,
         },
+        $inc: {
+          gamesPlayed: 1,
+        },
         $setOnInsert: {
-          _id: userId,
+          _id: `${userId}:ranked`,
+          userId,
+          mode: "ranked",
           createdAt: now,
         },
       },
       { upsert: true },
-    );
-
-    await this.profilesCollection().updateOne(
-      { _id: userId },
-      {
-        $set: {
-          rating: nextRating,
-          updatedAt: now,
-        },
-      },
     );
 
     return peakRating;
@@ -470,12 +473,19 @@ export class CompetitionService {
     };
 
     await this.statsCollection().updateOne(
-      { userId },
+      { _id: `${userId}:ranked` },
       {
-        $inc: inc,
+        $inc: {
+          gamesPlayed: inc.gamesPlayed,
+          wins: inc.wins,
+          losses: inc.losses,
+          draws: inc.draws,
+        },
         $set: { updatedAt: now },
         $setOnInsert: {
+          _id: `${userId}:ranked`,
           userId,
+          mode: "ranked",
           createdAt: now,
         },
       },
@@ -483,7 +493,7 @@ export class CompetitionService {
     );
 
     const stats = await this.statsCollection().findOne(
-      { userId },
+      { _id: `${userId}:ranked` },
       {
         projection: {
           gamesPlayed: 1,
@@ -496,7 +506,7 @@ export class CompetitionService {
     );
 
     return {
-      gamesPlayed: Number(stats?.gamesPlayed ?? stats?.totalGames ?? 0),
+      gamesPlayed: Number(stats?.gamesPlayed ?? 0),
       wins: Number(stats?.wins ?? 0),
       losses: Number(stats?.losses ?? 0),
       draws: Number(stats?.draws ?? 0),
@@ -506,23 +516,16 @@ export class CompetitionService {
   private async getUserRating(userId: string): Promise<number> {
     const db = this.mongoService.getDb();
     const ratingDoc = await db
-      .collection<{ _id: string; rating?: number }>("user_ratings")
-      .findOne({ _id: userId }, { projection: { rating: 1 } });
+      .collection<{ _id: string; rating?: number }>(COLLECTIONS.PLAYER_RATINGS)
+      .findOne(
+        { _id: `${userId}:ranked` },
+        { projection: { rating: 1 } },
+      );
     if (
       typeof ratingDoc?.rating === "number" &&
       Number.isFinite(ratingDoc.rating)
     ) {
       return Math.max(100, Math.round(ratingDoc.rating));
-    }
-
-    const profileDoc = await db
-      .collection<{ _id: string; rating?: number }>("user_profiles")
-      .findOne({ _id: userId }, { projection: { rating: 1 } });
-    if (
-      typeof profileDoc?.rating === "number" &&
-      Number.isFinite(profileDoc.rating)
-    ) {
-      return Math.max(100, Math.round(profileDoc.rating));
     }
 
     return 1200;
@@ -537,7 +540,7 @@ export class CompetitionService {
       username?: string;
       displayName?: string;
     }>(
-      "user_profiles",
+      COLLECTIONS.USERS,
     );
     const profileDoc = await userProfiles.findOne(
       { _id: userId },
@@ -561,7 +564,9 @@ export class CompetitionService {
     moves: Array<Record<string, unknown>>,
     now: Date,
   ): Promise<void> {
-    const collection = this.mongoService.getDb().collection("game_moves");
+    const collection = this.mongoService
+      .getDb()
+      .collection(COLLECTIONS.GAME_MOVES);
     await collection.deleteMany({ gameId });
 
     if (!Array.isArray(moves) || moves.length === 0) {
@@ -859,6 +864,7 @@ export class CompetitionService {
     try {
       insertResult = await rankedQueue.insertOne({
         userId: user.userId,
+        mode: CompetitionGameMode.RANKED,
         status: "waiting",
         joinedAt: now,
         updatedAt: now,
@@ -1038,7 +1044,7 @@ export class CompetitionService {
             : "draw";
       const userRating = await this.getUserRating(user.userId);
       const userStats = await this.statsCollection().findOne({
-        userId: user.userId,
+        _id: `${user.userId}:ranked`,
       });
       const existingOutcome = this.resolveOutcomeForUser(
         persistedExistingResult,
@@ -1101,6 +1107,11 @@ export class CompetitionService {
           moves: Array.isArray(payload.moves)
             ? payload.moves
             : game.moves || [],
+          totalMoves: Array.isArray(payload.moves)
+            ? payload.moves.length
+            : Array.isArray(game.moves)
+              ? game.moves.length
+              : 0,
           updatedAt: now,
           finishedAt: now,
         },
@@ -1129,6 +1140,34 @@ export class CompetitionService {
           blackRatingBefore,
           whiteRatingAfter,
           blackRatingAfter,
+          players: [
+            {
+              userId: whitePlayerId,
+              color: "white",
+              ratingBefore: whiteRatingBefore,
+              ratingAfter: whiteRatingAfter,
+              ratingDelta: whiteDelta,
+              result: this.resolveOutcomeForUser(
+                persistedResult,
+                whitePlayerId,
+                whitePlayerId,
+                blackPlayerId,
+              ),
+            },
+            {
+              userId: blackPlayerId,
+              color: "black",
+              ratingBefore: blackRatingBefore,
+              ratingAfter: blackRatingAfter,
+              ratingDelta: blackDelta,
+              result: this.resolveOutcomeForUser(
+                persistedResult,
+                blackPlayerId,
+                whitePlayerId,
+                blackPlayerId,
+              ),
+            },
+          ],
           updatedAt: now,
         },
       },
@@ -1137,6 +1176,31 @@ export class CompetitionService {
     await Promise.all([
       this.updateUserRatingAfterMatch(whitePlayerId, whiteRatingAfter, now),
       this.updateUserRatingAfterMatch(blackPlayerId, blackRatingAfter, now),
+    ]);
+
+    await this.mongoService.getDb().collection(COLLECTIONS.RATING_EVENTS).insertMany([
+      {
+        userId: whitePlayerId,
+        mode: "ranked",
+        matchId: String(match.matchId || matchId),
+        gameId: String(game._id),
+        ratingBefore: whiteRatingBefore,
+        ratingAfter: whiteRatingAfter,
+        ratingDelta: whiteDelta,
+        reason: normalizedEndReason,
+        createdAt: now,
+      },
+      {
+        userId: blackPlayerId,
+        mode: "ranked",
+        matchId: String(match.matchId || matchId),
+        gameId: String(game._id),
+        ratingBefore: blackRatingBefore,
+        ratingAfter: blackRatingAfter,
+        ratingDelta: blackDelta,
+        reason: normalizedEndReason,
+        createdAt: now,
+      },
     ]);
 
     const whiteOutcome = this.resolveOutcomeForUser(
@@ -1939,10 +2003,17 @@ export class CompetitionService {
       mode: CompetitionGameMode.RANKED,
       state: "InGame",
       status: "active",
+      players: [
+        { userId: colors.whitePlayerId, color: "white" },
+        { userId: colors.blackPlayerId, color: "black" },
+      ],
       whitePlayerId: colors.whitePlayerId,
       blackPlayerId: colors.blackPlayerId,
       result: null,
+      initialFen: this.initialFen,
       initialFEN: this.initialFen,
+      currentFen: this.initialFen,
+      totalMoves: 0,
       createdAt: now,
       updatedAt: now,
       finishedAt: null,
@@ -1953,7 +2024,22 @@ export class CompetitionService {
     await this.matchesCollection().insertOne({
       matchId,
       gameId: gameInsert.insertedId,
+      mode: CompetitionGameMode.RANKED,
       timeControl: self.timeControl,
+      players: [
+        {
+          userId: colors.whitePlayerId,
+          color: "white",
+          ratingBefore:
+            colors.whitePlayerId === self.userId ? selfRating : chosen.rating,
+        },
+        {
+          userId: colors.blackPlayerId,
+          color: "black",
+          ratingBefore:
+            colors.blackPlayerId === self.userId ? selfRating : chosen.rating,
+        },
+      ],
       whitePlayerId: colors.whitePlayerId,
       blackPlayerId: colors.blackPlayerId,
       whiteRating:
@@ -2181,10 +2267,17 @@ export class CompetitionService {
           mode: CompetitionGameMode.RANKED,
           state: "InGame",
           status: "active",
+          players: [
+            { userId: colors.whitePlayerId, color: "white" },
+            { userId: colors.blackPlayerId, color: "black" },
+          ],
           whitePlayerId: colors.whitePlayerId,
           blackPlayerId: colors.blackPlayerId,
           result: null,
+          initialFen: this.initialFen,
           initialFEN: this.initialFen,
+          currentFen: this.initialFen,
+          totalMoves: 0,
           createdAt: now,
           updatedAt: now,
           finishedAt: null,
@@ -2195,7 +2288,22 @@ export class CompetitionService {
         await this.matchesCollection().insertOne({
           matchId,
           gameId: gameInsert.insertedId,
+          mode: CompetitionGameMode.RANKED,
           timeControl: first.timeControl,
+          players: [
+            {
+              userId: colors.whitePlayerId,
+              color: "white",
+              ratingBefore:
+                colors.whitePlayerId === first.userId ? firstRating : secondRating,
+            },
+            {
+              userId: colors.blackPlayerId,
+              color: "black",
+              ratingBefore:
+                colors.blackPlayerId === first.userId ? firstRating : secondRating,
+            },
+          ],
           whitePlayerId: colors.whitePlayerId,
           blackPlayerId: colors.blackPlayerId,
           whiteRating:
@@ -2252,20 +2360,24 @@ export class CompetitionService {
     query: RankedPaginationQueryDto,
   ): Promise<Record<string, unknown>> {
     const db = this.mongoService.getDb();
-    const games = db.collection("games");
-    const rankedMatches = db.collection("ranked_matches");
+    const games = db.collection(COLLECTIONS.GAMES);
+    const rankedMatches = db.collection(COLLECTIONS.MATCHES);
     const profiles = db.collection<{
       _id: string;
       username?: string | null;
       displayName?: string | null;
       avatarUrl?: string | null;
-    }>("user_profiles");
+    }>(COLLECTIONS.USERS);
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 10;
     const filter = {
       mode: CompetitionGameMode.RANKED,
-      $or: [{ whitePlayerId: user.userId }, { blackPlayerId: user.userId }],
+      $or: [
+        { whitePlayerId: user.userId },
+        { blackPlayerId: user.userId },
+        { "players.userId": user.userId },
+      ],
     };
 
     const [items, total] = await Promise.all([
@@ -2282,6 +2394,15 @@ export class CompetitionService {
       new Set(
         items
           .flatMap((item) => [item.whitePlayerId, item.blackPlayerId])
+          .concat(
+            items.flatMap((item) =>
+              Array.isArray(item.players)
+                ? item.players.map(
+                    (player: { userId?: unknown }) => player.userId,
+                  )
+                : [],
+            ),
+          )
           .filter(
             (id): id is string => typeof id === "string" && id.length > 0,
           ),
@@ -2325,8 +2446,8 @@ export class CompetitionService {
       playerIds.length > 0
         ? await this.ratingsCollection()
             .find(
-              { _id: { $in: playerIds } },
-              { projection: { _id: 1, rating: 1 } },
+              { userId: { $in: playerIds }, mode: "ranked" },
+              { projection: { _id: 1, userId: 1, rating: 1 } },
             )
             .toArray()
         : [];
@@ -2334,12 +2455,14 @@ export class CompetitionService {
     const ratingMap = new Map<string, number>();
     for (const doc of ratingDocs) {
       const rating = Number(doc?.rating ?? 0);
-      if (
-        typeof doc?._id === "string" &&
-        Number.isFinite(rating) &&
-        rating > 0
-      ) {
-        ratingMap.set(doc._id, this.normalizeRating(rating));
+      const docUserId =
+        typeof doc?.userId === "string"
+          ? doc.userId
+          : typeof doc?._id === "string"
+            ? doc._id.split(":")[0]
+            : null;
+      if (docUserId && Number.isFinite(rating) && rating > 0) {
+        ratingMap.set(docUserId, this.normalizeRating(rating));
       }
     }
 
@@ -2700,8 +2823,10 @@ export class CompetitionService {
     query: TournamentQueryDto,
   ): Promise<Record<string, unknown>> {
     const db = this.mongoService.getDb();
-    const tournaments = db.collection("tournaments");
-    const tournamentParticipants = db.collection("tournament_participants");
+    const tournaments = db.collection(COLLECTIONS.TOURNAMENTS);
+    const tournamentParticipants = db.collection(
+      COLLECTIONS.TOURNAMENT_PARTICIPANTS,
+    );
     const userProfiles = this.profilesCollection();
 
     const page = query.page || 1;
@@ -2968,7 +3093,7 @@ export class CompetitionService {
       username?: string;
       displayName?: string;
       rating?: number;
-    }>("user_profiles");
+    }>(COLLECTIONS.USERS);
 
     const query = ObjectId.isValid(tournamentId)
       ? { _id: new ObjectId(tournamentId) }

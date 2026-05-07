@@ -768,7 +768,7 @@ export class ProfileService {
     const userId = dto.userId.trim();
     const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRY_MS);
     const profile = await this.repository.findUserProfileById(userId);
-    if (!profile || profile.isVerified) {
+    if (!profile || profile.emailVerifiedAt || profile.isVerified) {
       return {
         ok: true,
         data: {

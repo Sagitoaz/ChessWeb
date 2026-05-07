@@ -5,14 +5,15 @@ type IntegrationUserProfileDoc = {
   _id: string
   username: string
   displayName?: string | null
-  isVerified: boolean
-  isActive: boolean
+  emailVerifiedAt?: Date | null
+  status: 'active' | 'disabled' | 'pending_verification'
   createdAt: Date
   updatedAt: Date
 }
 
 type IntegrationUserRatingDoc = {
   _id: string
+  userId: string
   mode?: 'ranked' | 'room' | 'bot' | 'tournament'
   rating: number
   peakRating: number
@@ -53,8 +54,8 @@ async function run(): Promise<void> {
   const repository = new ProfileRepository(mongoService)
   const db = mongoService.getDb()
 
-  const userProfiles = db.collection<IntegrationUserProfileDoc>('user_profiles')
-  const userRatings = db.collection<IntegrationUserRatingDoc>('user_ratings')
+  const userProfiles = db.collection<IntegrationUserProfileDoc>('users')
+  const userRatings = db.collection<IntegrationUserRatingDoc>('player_ratings')
   const games = db.collection<IntegrationGameDoc>('games')
 
   const suffix = randomUUID().replace(/-/g, '')
@@ -68,8 +69,8 @@ async function run(): Promise<void> {
         _id: userA,
         username: `day3-${suffix}-a`,
         displayName: 'Day3 A',
-        isVerified: true,
-        isActive: true,
+        emailVerifiedAt: now,
+        status: 'active',
         createdAt: now,
         updatedAt: now,
       },
@@ -77,8 +78,8 @@ async function run(): Promise<void> {
         _id: userB,
         username: `day3-${suffix}-b`,
         displayName: 'Day3 B',
-        isVerified: true,
-        isActive: true,
+        emailVerifiedAt: now,
+        status: 'active',
         createdAt: now,
         updatedAt: now,
       },
@@ -86,14 +87,16 @@ async function run(): Promise<void> {
 
     await userRatings.insertMany([
       {
-        _id: userA,
+        _id: `${userA}:ranked`,
+        userId: userA,
         mode: 'ranked',
         rating: 1710,
         peakRating: 1750,
         updatedAt: now,
       },
       {
-        _id: userB,
+        _id: `${userB}:bot`,
+        userId: userB,
         mode: 'bot',
         rating: 1200,
         peakRating: 1300,
@@ -159,7 +162,7 @@ async function run(): Promise<void> {
     console.log('[integration-test] Day 3 repository leaderboard/games real Mongo test passed')
   } finally {
     await games.deleteMany({ _id: { $regex: `^g-it-day3-.*-${suffix}$` } as never })
-    await userRatings.deleteMany({ _id: { $in: [userA, userB] } })
+    await userRatings.deleteMany({ userId: { $in: [userA, userB] } })
     await userProfiles.deleteMany({ _id: { $in: [userA, userB] } })
     await mongoService.onModuleDestroy()
   }

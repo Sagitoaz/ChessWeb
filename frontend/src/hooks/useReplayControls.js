@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Chess } from 'chess.js'
+import { DEFAULT_INITIAL_FEN, getGameMoves, getInitialFen } from '@/utils/gameShape'
 
 function computeFENAtIndex(initialFEN, moves, targerIndex) {
   const chess = new Chess(initialFEN)
@@ -24,9 +25,8 @@ export function useReplayControls(gameData) {
   const [cursor, setCursor] = useState(-1)
   const [error, setError] = useState(null)
 
-  const moves = useMemo(() => gameData?.moves ?? [], [gameData])
-  const initialFEN =
-    gameData?.initialFEN ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+  const moves = useMemo(() => getGameMoves(gameData), [gameData])
+  const initialFEN = getInitialFen(gameData) || DEFAULT_INITIAL_FEN
 
   // ReplaySession.load(game) — reset khi load game mới
   useEffect(() => {
