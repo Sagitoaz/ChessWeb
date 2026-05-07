@@ -1,66 +1,57 @@
 import { Routes, Route, Navigate, Link } from 'react-router-dom'
-import { lazy, Suspense } from 'react'
-import { Loader } from '@components/common'
 import { AppLayout } from '@components/layout'
 import PublicRoute from './PublicRoute'
 import PrivateRoute from './PrivateRoute'
 
 // =============================================================================
-// LAZY IMPORTS — Mỗi trang được tải khi người dùng truy cập (tối ưu tốc độ)
+// ROUTE IMPORTS
+//
+// Các route chính được import trực tiếp để chuyển trang trong SPA không phải chờ
+// chunk lazy-load. Trước đây Suspense bọc toàn bộ Routes làm sidebar/content biến
+// mất trong lần vào đầu tiên, tạo cảm giác như reload cả trang.
 // =============================================================================
 
 // Auth Pages (đăng nhập / đăng ký)
-const LoginPage = lazy(() => import('@pages/auth/LoginPage'))
-const LogoutPage = lazy(() => import('@pages/auth/LogoutPage'))
-const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'))
-const ForgotPasswordPage = lazy(() => import('@pages/auth/ForgotPasswordPage'))
-const ResetPasswordPage = lazy(() => import('@pages/auth/ResetPasswordPage'))
+import LoginPage from '@pages/auth/LoginPage'
+import LogoutPage from '@pages/auth/LogoutPage'
+import RegisterPage from '@pages/auth/RegisterPage'
+import ForgotPasswordPage from '@pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from '@pages/auth/ResetPasswordPage'
 
 // Home
-const DashboardPage = lazy(() => import('@pages/home/DashboardPage'))
+import DashboardPage from '@pages/home/DashboardPage'
 
 // Profile
-const ProfilePage = lazy(() => import('@pages/profile/ProfilePage'))
-const EditProfilePage = lazy(() => import('@pages/profile/EditProfilePage'))
-const LeaderboardPage = lazy(() => import('@pages/profile/LeaderboardPage'))
+import ProfilePage from '@pages/profile/ProfilePage'
+import EditProfilePage from '@pages/profile/EditProfilePage'
+import LeaderboardPage from '@pages/profile/LeaderboardPage'
 
 // Ranked — những trang này quản lý layout BÊN TRONG nên không cần AppLayout bọc ngoài
-const RankedLobbyPage = lazy(() => import('@pages/ranked/RankedLobbyPage'))
-const RankedGamePage = lazy(() => import('@pages/ranked/RankedGamePage'))
-const RankedHistoryPage = lazy(() => import('@pages/ranked/RankedHistoryPage'))
-const RankedStatsPage = lazy(() => import('@pages/ranked/RankedStatsPage'))
+import RankedLobbyPage from '@pages/ranked/RankedLobbyPage'
+import RankedGamePage from '@pages/ranked/RankedGamePage'
+import RankedHistoryPage from '@pages/ranked/RankedHistoryPage'
+import RankedStatsPage from '@pages/ranked/RankedStatsPage'
 
 // Rooms (phòng chơi)
-const RoomListPage = lazy(() => import('@pages/rooms/RoomListPage'))
-const CreateRoomPage = lazy(() => import('@pages/rooms/CreateRoomPage'))
-const JoinRoomPage = lazy(() => import('@pages/rooms/JoinRoomPage'))
-const RoomGamePage = lazy(() => import('@pages/rooms/RoomPlayPage'))
+import RoomListPage from '@pages/rooms/RoomListPage'
+import CreateRoomPage from '@pages/rooms/CreateRoomPage'
+import JoinRoomPage from '@pages/rooms/JoinRoomPage'
+import RoomGamePage from '@pages/rooms/RoomPlayPage'
 
 // Tournaments (giải đấu)
-const TournamentListPage = lazy(() => import('@pages/tournaments/TournamentListPage'))
-const CreateTournamentPage = lazy(() => import('@pages/tournaments/CreateTournamentPage'))
-const TournamentDetailPage = lazy(() => import('@pages/tournaments/TournamentDetailPage'))
-const TournamentBracketPage = lazy(() => import('@pages/tournaments/TournamentBracketPage'))
-const TournamentMatchPlayPage = lazy(() => import('@pages/tournaments/TournamentMatchPlayPage'))
+import TournamentListPage from '@pages/tournaments/TournamentListPage'
+import CreateTournamentPage from '@pages/tournaments/CreateTournamentPage'
+import TournamentDetailPage from '@pages/tournaments/TournamentDetailPage'
+import TournamentBracketPage from '@pages/tournaments/TournamentBracketPage'
+import TournamentMatchPlayPage from '@pages/tournaments/TournamentMatchPlayPage'
 
 // Bot
-const BotSelectPage = lazy(() => import('@pages/bot/BotSelectPage'))
-const BotGamePage = lazy(() => import('@pages/bot/BotGamePage'))
+import BotSelectPage from '@pages/bot/BotSelectPage'
+import BotGamePage from '@pages/bot/BotGamePage'
 
 // Replay (xem lại ván đấu)
-const ReplayListPage = lazy(() => import('@pages/replay/ReplayListPage'))
-const ReplayViewerPage = lazy(() => import('@pages/replay/ReplayViewerPage'))
-
-// =============================================================================
-// LOADING SPINNER — Hiển thị khi đang tải trang
-// =============================================================================
-const PageLoader = () => (
-  <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/20 px-4">
-    <div className="bg-white/95 border border-gray-200 shadow-lg rounded-lg px-4 py-3">
-      <Loader size="sm" text="Đang tải trang..." />
-    </div>
-  </div>
-)
+import ReplayListPage from '@pages/replay/ReplayListPage'
+import ReplayViewerPage from '@pages/replay/ReplayViewerPage'
 
 // =============================================================================
 // 404 PAGE
@@ -96,144 +87,142 @@ const NotFoundPage = () => (
 // =============================================================================
 function AppRoutes() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Routes>
-        {/* =========================================================
+    <Routes>
+      {/* =========================================================
             ROOT — Redirect thẳng vào dashboard
         ========================================================= */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        {/* =========================================================
+      {/* =========================================================
             AUTH — Trang đăng nhập / đăng ký (không có sidebar)
         ========================================================= */}
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <PublicRoute>
-              <RegisterPage />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            <PublicRoute>
-              <ForgotPasswordPage />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/reset-password"
-          element={
-            <PublicRoute>
-              <ResetPasswordPage />
-            </PublicRoute>
-          }
-        />
-        <Route path="/logout" element={<LogoutPage />} />
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <LoginPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          <PublicRoute>
+            <RegisterPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPasswordPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPasswordPage />
+          </PublicRoute>
+        }
+      />
+      <Route path="/logout" element={<LogoutPage />} />
 
-        {/* =========================================================
+      {/* =========================================================
             RANKED — Trang này tự có MainLayout bên trong
             (Không bọc AppLayout để tránh double-wrap)
         ========================================================= */}
-        <Route
-          path="/ranked"
-          element={
-            <PrivateRoute>
-              <RankedLobbyPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/ranked/game/:matchId"
-          element={
-            <PrivateRoute>
-              <RankedGamePage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/ranked/history"
-          element={
-            <PrivateRoute>
-              <RankedHistoryPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/ranked/stats"
-          element={
-            <PrivateRoute>
-              <RankedStatsPage />
-            </PrivateRoute>
-          }
-        />
+      <Route
+        path="/ranked"
+        element={
+          <PrivateRoute>
+            <RankedLobbyPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/ranked/game/:matchId"
+        element={
+          <PrivateRoute>
+            <RankedGamePage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/ranked/history"
+        element={
+          <PrivateRoute>
+            <RankedHistoryPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/ranked/stats"
+        element={
+          <PrivateRoute>
+            <RankedStatsPage />
+          </PrivateRoute>
+        }
+      />
 
-        {/* =========================================================
+      {/* =========================================================
             BOT GAME — Tự có MainLayout bên trong
             (Không bọc AppLayout để tránh double-wrap)
         ========================================================= */}
-        <Route
-          path="/bot/game/:gameId"
-          element={
-            <PrivateRoute>
-              <BotGamePage />
-            </PrivateRoute>
-          }
-        />
+      <Route
+        path="/bot/game/:gameId"
+        element={
+          <PrivateRoute>
+            <BotGamePage />
+          </PrivateRoute>
+        }
+      />
 
-        {/* =========================================================
+      {/* =========================================================
             APP LAYOUT — Tất cả trang có Sidebar + Header
             AppLayout tự động wrap Header + Sidebar + Footer.
             Muốn thêm trang mới? Thêm <Route> vào trong đây!
         ========================================================= */}
-        <Route element={<AppLayout />}>
-          {/* Dashboard */}
-          <Route path="/dashboard" element={<DashboardPage />} />
+      <Route element={<AppLayout />}>
+        {/* Dashboard */}
+        <Route path="/dashboard" element={<DashboardPage />} />
 
-          {/* Profile */}
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/profile/edit" element={<EditProfilePage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
+        {/* Profile */}
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile/edit" element={<EditProfilePage />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
 
-          {/* Phòng chơi */}
-          <Route path="/rooms" element={<RoomListPage />} />
-          <Route path="/rooms/create" element={<CreateRoomPage />} />
-          <Route path="/rooms/join" element={<JoinRoomPage />} />
-          <Route path="/rooms/:roomId" element={<RoomGamePage />} />
+        {/* Phòng chơi */}
+        <Route path="/rooms" element={<RoomListPage />} />
+        <Route path="/rooms/create" element={<CreateRoomPage />} />
+        <Route path="/rooms/join" element={<JoinRoomPage />} />
+        <Route path="/rooms/:roomId" element={<RoomGamePage />} />
 
-          {/* Giải đấu */}
-          <Route path="/tournaments" element={<TournamentListPage />} />
-          <Route path="/tournaments/create" element={<CreateTournamentPage />} />
-          <Route path="/tournaments/:tournamentId" element={<TournamentDetailPage />} />
-          <Route path="/tournaments/:tournamentId/bracket" element={<TournamentBracketPage />} />
-          <Route
-            path="/tournaments/:tournamentId/matches/:gameId/play"
-            element={<TournamentMatchPlayPage />}
-          />
+        {/* Giải đấu */}
+        <Route path="/tournaments" element={<TournamentListPage />} />
+        <Route path="/tournaments/create" element={<CreateTournamentPage />} />
+        <Route path="/tournaments/:tournamentId" element={<TournamentDetailPage />} />
+        <Route path="/tournaments/:tournamentId/bracket" element={<TournamentBracketPage />} />
+        <Route
+          path="/tournaments/:tournamentId/matches/:gameId/play"
+          element={<TournamentMatchPlayPage />}
+        />
 
-          {/* Chơi với Bot */}
-          <Route path="/bot" element={<BotSelectPage />} />
+        {/* Chơi với Bot */}
+        <Route path="/bot" element={<BotSelectPage />} />
 
-          {/* Replay */}
-          <Route path="/replays" element={<ReplayListPage />} />
-          <Route path="/replays/:gameId" element={<ReplayViewerPage />} />
-        </Route>
+        {/* Replay */}
+        <Route path="/replays" element={<ReplayListPage />} />
+        <Route path="/replays/:gameId" element={<ReplayViewerPage />} />
+      </Route>
 
-        {/* =========================================================
+      {/* =========================================================
             404 — Không tìm thấy trang
         ========================================================= */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </Suspense>
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
   )
 }
 
