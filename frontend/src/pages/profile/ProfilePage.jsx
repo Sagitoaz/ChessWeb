@@ -83,6 +83,38 @@ const normalizeResult = (rawResult, playerSide = null) => {
   return 'draw'
 }
 
+const toTimestampMs = (value) => {
+  if (!value) return null
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+const resolveMatchDuration = (item, replay) => {
+  const direct = Number(
+    item.durationSeconds ?? item.duration ?? replay?.durationSeconds ?? replay?.duration
+  )
+  if (Number.isFinite(direct) && direct > 0) {
+    return Math.round(direct)
+  }
+
+  const startedAt = toTimestampMs(
+    item.startedAt || replay?.startedAt || item.createdAt || replay?.createdAt
+  )
+  const finishedAt = toTimestampMs(
+    item.finishedAt ||
+      replay?.finishedAt ||
+      item.completedAt ||
+      replay?.completedAt ||
+      item.updatedAt ||
+      replay?.updatedAt
+  )
+  if (startedAt === null || finishedAt === null || finishedAt <= startedAt) {
+    return 0
+  }
+
+  return Math.max(1, Math.round((finishedAt - startedAt) / 1000))
+}
+
 const normalizeHistoryPayload = (payload, username) => {
   const data = payload?.data ?? payload ?? {}
   const items = Array.isArray(data.items) ? data.items : []
@@ -112,9 +144,7 @@ const normalizeHistoryPayload = (payload, username) => {
         result: normalizeResult(item.result, item.playerSide || null),
         opponent,
         playedAt: item.finishedAt || item.createdAt || replay?.createdAt || null,
-        duration: Number(
-          replay?.metadata?.totalMoves || item.duration || item.durationSeconds || 0
-        ),
+        duration: resolveMatchDuration(item, replay),
         canAnalyze: Boolean(item.gameId || item.id || replay?.id || item._id),
       }
     })

@@ -447,6 +447,36 @@ export class CompetitionService {
     return result === "draw" ? "draw" : "completed";
   }
 
+  private toTimestampMs(value: unknown): number | null {
+    if (value instanceof Date) {
+      const timestamp = value.getTime();
+      return Number.isFinite(timestamp) ? timestamp : null;
+    }
+
+    if (typeof value === "string" || typeof value === "number") {
+      const timestamp = new Date(value).getTime();
+      return Number.isFinite(timestamp) ? timestamp : null;
+    }
+
+    return null;
+  }
+
+  private calculateGameDurationSeconds(game: Record<string, unknown>): number {
+    const startedAt =
+      this.toTimestampMs(game.startedAt) ??
+      this.toTimestampMs(game.createdAt);
+    const finishedAt =
+      this.toTimestampMs(game.finishedAt) ??
+      this.toTimestampMs(game.completedAt) ??
+      this.toTimestampMs(game.updatedAt);
+
+    if (startedAt === null || finishedAt === null || finishedAt <= startedAt) {
+      return 0;
+    }
+
+    return Math.max(1, Math.round((finishedAt - startedAt) / 1000));
+  }
+
   private async updateUserRatingAfterMatch(
     userId: string,
     nextRating: number,
@@ -2627,6 +2657,9 @@ export class CompetitionService {
               : Array.isArray(item.moves)
                 ? item.moves.length
                 : 0;
+        const durationSeconds = this.calculateGameDurationSeconds(
+          item as Record<string, unknown>,
+        );
 
         return {
           id: item._id?.toString?.() || item._id,
@@ -2644,8 +2677,11 @@ export class CompetitionService {
           opponentUsername: usernameMap.get(opponentId) || "Unknown",
           opponentAvatarUrl: avatarMap.get(opponentId) || null,
           opponentRating: opponentRating > 0 ? opponentRating : null,
+          startedAt: item.startedAt || item.createdAt || null,
           createdAt: item.createdAt,
           finishedAt: item.finishedAt || null,
+          duration: durationSeconds,
+          durationSeconds,
           ratingChange,
           totalMoves: computedTotalMoves,
           endReason: this.normalizeEndReason(

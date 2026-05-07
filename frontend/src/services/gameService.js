@@ -68,6 +68,27 @@ const normalizeRankedHistoryResult = (item, playerColor) => {
   return 'draw'
 }
 
+const toTimestampMs = (value) => {
+  if (!value) return null
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+const resolveDurationSeconds = (item) => {
+  const direct = Number(item.durationSeconds ?? item.duration ?? item.elapsedSeconds)
+  if (Number.isFinite(direct) && direct > 0) {
+    return Math.round(direct)
+  }
+
+  const startedAt = toTimestampMs(item.startedAt || item.createdAt)
+  const finishedAt = toTimestampMs(item.finishedAt || item.completedAt || item.updatedAt)
+  if (startedAt === null || finishedAt === null || finishedAt <= startedAt) {
+    return 0
+  }
+
+  return Math.max(1, Math.round((finishedAt - startedAt) / 1000))
+}
+
 const normalizeEndReason = (reason, result) => {
   const value = typeof reason === 'string' ? reason.trim().toLowerCase() : ''
 
@@ -127,6 +148,7 @@ const normalizeRankedHistory = (payload) => {
   const matches = items.map((item) => {
     const playerColor = item.playerColor || item.color || 'white'
     const result = normalizeRankedHistoryResult(item, playerColor)
+    const durationSeconds = resolveDurationSeconds(item)
     const opponentId =
       item.opponentId ||
       (playerColor === 'white' ? getGamePlayerId(item, 'black') : getGamePlayerId(item, 'white'))
@@ -149,7 +171,7 @@ const normalizeRankedHistory = (payload) => {
       playerColor,
       endReason: normalizeEndReason(item.endReason || item.finishReason || '', result),
       moves: getGameTotalMoves(item),
-      duration: Number(item.duration || item.durationSeconds || 0),
+      duration: durationSeconds,
       playedAt: item.playedAt || item.finishedAt || item.createdAt || new Date().toISOString(),
     }
   })

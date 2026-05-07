@@ -90,8 +90,9 @@ const toEndReasonInfo = (reason) => {
 
 /** Format seconds → "M:SS" */
 const fmtDuration = (secs) => {
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
+  const safeSecs = Math.max(0, Math.floor(Number(secs) || 0))
+  const m = Math.floor(safeSecs / 60)
+  const s = safeSecs % 60
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
