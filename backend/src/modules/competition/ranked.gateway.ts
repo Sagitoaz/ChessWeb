@@ -64,6 +64,7 @@ type GameResignPayload = {
 
 type GameDrawPayload = {
   matchId?: string;
+  moves?: Array<Record<string, unknown>>;
 };
 
 type GameEndPayload = {
@@ -1060,13 +1061,6 @@ export class RankedGateway
     const participants =
       await this.competitionService.getMatchParticipants(matchId);
 
-    this.emitGameDrawOffer(matchId, participants, null, {
-      matchId,
-      type: "accepted",
-      byUserId: user.userId,
-      at: new Date().toISOString(),
-    });
-
     try {
       const completion = await this.competitionService.completeRankedMatch(
         { userId: user.userId, roles: user.roles || [] },
@@ -1074,8 +1068,16 @@ export class RankedGateway
         {
           result: RankedMatchCompletionResult.DRAW,
           reason: "draw_agreement",
+          moves: Array.isArray(body?.moves) ? body.moves : [],
         },
       );
+
+      this.emitGameDrawOffer(matchId, participants, null, {
+        matchId,
+        type: "accepted",
+        byUserId: user.userId,
+        at: new Date().toISOString(),
+      });
 
       const payload: GameEndPayload = {
         matchId,
@@ -1090,6 +1092,13 @@ export class RankedGateway
       const roomCompletion =
         await this.competitionService.completeRoomGameByDrawAgreement(matchId);
       if (roomCompletion) {
+        this.emitGameDrawOffer(matchId, participants, null, {
+          matchId,
+          type: "accepted",
+          byUserId: user.userId,
+          at: new Date().toISOString(),
+        });
+
         const payload: GameEndPayload = {
           matchId,
           reason: "draw_agreement",
@@ -1101,14 +1110,12 @@ export class RankedGateway
         return;
       }
 
-      const payload: GameEndPayload = {
+      client.emit("ranked:error", {
+        code: "DRAW_SAVE_FAILED",
+        message: "Could not save draw result",
         matchId,
-        reason: "draw_agreement",
-        result: RankedMatchCompletionResult.DRAW,
         at: new Date().toISOString(),
-      };
-      this.stopGameClock(matchId);
-      this.emitGameEnd(matchId, participants, payload);
+      });
     }
   }
 

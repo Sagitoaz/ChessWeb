@@ -1146,7 +1146,7 @@ const RankedGamePage = () => {
 
   const handleAcceptDraw = useCallback(() => {
     if (gameSocket?.isConnected && matchId) {
-      gameSocket.acceptDraw()
+      gameSocket.acceptDraw({ moves: gameRef.current.history({ verbose: true }) })
       setDrawOffer(null)
       return
     }

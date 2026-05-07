@@ -179,9 +179,12 @@ export function useGameSocket(matchId) {
   }, [matchId, emit])
 
   // Accept draw
-  const acceptDraw = useCallback(() => {
+  const acceptDraw = useCallback((payload = {}) => {
     if (!matchId) return
-    emit('game:acceptDraw', { matchId })
+    emit('game:acceptDraw', {
+      matchId,
+      moves: Array.isArray(payload?.moves) ? payload.moves : undefined,
+    })
   }, [matchId, emit])
 
   // Decline draw
