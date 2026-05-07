@@ -21,7 +21,7 @@ import { useNotification } from '@/components/common/Notification'
 import { useGameSocket } from '@hooks/useWebSocket'
 import { useAuthStore } from '@store'
 import { ChessGame } from '@utils/chessLogic'
-import { API_URL, RANKS } from '@utils/constants'
+import { RANKS } from '@utils/constants'
 import { formatEloDelta, eloDeltaColor } from '@utils/formatters'
 import { buildMovePairs, getMoveLabel } from '@/utils/moveNotation'
 import { getUserDisplayName } from '@/utils/userDisplay'
@@ -560,7 +560,6 @@ const RankedGamePage = () => {
   const [showEndModal, setShowEndModal] = useState(false)
   const [persistedResultData, setPersistedResultData] = useState(null)
   const endedRef = useRef(false)
-  const unloadForfeitSentRef = useRef(false)
   const currentUserId = normalizeId(
     storeUser?.id || storeUser?.userId || storeUser?._id || storeUser?.sub
   )
@@ -1201,58 +1200,6 @@ const RankedGamePage = () => {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [gamePhase])
-
-  useEffect(() => {
-    if (gamePhase !== GAME_PHASE.PLAYING || !matchId) return
-
-    const sendDisconnectForfeit = () => {
-      if (endedRef.current || unloadForfeitSentRef.current) return
-      unloadForfeitSentRef.current = true
-
-      try {
-        gameSocket?.resign?.()
-      } catch {
-        // Best effort only: page is going away.
-      }
-
-      try {
-        fetch(`${API_URL}/ranked/matches/${encodeURIComponent(matchId)}/complete`, {
-          method: 'POST',
-          credentials: 'include',
-          keepalive: true,
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          },
-          body: JSON.stringify({
-            result: toRankedApiResult(playerColor, 'lose'),
-            reason: 'disconnect_forfeit',
-            moves: gameRef.current.history({ verbose: true }),
-          }),
-        })
-      } catch {
-        // If keepalive cannot be queued, backend socket disconnect still handles the loss.
-      }
-    }
-
-    const handlePageHide = () => {
-      sendDisconnectForfeit()
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        sendDisconnectForfeit()
-      }
-    }
-
-    window.addEventListener('pagehide', handlePageHide)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      window.removeEventListener('pagehide', handlePageHide)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [authToken, gamePhase, gameSocket, matchId, playerColor])
 
   useEffect(() => {
     if (gamePhase !== GAME_PHASE.PLAYING) return
