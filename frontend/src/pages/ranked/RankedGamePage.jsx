@@ -70,10 +70,11 @@ const fmtClock = (ms) => {
   return `${min}:${String(sec).padStart(2, '0')}`
 }
 
-/** Elo formula mock: K × (S – E), K = 32 */
+/** Local display fallback only; backend remains the source of truth. */
 const calcMockRatingDelta = (result, pRating, oRating) => {
+  if (result === 'draw') return 0
   const E = 1 / (1 + Math.pow(10, (oRating - pRating) / 400))
-  const S = result === 'win' ? 1 : result === 'draw' ? 0.5 : 0
+  const S = result === 'win' ? 1 : 0
   return Math.round(32 * (S - E))
 }
 

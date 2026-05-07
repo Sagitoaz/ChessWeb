@@ -1167,6 +1167,32 @@ export class CompetitionService {
         whitePlayerId,
         blackPlayerId,
       );
+      const existingPlayerRecord = Array.isArray(match.players)
+        ? match.players.find(
+            (entry) =>
+              entry &&
+              typeof entry === "object" &&
+              String((entry as { userId?: unknown }).userId || "") === user.userId,
+          )
+        : null;
+      const existingRatingDelta =
+        persistedExistingResult === "draw"
+          ? 0
+          : Number(
+              (existingPlayerRecord as { ratingDelta?: unknown } | null)
+                ?.ratingDelta ?? 0,
+            );
+      const existingRatingAfter = Number(
+        (existingPlayerRecord as { ratingAfter?: unknown } | null)
+          ?.ratingAfter ?? userRating,
+      );
+      const existingRatingBefore = Number(
+        (existingPlayerRecord as { ratingBefore?: unknown } | null)
+          ?.ratingBefore ??
+          (Number.isFinite(existingRatingAfter - existingRatingDelta)
+            ? existingRatingAfter - existingRatingDelta
+            : userRating),
+      );
       return {
         matchId: String(match.matchId || matchId),
         alreadyCompleted: true,
@@ -1174,7 +1200,9 @@ export class CompetitionService {
         player: {
           userId: user.userId,
           outcome: existingOutcome,
-          ratingAfter: userRating,
+          ratingBefore: existingRatingBefore,
+          ratingAfter: existingRatingAfter,
+          ratingDelta: existingRatingDelta,
           gamesPlayed: Number(userStats?.gamesPlayed ?? 0),
           wins: Number(userStats?.wins ?? 0),
           losses: Number(userStats?.losses ?? 0),
@@ -1193,12 +1221,16 @@ export class CompetitionService {
       persistedResult,
     );
 
+    const isDrawResult = persistedResult === "draw";
     const kFactor = 32;
-    const whiteDelta = Math.round(
-      kFactor *
-        (whiteScore - this.expectedScore(whiteRatingBefore, blackRatingBefore)),
-    );
-    const blackDelta = -whiteDelta;
+    const whiteDelta = isDrawResult
+      ? 0
+      : Math.round(
+          kFactor *
+            (whiteScore -
+              this.expectedScore(whiteRatingBefore, blackRatingBefore)),
+        );
+    const blackDelta = isDrawResult ? 0 : -whiteDelta;
 
     const whiteRatingAfter = this.normalizeRating(
       whiteRatingBefore + whiteDelta,
