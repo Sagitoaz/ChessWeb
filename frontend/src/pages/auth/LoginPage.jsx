@@ -114,15 +114,17 @@ const LoginPage = () => {
   }, [clearError, googleAuth, navigate, notifyError, notifySuccess])
 
   return (
-    <div className="min-h-screen bg-[#e1edff] flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-8">
+    <div className="min-h-[100dvh] bg-[#e1edff] flex items-center justify-center px-4 py-6">
+      <div className="w-full max-w-5xl flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-10 lg:gap-8">
         {/* LEFT */}
         <div className="w-full lg:w-1/2 text-center lg:text-left">
           <div className="mb-4">
             <span className="text-6xl text-blue-600 leading-none select-none">♟</span>
           </div>
-          <h1 className="text-5xl font-bold text-blue-600 tracking-tight mb-4">WebChess</h1>
-          <p className="text-2xl font-medium text-gray-800 leading-tight max-w-md mx-auto lg:mx-0">
+          <h1 className="text-4xl sm:text-5xl font-bold text-blue-600 tracking-tight mb-3 sm:mb-4">
+            WebChess
+          </h1>
+          <p className="text-lg sm:text-2xl font-medium text-gray-800 leading-tight max-w-md mx-auto lg:mx-0">
             Nền tảng cờ vua trực tuyến. Kết nối và thi đấu cùng các kỳ thủ toàn cầu.
           </p>
         </div>
@@ -134,7 +136,7 @@ const LoginPage = () => {
             padding="none"
             className="bg-white shadow-md border-none rounded-xl overflow-hidden"
           >
-            <div className="p-8">
+            <div className="p-5 sm:p-8">
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-blue-400">Đăng nhập</h2>
                 <p className="text-sm text-gray-500 mt-1">Chào mừng bạn trở lại bàn cờ.</p>

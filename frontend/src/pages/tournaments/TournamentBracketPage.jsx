@@ -188,7 +188,7 @@ export default function TournamentBracketPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#e1edff] p-4">
+    <div className="min-h-[100dvh] bg-[#e1edff] px-3 py-4 sm:p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -202,11 +202,11 @@ export default function TournamentBracketPage() {
           </Button>
 
           <div className="text-center">
-            <h1 className="text-4xl font-bold text-blue-600 mb-2 flex items-center justify-center gap-3">
-              <Trophy size={40} />
+            <h1 className="flex items-center justify-center gap-3 text-2xl font-bold text-blue-600 mb-2 sm:text-4xl">
+              <Trophy className="h-8 w-8 sm:h-10 sm:w-10" />
               {bracket.tournamentName}
             </h1>
-            <p className="text-lg text-gray-800">Bracket - {bracket.format}</p>
+            <p className="text-base text-gray-800 sm:text-lg">Bracket - {bracket.format}</p>
           </div>
         </div>
 
@@ -216,10 +216,10 @@ export default function TournamentBracketPage() {
           padding="none"
           className="bg-white shadow-md border-none rounded-xl overflow-hidden"
         >
-          <div className="p-6">
+          <div className="p-3 sm:p-6">
             <div className="overflow-x-auto">
-              <div className="min-w-[900px]">
-                <div className="flex gap-8 justify-center">
+              <div className="min-w-[760px] lg:min-w-[900px]">
+                <div className="flex gap-4 justify-center lg:gap-8">
                   {/* Render each round as a column */}
                   {bracket.rounds.map((round, roundIndex) => (
                     <div key={roundIndex} className="flex-1 max-w-xs">

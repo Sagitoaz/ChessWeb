@@ -137,6 +137,7 @@ export default function BotGamePage() {
   const playerColor = gameData?.playerColor ?? 'White'
   const playerColorCode = playerColor === 'White' ? 'w' : 'b'
   const playerSideLabel = playerColor === 'White' ? 'Trắng' : 'Đen'
+  const botElo = gameData?.botPlayer?.rating ?? gameData?.config?.rating ?? 'N/A'
 
   const persistFinishedGame = useCallback(
     async (result, { endReason } = {}) => {
@@ -697,7 +698,7 @@ export default function BotGamePage() {
                   ? 'Đang lưu kết quả...'
                   : 'Đang chốt kết quả...'}
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => navigate('/bot')}
                 className="px-6 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold text-white"
@@ -715,10 +716,10 @@ export default function BotGamePage() {
         </div>
       )}
 
-      <div className="mx-auto px-2 sm:px-4 py-2">
+      <div className="mx-auto max-w-[1500px] px-2 sm:px-4 py-2">
         {/* Header bar */}
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               onClick={handleLeaveRequest}
               className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
@@ -726,8 +727,8 @@ export default function BotGamePage() {
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <div className="min-w-0">
+              <h1 className="flex items-center gap-2 truncate text-base sm:text-lg font-bold text-gray-900">
                 <Trophy className="w-5 h-5 text-green-600" />
                 Đấu với Bot
                 <span
@@ -736,8 +737,8 @@ export default function BotGamePage() {
                   {difficultyLabel}
                 </span>
               </h1>
-              <p className="text-xs text-gray-500 font-mono">
-                {gameData.botPlayer?.username} · {difficultyLabel}
+              <p className="truncate text-xs text-gray-500 font-mono">
+                {gameData.botPlayer?.username} · ELO {botElo}
               </p>
             </div>
           </div>
@@ -751,10 +752,10 @@ export default function BotGamePage() {
             <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-gray-200 mb-1">
               <span className="text-2xl leading-none">🤖</span>
               <div className="min-w-0">
-                <span className="font-semibold text-gray-900 text-sm">
+                <span className="font-semibold text-gray-900 text-sm truncate">
                   {gameData.botPlayer?.username}
                 </span>
-                <span className="text-xs text-gray-400 ml-2">~{gameData.botPlayer?.rating}</span>
+                <span className="text-xs text-gray-400 ml-2">ELO {botElo}</span>
                 {isBotThinking && (
                   <span className="ml-2 text-xs text-yellow-600 animate-pulse font-medium">
                     Đang suy nghĩ...
@@ -807,8 +808,7 @@ export default function BotGamePage() {
 
           {/* RIGHT: Side panel */}
           <div
-            className="w-full xl:w-[360px] flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden xl:sticky xl:top-3"
-            style={{ height: 'calc(100vh - 120px)', maxHeight: '820px' }}
+            className="w-full xl:w-[360px] flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden min-h-[420px] max-h-[75vh] xl:h-[calc(100dvh-120px)] xl:max-h-[820px] xl:sticky xl:top-3"
           >
             {/* Status strip */}
             <div

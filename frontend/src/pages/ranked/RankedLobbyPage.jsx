@@ -363,7 +363,14 @@ const RankedLobbyPage = () => {
     return () => {
       clearMatchTransitionTimers()
     }
-  }, [navigate, onMatchFound, onQueueUpdate, onRankedError, showNotification])
+  }, [
+    clearMatchTransitionTimers,
+    navigate,
+    onMatchFound,
+    onQueueUpdate,
+    onRankedError,
+    showNotification,
+  ])
 
   // ──── Search Timer ────
   useEffect(() => {

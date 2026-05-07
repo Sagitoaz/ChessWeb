@@ -184,7 +184,7 @@ export default function CreateTournamentPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#e1edff] p-4">
+    <div className="min-h-[100dvh] bg-[#e1edff] px-3 py-4 sm:p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
@@ -192,13 +192,17 @@ export default function CreateTournamentPage() {
             <ArrowLeft size={18} />
             Quay lại
           </Button>
-          <h1 className="text-4xl font-bold text-blue-600 mb-2">Tạo giải đấu mới</h1>
-          <p className="text-lg text-gray-800">Tổ chức giải đấu cờ vua của riêng bạn</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-blue-600 mb-2">
+            Tạo giải đấu mới
+          </h1>
+          <p className="text-base sm:text-lg text-gray-800">
+            Tổ chức giải đấu cờ vua của riêng bạn
+          </p>
         </div>
 
         {/* Stepper */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
+        <div className="mb-6 overflow-x-auto pb-2">
+          <div className="flex min-w-[560px] items-center justify-between sm:min-w-0">
             {steps.map((step, index) => {
               const Icon = step.icon
               const isActive = currentStep === step.number
@@ -206,9 +210,9 @@ export default function CreateTournamentPage() {
 
               return (
                 <React.Fragment key={step.number}>
-                  <div className="flex flex-col items-center flex-1">
+                  <div className="flex flex-1 flex-col items-center">
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
+                      className={`mb-2 flex h-10 w-10 items-center justify-center rounded-full sm:h-12 sm:w-12 ${
                         isCompleted
                           ? 'bg-green-500 text-white'
                           : isActive
@@ -216,7 +220,7 @@ export default function CreateTournamentPage() {
                             : 'bg-white text-gray-400 border-2 border-gray-300'
                       }`}
                     >
-                      {isCompleted ? <Check size={24} /> : <Icon size={24} />}
+                      {isCompleted ? <Check size={22} /> : <Icon size={22} />}
                     </div>
                     <p
                       className={`text-sm font-medium text-center ${
@@ -248,12 +252,14 @@ export default function CreateTournamentPage() {
           padding="none"
           className="bg-white shadow-md border-none rounded-xl overflow-hidden"
         >
-          <div className="p-8">
+          <div className="p-4 sm:p-8">
             {/* Step 1: Basic Info */}
             {currentStep === 1 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-blue-400 mb-2">Thông tin cơ bản</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-blue-400 mb-2">
+                    Thông tin cơ bản
+                  </h2>
                   <p className="text-gray-600">Điền thông tin chung về giải đấu</p>
                 </div>
 
@@ -307,7 +313,9 @@ export default function CreateTournamentPage() {
             {currentStep === 2 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-blue-400 mb-2">Cài đặt giải đấu</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-blue-400 mb-2">
+                    Cài đặt giải đấu
+                  </h2>
                   <p className="text-gray-600">Chọn định dạng và cài đặt trận đấu</p>
                 </div>
 
@@ -344,7 +352,7 @@ export default function CreateTournamentPage() {
                   <label className="block text-sm font-semibold text-gray-900 mb-3">
                     Số người tối đa
                   </label>
-                  <div className="grid grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                     {PARTICIPANT_OPTIONS.map((num) => (
                       <button
                         key={num}
@@ -396,11 +404,13 @@ export default function CreateTournamentPage() {
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-blue-400 mb-2">Lịch trình</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-blue-400 mb-2">
+                    Lịch trình
+                  </h2>
                   <p className="text-gray-600">Đặt thời gian bắt đầu và hạn đăng ký</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">
                       Ngày bắt đầu <span className="text-red-500">*</span>
@@ -466,7 +476,9 @@ export default function CreateTournamentPage() {
             {currentStep === 4 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-blue-400 mb-2">Xem lại thông tin</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-blue-400 mb-2">
+                    Xem lại thông tin
+                  </h2>
                   <p className="text-gray-600">Kiểm tra lại thông tin trước khi tạo</p>
                 </div>
 
@@ -474,9 +486,9 @@ export default function CreateTournamentPage() {
                   <div className="bg-gray-50 rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 mb-3">Thông tin cơ bản</h3>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                         <span className="text-gray-600">Tên giải:</span>
-                        <span className="font-medium text-gray-900">{formData.name}</span>
+                        <span className="break-words font-medium text-gray-900">{formData.name}</span>
                       </div>
                       {formData.description && (
                         <div>
@@ -485,9 +497,11 @@ export default function CreateTournamentPage() {
                         </div>
                       )}
                       {formData.prize && (
-                        <div className="flex justify-between">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                           <span className="text-gray-600">Giải thưởng:</span>
-                          <span className="font-medium text-gray-900">{formData.prize}</span>
+                          <span className="break-words font-medium text-gray-900">
+                            {formData.prize}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -496,19 +510,19 @@ export default function CreateTournamentPage() {
                   <div className="bg-gray-50 rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 mb-3">Cài đặt</h3>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                         <span className="text-gray-600">Định dạng:</span>
                         <span className="font-medium text-gray-900">
                           {FORMATS.find((f) => f.value === formData.format)?.label}
                         </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                         <span className="text-gray-600">Số người tối đa:</span>
                         <span className="font-medium text-gray-900">
                           {formData.maxParticipants}
                         </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                         <span className="text-gray-600">Thời gian:</span>
                         <span className="font-medium text-gray-900">{formData.timeControl}</span>
                       </div>
@@ -518,7 +532,7 @@ export default function CreateTournamentPage() {
                   <div className="bg-gray-50 rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 mb-3">Lịch trình</h3>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                         <span className="text-gray-600">Bắt đầu:</span>
                         <span className="font-medium text-gray-900">
                           {new Date(`${formData.startDate}T${formData.startTime}`).toLocaleString(
@@ -526,7 +540,7 @@ export default function CreateTournamentPage() {
                           )}
                         </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                         <span className="text-gray-600">Hạn đăng ký:</span>
                         <span className="font-medium text-gray-900">
                           {new Date(formData.registrationDeadline).toLocaleString('vi-VN')}
@@ -545,7 +559,7 @@ export default function CreateTournamentPage() {
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex gap-3 pt-6 border-t border-gray-100 mt-6">
+            <div className="flex flex-col gap-3 border-t border-gray-100 pt-6 mt-6 sm:flex-row">
               {currentStep > 1 && (
                 <Button variant="outline" onClick={handleBack} fullWidth>
                   <ChevronLeft size={18} />

@@ -18,8 +18,6 @@ const BOT_LEVELS = [
     name: 'Dễ',
     icon: Bot,
     ratingRange: '600-900',
-    depth: 8,
-    timeLimitMs: 600,
     description: 'Phù hợp người mới làm quen',
     bgLight: STATUS_COLORS.win.bg,
     textColor: STATUS_COLORS.win.text,
@@ -30,8 +28,6 @@ const BOT_LEVELS = [
     name: 'Bình thường',
     icon: Zap,
     ratingRange: '1100-1400',
-    depth: 14,
-    timeLimitMs: 1600,
     description: 'Có phản đòn cơ bản, phù hợp luyện tập',
     bgLight: STATUS_COLORS.waiting.bg,
     textColor: STATUS_COLORS.waiting.text,
@@ -42,8 +38,6 @@ const BOT_LEVELS = [
     name: 'Khó',
     icon: Brain,
     ratingRange: '1800-2200',
-    depth: 22,
-    timeLimitMs: 4200,
     description: 'Tính toán sâu và trừng phạt sai lầm rõ rệt',
     bgLight: 'bg-orange-50',
     textColor: 'text-orange-700',
@@ -54,8 +48,6 @@ const BOT_LEVELS = [
     name: 'Siêu cấp khó',
     icon: Skull,
     ratingRange: '3200+',
-    depth: 40,
-    timeLimitMs: 18000,
     description: 'Giới hạn cao nhất, chỉ để thử sức',
     bgLight: STATUS_COLORS.lose.bg,
     textColor: STATUS_COLORS.lose.text,
@@ -105,15 +97,17 @@ export default function BotSelectPage() {
   }
 
   return (
-    <div className={`min-h-screen ${THEME.background.page} py-12 px-4`}>
+    <div className={`min-h-[100dvh] ${THEME.background.page} px-4 py-8 sm:py-12`}>
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-10">
-          <div className="text-6xl mb-4">🤖</div>
-          <h1 className={`text-4xl font-bold ${THEME.text.primary} mb-3`}>Chơi Với Bot</h1>
+        <div className="text-center mb-8 sm:mb-10">
+          <div className="text-5xl sm:text-6xl mb-4">🤖</div>
+          <h1 className={`text-3xl sm:text-4xl font-bold ${THEME.text.primary} mb-3`}>
+            Chơi Với Bot
+          </h1>
           <p className={THEME.text.secondary}>GameMode: HumanVsBot — Không tính ELO</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-8">
           {BOT_LEVELS.map((lvl) => {
             const isSelected = selectedLevel === lvl.level
             const Icon = lvl.icon
@@ -121,7 +115,7 @@ export default function BotSelectPage() {
               <button
                 key={lvl.level}
                 onClick={() => setSelectedLevel(lvl.level)}
-                className={`${THEME.background.card} ${THEME.rounded.lg} border-2 p-6 text-left transition-all ${THEME.shadow.sm} ${
+                className={`${THEME.background.card} ${THEME.rounded.lg} border-2 p-4 sm:p-6 text-left transition-all ${THEME.shadow.sm} ${
                   isSelected
                     ? `${lvl.borderColor} ${lvl.bgLight}`
                     : `${THEME.border.DEFAULT} ${THEME.background.hover}`
@@ -143,11 +137,8 @@ export default function BotSelectPage() {
                 </div>
                 <h3 className={`text-xl font-bold ${THEME.text.primary} mb-1`}>{lvl.name}</h3>
                 <p className={`text-sm ${THEME.text.secondary} mb-3`}>{lvl.description}</p>
-                <div className={`text-xs ${THEME.text.muted} space-y-1`}>
+                <div className={`text-xs ${THEME.text.muted}`}>
                   <div>ELO: {lvl.ratingRange}</div>
-                  <div>
-                    Depth: {lvl.depth} | Time: {lvl.timeLimitMs}ms
-                  </div>
                 </div>
               </button>
             )

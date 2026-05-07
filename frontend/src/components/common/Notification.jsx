@@ -182,7 +182,7 @@ export const NotificationProvider = ({ children, position = 'top-right' }) => {
       
       {/* Toast Container */}
       <div 
-        className={`fixed ${positionClasses[position]} z-50 w-full max-w-sm`}
+        className={`fixed ${positionClasses[position]} z-50 w-[calc(100%-1.5rem)] max-w-sm sm:w-full`}
         aria-live="polite"
         aria-atomic="true"
       >

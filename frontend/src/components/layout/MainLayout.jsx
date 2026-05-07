@@ -33,7 +33,7 @@ const MainLayout = ({ children, hideSidebar = false, hideFooter = false }) => {
   }, [location.pathname, setSidebarOpen])
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#e1edff]">
+    <div className="flex h-[100dvh] min-h-screen flex-col overflow-hidden bg-[#e1edff]">
       {/* Header cố định trên cùng */}
       <Header />
 
