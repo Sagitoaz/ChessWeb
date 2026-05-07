@@ -35,6 +35,21 @@ export default function TournamentBracketPage() {
   }, [tournamentId])
 
   const MatchCard = ({ match }) => {
+    const openMatchDetail = (event) => {
+      event?.stopPropagation?.()
+      const gameId = String(match?.gameId || '').trim()
+      const status = String(match?.status || '').toLowerCase()
+      if (gameId && status === 'completed') {
+        navigate(`/replays/${gameId}`)
+        return
+      }
+      if (gameId) {
+        navigate(`/tournaments/${tournamentId}/matches/${gameId}/play`)
+        return
+      }
+      navigate(`/tournaments/${tournamentId}`, { state: { activeTab: 'matches' } })
+    }
+
     const getStatusColor = (status) => {
       const colors = {
         completed: 'border-green-300 bg-green-50',
@@ -73,7 +88,7 @@ export default function TournamentBracketPage() {
         className={`border-2 rounded-lg transition-all ${getStatusColor(match.status)} ${
           match.status !== 'pending' ? 'hover:shadow-md cursor-pointer' : 'opacity-70'
         }`}
-        onClick={() => navigate(`/tournaments/${tournamentId}`)}
+        onClick={openMatchDetail}
       >
         <div className="p-3">
           <div className="flex items-center justify-between mb-2">
@@ -142,7 +157,7 @@ export default function TournamentBracketPage() {
                 size="sm"
                 fullWidth
                 className="text-xs"
-                onClick={() => navigate(`/tournaments/${tournamentId}`)}
+                onClick={openMatchDetail}
               >
                 <Eye size={12} />
                 Xem chi tiết

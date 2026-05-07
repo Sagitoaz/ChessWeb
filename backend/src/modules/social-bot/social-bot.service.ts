@@ -2790,6 +2790,7 @@ export class SocialBotService {
     userId: string,
     tournamentId: string,
     matchIdOrGameId: string,
+    payload?: { moves?: Array<Record<string, unknown>> },
   ) {
     const tournament = await this.repo.findTournamentById(tournamentId);
     if (!tournament) {
@@ -2835,6 +2836,7 @@ export class SocialBotService {
 
     const gameId = String(match?.gameId || "");
     if (ObjectId.isValid(gameId)) {
+      const moves = Array.isArray(payload?.moves) ? payload.moves : undefined;
       await this.repo.updateGameIfNotSaved(gameId, {
         state: "Saved",
         status: "finished",
@@ -2843,6 +2845,7 @@ export class SocialBotService {
             ? "white_win"
             : "black_win",
         endReason: "resignation",
+        ...(moves ? { moves, totalMoves: moves.length } : {}),
         finishedAt: new Date(),
         updatedAt: new Date(),
       });

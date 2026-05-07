@@ -148,7 +148,12 @@ export default function TournamentDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const authUser = useAuthStore((state) => state.user)
-  const [activeTab, setActiveTab] = useState('overview')
+  const initialTab = ['overview', 'participants', 'matches', 'standings', 'bracket'].includes(
+    location.state?.activeTab
+  )
+    ? location.state.activeTab
+    : 'overview'
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [loading, setLoading] = useState(true)
   const [tournament, setTournament] = useState(null)
   const [isRegistered, setIsRegistered] = useState(false)
@@ -311,6 +316,16 @@ export default function TournamentDetailPage() {
       retries: location.state?.justCreatedTournament ? 4 : 1,
     })
   }, [loadTournament, location.state?.justCreatedTournament])
+
+  useEffect(() => {
+    if (
+      ['overview', 'participants', 'matches', 'standings', 'bracket'].includes(
+        location.state?.activeTab
+      )
+    ) {
+      setActiveTab(location.state.activeTab)
+    }
+  }, [location.state?.activeTab])
 
   useEffect(() => {
     setParticipantsPage(1)

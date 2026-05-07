@@ -861,6 +861,11 @@ export class RankedGateway
       ...move,
       clocks: this.buildClockSnapshot(clock),
     };
+    await this.competitionService.recordLiveGameMove(
+      matchId,
+      authoritativeMove,
+      user.userId,
+    );
 
     this.server
       .to(`match:${matchId}`)

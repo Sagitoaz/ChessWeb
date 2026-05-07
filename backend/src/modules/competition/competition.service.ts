@@ -687,6 +687,56 @@ export class CompetitionService {
     );
   }
 
+  async recordLiveGameMove(
+    gameId: string,
+    move: Record<string, unknown>,
+    byUserId: string,
+  ): Promise<void> {
+    if (!ObjectId.isValid(gameId) || !move?.from || !move?.to) return;
+
+    const objectId = new ObjectId(gameId);
+    const now = new Date();
+    const game = await this.gamesCollection().findOne(
+      { _id: objectId },
+      { projection: { moves: 1, status: 1, state: 1, result: 1 } },
+    );
+    if (!game || game.result || String(game.status || "").toLowerCase() === "finished") {
+      return;
+    }
+
+    const previousMoves = Array.isArray(game.moves)
+      ? (game.moves as Array<Record<string, unknown>>)
+      : [];
+    const ply = previousMoves.length + 1;
+    const normalizedMove = {
+      ...move,
+      ply,
+      byUserId,
+      uci:
+        typeof move.uci === "string" && move.uci.trim().length > 0
+          ? move.uci.trim()
+          : `${String(move.from)}${String(move.to)}${String(move.promotion || "")}`,
+      timestamp:
+        typeof move.timestamp === "string" && move.timestamp.trim().length > 0
+          ? move.timestamp
+          : now.toISOString(),
+    };
+    const moves = [...previousMoves, normalizedMove];
+
+    await this.gamesCollection().updateOne(
+      { _id: objectId },
+      {
+        $set: {
+          moves,
+          totalMoves: moves.length,
+          "metadata.totalMoves": moves.length,
+          updatedAt: now,
+        },
+      },
+    );
+    await this.replaceGameMoves(gameId, moves, now);
+  }
+
   private isColorCompatible(a: PreferredColor, b: PreferredColor): boolean {
     if (a === PreferredColor.RANDOM || b === PreferredColor.RANDOM) return true;
     return a !== b;

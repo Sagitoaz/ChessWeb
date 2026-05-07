@@ -201,12 +201,14 @@ export class SocialBotController {
     @Req() req: AuthRequest,
     @Param("id") id: string,
     @Param("matchId") matchId: string,
+    @Body() body: { moves?: Array<Record<string, unknown>> },
     @Headers("x-request-id") requestId?: string,
   ): Promise<ApiResponse<unknown>> {
     const data = await this.service.resignTournamentMatch(
       this.getUserId(req),
       id,
       matchId,
+      body,
     );
     return successResponse(data, requestId || null);
   }

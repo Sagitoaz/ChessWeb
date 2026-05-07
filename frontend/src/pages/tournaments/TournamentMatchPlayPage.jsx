@@ -13,8 +13,17 @@ import { getUserDisplayName } from '@/utils/userDisplay'
 import { DEFAULT_INITIAL_FEN, getGameMoves, getGamePlayerId, getInitialFen } from '@/utils/gameShape'
 
 const INITIAL_FEN = DEFAULT_INITIAL_FEN
+const DEFAULT_CLOCK_MS = 10 * 60 * 1000
 
 const normalizeTurnLabel = (turn) => (turn === 'w' ? 'Trắng' : 'Đen')
+
+const formatClock = (ms) => {
+  const safeMs = Math.max(0, Number.isFinite(Number(ms)) ? Number(ms) : DEFAULT_CLOCK_MS)
+  const totalSeconds = Math.ceil(safeMs / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
 
 const normalizeResultLabel = (raw) => {
   const value = String(raw || 'draw').toLowerCase()
@@ -87,9 +96,12 @@ export default function TournamentMatchPlayPage() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [pendingLeavePath, setPendingLeavePath] = useState(null)
   const [submittingLeave, setSubmittingLeave] = useState(false)
+  const [whiteTimeMs, setWhiteTimeMs] = useState(DEFAULT_CLOCK_MS)
+  const [blackTimeMs, setBlackTimeMs] = useState(DEFAULT_CLOCK_MS)
 
   const chessRef = useRef(new Chess(INITIAL_FEN))
   const isLoadingGameRef = useRef(false)
+  const autoReturnTimerRef = useRef(null)
 
   const currentUserId = normalizeId(
     authUser?.id || authUser?.userId || authUser?._id || authUser?.sub || null
@@ -112,6 +124,7 @@ export default function TournamentMatchPlayPage() {
     onMoveUpdate,
     onGameEnd,
     onGameStatus,
+    onTimeUpdate,
     off,
   } = useGameSocket(gameId)
 
@@ -239,6 +252,13 @@ export default function TournamentMatchPlayPage() {
       const move = payload?.move
       if (!move?.from || !move?.to) return
 
+      if (Number.isFinite(Number(move?.clocks?.whiteTimeMs))) {
+        setWhiteTimeMs(Math.max(0, Number(move.clocks.whiteTimeMs)))
+      }
+      if (Number.isFinite(Number(move?.clocks?.blackTimeMs))) {
+        setBlackTimeMs(Math.max(0, Number(move.clocks.blackTimeMs)))
+      }
+
       const applied = chessRef.current.move({
         from: move.from,
         to: move.to,
@@ -278,6 +298,19 @@ export default function TournamentMatchPlayPage() {
       void loadGame()
     }
 
+    const handleTimeUpdate = (payload) => {
+      if (String(payload?.matchId || '') !== String(gameId || '')) return
+      const clocks = payload?.clocks || {}
+      const nextWhite = Number(clocks?.whiteTimeMs)
+      const nextBlack = Number(clocks?.blackTimeMs)
+      if (Number.isFinite(nextWhite)) {
+        setWhiteTimeMs(Math.max(0, nextWhite))
+      }
+      if (Number.isFinite(nextBlack)) {
+        setBlackTimeMs(Math.max(0, nextBlack))
+      }
+    }
+
     const handleGameStatus = (payload) => {
       if (String(payload?.matchId || '') !== String(gameId || '')) return
       if (typeof payload?.status === 'string') {
@@ -293,14 +326,26 @@ export default function TournamentMatchPlayPage() {
 
     onMoveUpdate(handleMoveUpdate)
     onGameEnd(handleGameEnd)
+    onTimeUpdate(handleTimeUpdate)
     onGameStatus(handleGameStatus)
 
     return () => {
       off('game:moveUpdate', handleMoveUpdate)
       off('game:end', handleGameEnd)
+      off('game:timeUpdate', handleTimeUpdate)
       off('game:status', handleGameStatus)
     }
-  }, [currentUserId, gameId, loadGame, off, onGameEnd, onGameStatus, onMoveUpdate, showNotification])
+  }, [
+    currentUserId,
+    gameId,
+    loadGame,
+    off,
+    onGameEnd,
+    onGameStatus,
+    onMoveUpdate,
+    onTimeUpdate,
+    showNotification,
+  ])
 
   const handleMove = useCallback(
     (move) => {
@@ -308,13 +353,21 @@ export default function TournamentMatchPlayPage() {
       setMoveHistory(chessRef.current.history({ verbose: true }))
       setLastMove({ from: move.from, to: move.to })
       sendMove({
+        ply: moveHistory.length + 1,
         from: move.from,
         to: move.to,
+        piece: move.piece,
+        color: move.color === 'w' ? 'White' : move.color === 'b' ? 'Black' : move.color,
+        captured: move.captured,
         promotion: move.promotion,
         san: move.san,
+        uci: `${move.from}${move.to}${move.promotion || ''}`,
+        isCheck: chessRef.current.inCheck(),
+        isCheckmate: chessRef.current.isCheckmate(),
+        timestamp: new Date().toISOString(),
       })
     },
-    [sendMove]
+    [moveHistory.length, sendMove]
   )
 
   const matchStarted = matchStatus === 'ongoing' && gameStatus === 'active'
@@ -331,6 +384,43 @@ export default function TournamentMatchPlayPage() {
     matchStarted &&
     Boolean(gameId) &&
     Boolean(whitePlayerId && blackPlayerId)
+
+  const buildReplayMoves = useCallback(() => {
+    return chessRef.current.history({ verbose: true }).map((move, index) => ({
+      ply: index + 1,
+      from: move.from,
+      to: move.to,
+      piece: move.piece,
+      captured: move.captured,
+      promotion: move.promotion,
+      san: move.san,
+      uci: `${move.from}${move.to}${move.promotion || ''}`,
+      color: move.color === 'w' ? 'White' : 'Black',
+      isCheck: move.san?.includes('+') || move.san?.includes('#') || false,
+      isCheckmate: move.san?.includes('#') || false,
+      timestamp: new Date().toISOString(),
+    }))
+  }, [])
+
+  useEffect(() => {
+    if (!resultText || !isParticipant || !tournamentId) return undefined
+    if (autoReturnTimerRef.current) {
+      clearTimeout(autoReturnTimerRef.current)
+    }
+    autoReturnTimerRef.current = window.setTimeout(() => {
+      navigate(`/tournaments/${tournamentId}`, {
+        replace: true,
+        state: { activeTab: 'matches' },
+      })
+    }, 2500)
+
+    return () => {
+      if (autoReturnTimerRef.current) {
+        clearTimeout(autoReturnTimerRef.current)
+        autoReturnTimerRef.current = null
+      }
+    }
+  }, [isParticipant, navigate, resultText, tournamentId])
 
   const handleCheckIn = useCallback(async () => {
     if (!tournamentId || !matchIdInBracket || !isParticipant || amReady || submittingReady) return
@@ -392,9 +482,11 @@ export default function TournamentMatchPlayPage() {
     try {
       if (isInLiveMatch && tournamentId && gameId) {
         const targetMatchId = matchIdInBracket || gameId
-        await gameService.resignTournamentMatch(tournamentId, targetMatchId)
+        await gameService.resignTournamentMatch(tournamentId, targetMatchId, {
+          moves: buildReplayMoves(),
+        })
         if (isSocketConnected) {
-          resign()
+          resign({ moves: buildReplayMoves() })
         }
         showNotification({
           type: 'info',
@@ -421,6 +513,7 @@ export default function TournamentMatchPlayPage() {
     }
   }, [
     gameId,
+    buildReplayMoves,
     isInLiveMatch,
     isSocketConnected,
     matchIdInBracket,
@@ -488,7 +581,9 @@ export default function TournamentMatchPlayPage() {
 
     try {
       const targetMatchId = matchIdInBracket || gameId
-      const response = await gameService.resignTournamentMatch(tournamentId, targetMatchId)
+      const response = await gameService.resignTournamentMatch(tournamentId, targetMatchId, {
+        moves: buildReplayMoves(),
+      })
       const payload = response?.data ?? response
 
       setResultText(normalizeResultLabel(payload?.result))
@@ -500,7 +595,7 @@ export default function TournamentMatchPlayPage() {
       setParticipantStatus('eliminated')
 
       if (isSocketConnected) {
-        resign()
+        resign({ moves: buildReplayMoves() })
       }
 
       void loadGame()
@@ -520,6 +615,7 @@ export default function TournamentMatchPlayPage() {
     }
   }, [
     gameId,
+    buildReplayMoves,
     isFinished,
     isSocketConnected,
     loadGame,
@@ -647,7 +743,7 @@ export default function TournamentMatchPlayPage() {
 
       {resultText && (
         <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
-          Kết thúc trận: {resultText}
+          Kết thúc trận: {resultText}. Bạn sẽ được đưa về trang giải đấu sau vài giây.
         </div>
       )}
 
@@ -696,6 +792,9 @@ export default function TournamentMatchPlayPage() {
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500">Trắng</p>
                   <p className="font-semibold text-gray-900 leading-tight">{whiteName}</p>
+                  <p className="mt-1 font-mono text-sm font-bold text-gray-700">
+                    {formatClock(whiteTimeMs)}
+                  </p>
                 </div>
               </div>
               {!isSpectator && playerColor === 'white' && (
@@ -709,6 +808,9 @@ export default function TournamentMatchPlayPage() {
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500">Đen</p>
                   <p className="font-semibold text-gray-900 leading-tight">{blackName}</p>
+                  <p className="mt-1 font-mono text-sm font-bold text-gray-700">
+                    {formatClock(blackTimeMs)}
+                  </p>
                 </div>
               </div>
               {!isSpectator && playerColor === 'black' && (
