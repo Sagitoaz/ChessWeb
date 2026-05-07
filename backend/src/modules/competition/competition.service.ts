@@ -259,6 +259,11 @@ export class CompetitionService {
     };
   }
 
+  async getActiveRankedMatchIdForUser(userId: string): Promise<string | null> {
+    const activeMatch = await this.getActiveRankedMatchForUser(userId);
+    return activeMatch?.matchId || null;
+  }
+
   private initializeQueueIndexes(): void {
     void this.ensureQueueIndexes().catch((error) => {
       this.logger.warn(
@@ -827,6 +832,7 @@ export class CompetitionService {
 
   private async getWaitingQueueEntries(
     timeControl?: RankedTimeControl,
+    onlineUserIds?: Set<string>,
   ): Promise<WaitingQueueEntry[]> {
     const match: Record<string, unknown> = { status: "waiting" };
     if (timeControl) {
@@ -838,32 +844,32 @@ export class CompetitionService {
       .sort({ joinedAt: 1, _id: 1 })
       .toArray()) as WaitingQueueEntry[];
 
-    if (!Array.isArray(entries) || entries.length < 2) {
-      return entries;
-    }
-
     const seenUsers = new Set<string>();
     const uniqueEntries: WaitingQueueEntry[] = [];
-    const duplicateIds: ObjectId[] = [];
+    const cancelledIds: ObjectId[] = [];
     for (const entry of entries) {
       if (seenUsers.has(entry.userId)) {
-        duplicateIds.push(entry._id);
+        cancelledIds.push(entry._id);
+        continue;
+      }
+      if (onlineUserIds && !onlineUserIds.has(entry.userId)) {
+        cancelledIds.push(entry._id);
         continue;
       }
       seenUsers.add(entry.userId);
       uniqueEntries.push(entry);
     }
 
-    if (duplicateIds.length > 0) {
+    if (cancelledIds.length > 0) {
       const now = new Date();
       await this.queueCollection().updateMany(
-        { _id: { $in: duplicateIds }, status: "waiting" },
+        { _id: { $in: cancelledIds }, status: "waiting" },
         {
           $set: {
             status: "cancelled",
             cancelledAt: now,
             updatedAt: now,
-            cancelReason: "duplicate_waiting_entry",
+            cancelReason: "stale_or_duplicate_waiting_entry",
           },
         },
       );
@@ -2196,8 +2202,12 @@ export class CompetitionService {
 
   async tryMatchNextPair(
     timeControl?: RankedTimeControl,
+    onlineUserIds?: Set<string>,
   ): Promise<RankedMatchResult | null> {
-    const waitingEntries = await this.getWaitingQueueEntries(timeControl);
+    const waitingEntries = await this.getWaitingQueueEntries(
+      timeControl,
+      onlineUserIds,
+    );
     if (waitingEntries.length < 2) return null;
 
     const ratingCache = new Map<string, number | null>();

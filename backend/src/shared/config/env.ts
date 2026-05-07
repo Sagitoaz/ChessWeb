@@ -57,6 +57,10 @@ export const env = {
     (process.env.AUTH_REFRESH_COOKIE_SECURE ||
       (process.env.NODE_ENV === "production" ? "true" : "false")
     ).toLowerCase() === "true",
+  authRefreshCookiePartitioned:
+    (process.env.AUTH_REFRESH_COOKIE_PARTITIONED ||
+      (process.env.NODE_ENV === "production" ? "true" : "false")
+    ).toLowerCase() === "true",
   authRefreshCookieSameSite: normalizeSameSite(
     process.env.AUTH_REFRESH_COOKIE_SAMESITE ||
       (process.env.NODE_ENV === "production" ? "none" : "lax"),

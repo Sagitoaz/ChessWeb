@@ -118,6 +118,27 @@ const normalizeId = (value) => {
   return String(value)
 }
 
+const buildChessJsMove = (game, move) => {
+  const nextMove = {
+    from: move.from,
+    to: move.to,
+  }
+
+  const fromPiece = game.get(move.from)
+  const isPromotionRank =
+    typeof move.to === 'string' &&
+    move.to.length === 2 &&
+    fromPiece?.type === 'p' &&
+    ((fromPiece.color === 'w' && move.to[1] === '8') ||
+      (fromPiece.color === 'b' && move.to[1] === '1'))
+
+  if (isPromotionRank && move.promotion) {
+    nextMove.promotion = move.promotion
+  }
+
+  return nextMove
+}
+
 // ─────────────────────────────────────────────────────
 // FALLBACK DATA
 // ─────────────────────────────────────────────────────
@@ -919,14 +940,23 @@ const RankedGamePage = () => {
     if (!gameSocket) return
 
     const handleMoveUpdate = (payload) => {
+      if (payload?.matchId && String(payload.matchId) !== String(matchId)) return
+      if (normalizeId(payload?.byUserId) === currentUserId) return
+
       const move = payload?.move
       if (!move?.from || !move?.to) return
 
-      const result = gameRef.current.move({
-        from: move.from,
-        to: move.to,
-        promotion: move.promotion || 'q',
-      })
+      const history = gameRef.current.history({ verbose: true })
+      const lastMoveInHistory = history[history.length - 1]
+      if (
+        lastMoveInHistory?.from === move.from &&
+        lastMoveInHistory?.to === move.to &&
+        (lastMoveInHistory?.promotion || '') === (move.promotion || '')
+      ) {
+        return
+      }
+
+      const result = gameRef.current.move(buildChessJsMove(gameRef.current, move))
 
       if (!result) return
 
@@ -1056,6 +1086,7 @@ const RankedGamePage = () => {
     }
   }, [
     gameSocket,
+    matchId,
     checkGameEnd,
     playSound,
     playerColor,

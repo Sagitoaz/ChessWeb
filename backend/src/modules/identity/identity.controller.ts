@@ -95,6 +95,10 @@ export class IdentityController {
       base.domain = env.authRefreshCookieDomain
     }
 
+    if (env.authRefreshCookiePartitioned && env.authRefreshCookieSecure) {
+      base.partitioned = true
+    }
+
     if (remember) {
       base.maxAge = env.authRefreshCookieMaxAgeMs
     }

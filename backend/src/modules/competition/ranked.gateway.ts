@@ -613,7 +613,6 @@ export class RankedGateway
         this.socketsByUser.get(user.userId) || new Set<string>();
       socketSet.add(client.id);
       this.socketsByUser.set(user.userId, socketSet);
-      this.clearPendingDisconnectsForUser(user.userId);
 
       const waitingCount = await this.competitionService.getWaitingQueueCount();
       this.server.emit("ranked:queueUpdate", { playersInQueue: waitingCount });
@@ -640,12 +639,24 @@ export class RankedGateway
 
     socketSet.delete(client.id);
     const userStillConnected = socketSet.size > 0;
+    const userStillConnectedToMatch = activeMatchId
+      ? Array.from(socketSet).some(
+          (socketId) => this.matchBySocketId.get(socketId) === activeMatchId,
+        )
+      : false;
     if (socketSet.size === 0) {
       this.socketsByUser.delete(user.userId);
     }
 
-    if (!userStillConnected && activeMatchId) {
+    if (activeMatchId && !userStillConnectedToMatch) {
       this.scheduleDisconnectForfeit(activeMatchId, user);
+    } else if (!userStillConnected) {
+      await this.competitionService.cancelWaitingQueueEntry(user.userId);
+      const pendingMatchId =
+        await this.competitionService.getActiveRankedMatchIdForUser(user.userId);
+      if (pendingMatchId) {
+        this.scheduleDisconnectForfeit(pendingMatchId, user);
+      }
     }
 
     const waitingCount = await this.competitionService.getWaitingQueueCount();
@@ -721,11 +732,18 @@ export class RankedGateway
     this.isMatchmakingCycleRunning = true;
     try {
       let created = 0;
-      let match = await this.competitionService.tryMatchNextPair(timeControl);
+      const onlineUserIds = new Set(this.socketsByUser.keys());
+      let match = await this.competitionService.tryMatchNextPair(
+        timeControl,
+        onlineUserIds,
+      );
       while (match) {
         created += 1;
         this.emitMatchFound(match);
-        match = await this.competitionService.tryMatchNextPair(timeControl);
+        match = await this.competitionService.tryMatchNextPair(
+          timeControl,
+          onlineUserIds,
+        );
       }
 
       const waitingCount =
@@ -770,6 +788,7 @@ export class RankedGateway
 
     client.join(`match:${matchId}`);
     this.matchBySocketId.set(client.id, matchId);
+    this.clearPendingDisconnectsForUser(user.userId);
     const clock = await this.ensureGameClock(matchId);
     this.emitGameClockToSocket(client.id, clock);
   }
