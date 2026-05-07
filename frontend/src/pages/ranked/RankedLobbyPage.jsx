@@ -65,7 +65,7 @@ const QUEUE_PREFERRED_COLORS = [
 // ═══════════════════════════════════════════════════════════
 // COMPONENT: SearchingOverlay
 // ═══════════════════════════════════════════════════════════
-const SearchingOverlay = ({ status, searchTime, queueCount, onCancel, matchData }) => {
+const SearchingOverlay = ({ status, searchTime, onCancel, matchData }) => {
   const statusConfig = {
     [QUEUE_STATUS.SEARCHING]: {
       title: 'Searching for opponent...',
@@ -121,16 +121,6 @@ const SearchingOverlay = ({ status, searchTime, queueCount, onCancel, matchData 
           </div>
         )}
 
-        {/* Queue Stats */}
-        {config.showTimer && queueCount > 0 && (
-          <div
-            className={`flex items-center justify-center gap-2 mb-6 text-sm ${THEME.text.secondary}`}
-          >
-            <Users className="w-4 h-4" />
-            <span>~{queueCount} players in queue</span>
-          </div>
-        )}
-
         {/* Pulsating dots animation */}
         {status === QUEUE_STATUS.SEARCHING && (
           <div className="flex justify-center gap-1.5 mb-6">
@@ -172,6 +162,7 @@ const RecentGameCard = ({ game }) => {
       label: 'WIN',
     },
     lose: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', label: 'LOSS' },
+    loss: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', label: 'LOSS' },
     draw: {
       bg: 'bg-yellow-500/10',
       border: 'border-yellow-500/30',
@@ -261,7 +252,6 @@ const RankedLobbyPage = () => {
   // ──── Queue & Match State ────
   const [queueStatus, setQueueStatus] = useState(QUEUE_STATUS.IDLE)
   const [searchTime, setSearchTime] = useState(0)
-  const [queueCount, setQueueCount] = useState(0)
   const [matchData, setMatchData] = useState(null)
   const [recentGames, setRecentGames] = useState([])
   const [loading, setLoading] = useState(true)
@@ -277,6 +267,7 @@ const RankedLobbyPage = () => {
   }, [])
 
   // ──── WebSocket Hook ────
+
   const {
     isConnected,
     connect,
@@ -286,6 +277,7 @@ const RankedLobbyPage = () => {
     onQueueUpdate,
     onRankedError,
   } = useRankedSocket()
+
 
   // ──── Load Recent Games ────
   useEffect(() => {
@@ -332,13 +324,6 @@ const RankedLobbyPage = () => {
       matchTransitionTimersRef.current = [connectingTimer, redirectTimer]
     }
 
-    const handleQueueUpdate = (data) => {
-      // data: { playersInQueue }
-      if (typeof data?.playersInQueue === 'number') {
-        setQueueCount(data.playersInQueue)
-      }
-    }
-
     const handleRankedError = (payload) => {
       const code = String(payload?.code || '')
       const message = String(payload?.message || 'Không thể tham gia hàng chờ đấu hạng.')
@@ -357,13 +342,16 @@ const RankedLobbyPage = () => {
     }
 
     onMatchFound(handleMatchFound)
-    onQueueUpdate(handleQueueUpdate)
     onRankedError(handleRankedError)
+<<<<<<< HEAD
 
     return () => {
       clearMatchTransitionTimers()
     }
   }, [navigate, onMatchFound, onQueueUpdate, onRankedError, showNotification])
+=======
+  }, [navigate, onMatchFound, onRankedError, showNotification])
+>>>>>>> 673bd22 (fix)
 
   // ──── Search Timer ────
   useEffect(() => {
@@ -407,7 +395,6 @@ const RankedLobbyPage = () => {
     setQueueStatus(QUEUE_STATUS.IDLE)
     setSearchTime(0)
     setMatchData(null)
-    setQueueCount(0)
 
     leaveQueue()
   }, [clearMatchTransitionTimers, leaveQueue])
@@ -820,7 +807,6 @@ const RankedLobbyPage = () => {
         <SearchingOverlay
           status={queueStatus}
           searchTime={searchTime}
-          queueCount={queueCount}
           onCancel={handleCancelSearch}
           matchData={matchData}
         />

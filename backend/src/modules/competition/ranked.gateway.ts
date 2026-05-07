@@ -635,13 +635,12 @@ export class RankedGateway
     if (!socketSet) return;
 
     socketSet.delete(client.id);
-    const userStillConnected = socketSet.size > 0;
     if (socketSet.size === 0) {
       this.socketsByUser.delete(user.userId);
     }
 
-    if (!userStillConnected && activeMatchId) {
-      this.scheduleDisconnectForfeit(activeMatchId, user);
+    if (activeMatchId) {
+      await this.completeGameByDisconnectForfeit(activeMatchId, user);
     }
 
     const waitingCount = await this.competitionService.getWaitingQueueCount();
