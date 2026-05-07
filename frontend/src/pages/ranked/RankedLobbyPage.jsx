@@ -342,11 +342,25 @@ const RankedLobbyPage = () => {
     const handleRankedError = (payload) => {
       const code = String(payload?.code || '')
       const message = String(payload?.message || 'Không thể tham gia hàng chờ đấu hạng.')
+      const activeMatchId = String(payload?.matchId || '').trim()
 
       if (code === 'ALREADY_IN_MATCH' || code === 'MATCHING_IN_PROGRESS') {
         setQueueStatus(QUEUE_STATUS.IDLE)
         setSearchTime(0)
         setMatchData(null)
+      }
+
+      if (code === 'ALREADY_IN_MATCH' && activeMatchId) {
+        showNotification({
+          type: 'warning',
+          title: 'Bạn đang có trận rank',
+          message: 'Đang đưa bạn quay lại trận đang diễn ra.',
+        })
+        navigate(`/ranked/game/${activeMatchId}`, {
+          replace: true,
+          state: { matchData: { matchId: activeMatchId, resumed: true } },
+        })
+        return
       }
 
       showNotification({
